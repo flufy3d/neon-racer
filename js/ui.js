@@ -31,8 +31,8 @@ export function floatLabel(text, worldPos, color = '#00ffff', size = 20) {
   const el = document.createElement('div');
   el.className = 'float-label';
   el.textContent = text;
-  el.style.left = ((v.x * 0.5 + 0.5) * innerWidth) + 'px';
-  el.style.top = ((-v.y * 0.5 + 0.5) * innerHeight) + 'px';
+  el.style.left = ((tmpV.x * 0.5 + 0.5) * innerWidth) + 'px';
+  el.style.top = ((-tmpV.y * 0.5 + 0.5) * innerHeight) + 'px';
   el.style.color = color;
   el.style.textShadow = `0 0 10px ${color}`;
   el.style.fontSize = size + 'px';
