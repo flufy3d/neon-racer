@@ -123,7 +123,7 @@
   <p class="sub">
     <b>← →</b> / <b>A D</b> 左右移动（按住连续滑动） &nbsp;&nbsp; <b>↑</b> / <b>空格</b> 跳跃<br>
     收集 <b style="color:#0ff">能量球</b> · 避开障碍 · 速度会越来越快<br>
-    手机/平板：拖动指哪飞哪 · 手指快速上甩即跳跃（无需抬手，不松手也能跳）
+    手机/平板：按住左/右半屏移动 · 轻点微调 · 两指同按急停 · 任意手指上甩跳跃
   </p>
   <button id="startBtn">开 始</button>
 </div>
@@ -627,7 +627,7 @@ function resetGame() {
   beatTimer = 0; beatGlow = 0; timeScale = 1; lastSpeedMark = 26; camRoll = 0;
   shieldReady = false; invuln = 0; orbCountAtShieldEvent = 0;
   maxCombo = 0;
-  touchTargetX = null; prevShipX = 0;
+  latVel = 0; activePointers.clear();
   for (const s of shockwaves) scene.remove(s.m);
   shockwaves = [];
   vig.style.opacity = 0;
@@ -729,32 +729,23 @@ addEventListener('keyup', e => {
   else if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
 });
 
-let touchTargetX = null, prevShipX = 0;
-let steerId = null, flickBaseY = 0;
-function screenToTrack(clientX) {
-  return Math.max(-TRACK_HALF, Math.min(TRACK_HALF, ((clientX / innerWidth) - 0.5) * 2.3 * TRACK_HALF));
-}
+let latVel = 0;
+const activePointers = new Map();
 addEventListener('pointerdown', e => {
-  if (e.pointerType !== 'touch') return;
-  if (steerId !== null || e.target.closest('button')) return;
+  if (e.pointerType !== 'touch' || e.target.closest('button')) return;
   if (state !== 'playing' || paused) return;
-  steerId = e.pointerId;
-  flickBaseY = e.clientY;
-  touchTargetX = screenToTrack(e.clientX);
+  activePointers.set(e.pointerId, { x: e.clientX, baseY: e.clientY });
 });
 addEventListener('pointermove', e => {
-  if (e.pointerId !== steerId || paused) return;
-  touchTargetX = screenToTrack(e.clientX);
-  if (e.clientY > flickBaseY) {
-    flickBaseY = e.clientY;
-  } else if (flickBaseY - e.clientY >= 60) {
-    jump();
-    flickBaseY = e.clientY;
-  }
+  const p = activePointers.get(e.pointerId);
+  if (!p) return;
+  p.x = e.clientX;
+  if (e.clientY > p.baseY) p.baseY = e.clientY;
+  else if (p.baseY - e.clientY >= 55) { jump(); p.baseY = e.clientY; }
 });
-const releaseSteer = e => { if (e.pointerId === steerId) steerId = null; };
-addEventListener('pointerup', releaseSteer);
-addEventListener('pointercancel', releaseSteer);
+const releasePointer = e => activePointers.delete(e.pointerId);
+addEventListener('pointerup', releasePointer);
+addEventListener('pointercancel', releasePointer);
 
 $('startBtn').onclick = startGame;
 $('restartBtn').onclick = startGame;
@@ -830,17 +821,31 @@ function animate() {
       scene.add(p);
     }
 
-    const kbd = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
-    if (kbd !== 0) {
-      const latSpeed = (6 + speed * 0.33) * (1 + tier * 0.08);
-      ship.position.x = Math.max(-TRACK_HALF, Math.min(TRACK_HALF, ship.position.x + kbd * latSpeed * dt));
-      touchTargetX = ship.position.x;
-    } else if (touchTargetX !== null) {
-      ship.position.x += (touchTargetX - ship.position.x) * Math.min(1, dt * 22);
+    let dir = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+    let braking = false;
+    if (activePointers.size) {
+      let s = 0, hasL = false, hasR = false;
+      for (const p of activePointers.values()) {
+        const side = p.x < innerWidth / 2 ? -1 : 1;
+        s += side;
+        if (side < 0) hasL = true; else hasR = true;
+      }
+      if (hasL && hasR) braking = true;
+      dir += s;
     }
-    const vx = dt > 0 ? (ship.position.x - prevShipX) / dt : 0;
-    prevShipX = ship.position.x;
-    const bankTarget = Math.max(-0.5, Math.min(0.5, -vx * 0.0022));
+    dir = Math.max(-1, Math.min(1, dir));
+    const maxV = (5 + speed * 0.27) * (1 + tier * 0.08);
+    if (dir !== 0) {
+      latVel += dir * 150 * dt;
+    } else {
+      const decel = (braking ? 340 : 175) * dt;
+      latVel = Math.abs(latVel) <= decel ? 0 : latVel - Math.sign(latVel) * decel;
+    }
+    latVel = Math.max(-maxV, Math.min(maxV, latVel));
+    const nx = ship.position.x + latVel * dt;
+    if ((nx <= -TRACK_HALF && latVel < 0) || (nx >= TRACK_HALF && latVel > 0)) latVel = 0;
+    ship.position.x = Math.max(-TRACK_HALF, Math.min(TRACK_HALF, nx));
+    const bankTarget = Math.max(-0.45, Math.min(0.45, -latVel * 0.02));
     ship.rotation.z += (bankTarget - ship.rotation.z) * Math.min(1, dt * 10);
 
     if (!grounded) {
@@ -1034,7 +1039,7 @@ function animate() {
 
     camera.position.x = ship.position.x * 0.35;
     camera.lookAt(ship.position.x * 0.5, 1, -12);
-    camRoll += (-vx * 0.0018 - camRoll) * Math.min(1, dt * 8);
+    camRoll += (-latVel * 0.0016 - camRoll) * Math.min(1, dt * 8);
     camera.rotation.z += camRoll;
 
     fovKick *= Math.exp(-dt * 5);
