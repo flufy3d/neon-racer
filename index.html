@@ -6,7 +6,7 @@
 <title>NEON RACER — 霓虹狂飙</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { width: 100%; height: 100%; overflow: hidden; background: #05050f; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; user-select: none; -webkit-user-select: none; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #05050f; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; user-select: none; -webkit-user-select: none; touch-action: none; overscroll-behavior: none; }
   canvas { display: block; }
   #hud { position: fixed; inset: 0; pointer-events: none; color: #fff; z-index: 10; font-variant-numeric: tabular-nums; }
   #topLeft { position: absolute; top: 16px; left: 22px; }
@@ -123,7 +123,7 @@
   <p class="sub">
     <b>← →</b> / <b>A D</b> 左右移动（按住连续滑动） &nbsp;&nbsp; <b>↑</b> / <b>空格</b> 跳跃<br>
     收集 <b style="color:#0ff">能量球</b> · 避开障碍 · 速度会越来越快<br>
-    手机/平板：左右拖动或轻点目标位置控制飞船，上滑跳跃
+    手机/平板：拖动指哪飞哪 · 手指快速上甩即跳跃（无需抬手，不松手也能跳）
   </p>
   <button id="startBtn">开 始</button>
 </div>
@@ -729,30 +729,32 @@ addEventListener('keyup', e => {
   else if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
 });
 
-let touchTargetX = null, touchStartX = 0, touchStartY = null, touchStartTime = 0, prevShipX = 0;
+let touchTargetX = null, prevShipX = 0;
+let steerId = null, flickBaseY = 0;
 function screenToTrack(clientX) {
   return Math.max(-TRACK_HALF, Math.min(TRACK_HALF, ((clientX / innerWidth) - 0.5) * 2.3 * TRACK_HALF));
 }
-addEventListener('touchstart', e => {
-  const t = e.touches[0];
-  touchStartX = t.clientX;
-  touchStartY = t.clientY;
-  touchStartTime = performance.now();
-}, { passive: true });
-addEventListener('touchmove', e => {
-  if (state === 'playing' && !paused) touchTargetX = screenToTrack(e.touches[0].clientX);
-}, { passive: true });
-addEventListener('touchend', e => {
-  if (touchStartY === null) return;
-  const t = e.changedTouches[0];
-  const dy = t.clientY - touchStartY, dx = t.clientX - touchStartX;
-  const held = performance.now() - touchStartTime;
-  if (dy < -50 && Math.abs(dx) < 80) jump();
-  else if (held < 260 && Math.abs(dx) < 30 && Math.abs(dy) < 24 && state === 'playing' && !paused) {
-    touchTargetX = screenToTrack(t.clientX);
+addEventListener('pointerdown', e => {
+  if (e.pointerType !== 'touch') return;
+  if (steerId !== null || e.target.closest('button')) return;
+  if (state !== 'playing' || paused) return;
+  steerId = e.pointerId;
+  flickBaseY = e.clientY;
+  touchTargetX = screenToTrack(e.clientX);
+});
+addEventListener('pointermove', e => {
+  if (e.pointerId !== steerId || paused) return;
+  touchTargetX = screenToTrack(e.clientX);
+  if (e.clientY > flickBaseY) {
+    flickBaseY = e.clientY;
+  } else if (flickBaseY - e.clientY >= 60) {
+    jump();
+    flickBaseY = e.clientY;
   }
-  touchStartY = null;
-}, { passive: true });
+});
+const releaseSteer = e => { if (e.pointerId === steerId) steerId = null; };
+addEventListener('pointerup', releaseSteer);
+addEventListener('pointercancel', releaseSteer);
 
 $('startBtn').onclick = startGame;
 $('restartBtn').onclick = startGame;
@@ -834,7 +836,7 @@ function animate() {
       ship.position.x = Math.max(-TRACK_HALF, Math.min(TRACK_HALF, ship.position.x + kbd * latSpeed * dt));
       touchTargetX = ship.position.x;
     } else if (touchTargetX !== null) {
-      ship.position.x += (touchTargetX - ship.position.x) * Math.min(1, dt * 12);
+      ship.position.x += (touchTargetX - ship.position.x) * Math.min(1, dt * 22);
     }
     const vx = dt > 0 ? (ship.position.x - prevShipX) / dt : 0;
     prevShipX = ship.position.x;
