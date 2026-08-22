@@ -76,3 +76,25 @@ button:hover { background: #0ff22; box-shadow: 0 0 30px #0ff, inset 0 0 25px #0f
   from { transform: translate(-50%, -50%); opacity: 1; }
   to { transform: translate(-50%, calc(-50% - 60px)); opacity: 0; }
 }
+@media (max-width: 640px) {
+  #topLeft { top: 10px; left: 12px; }
+  #score { font-size: 22px; }
+  .miniRow { font-size: 11px; gap: 8px; margin-top: 2px; }
+  #panel { width: 132px; top: 10px; right: 10px; padding: 7px 10px 8px; border-radius: 9px; }
+  .pTitle { font-size: 8px; letter-spacing: 2px; margin: 7px 0 3px; padding-bottom: 2px; }
+  #tierName { font-size: 11px; }
+  .barWrap { height: 4px; margin-top: 5px; }
+  .tiny { font-size: 8.5px; margin-top: 3px; }
+  .ab { font-size: 10px; gap: 5px; padding: 1.5px 0; }
+  .ab i { width: 5px; height: 5px; }
+  .ab b { font-size: 8px; }
+  .drow { font-size: 10px; padding: 1.5px 0; }
+  #comboBox { top: 22%; font-size: clamp(24px, 7vw, 36px); }
+  #comboBar { width: 90px; }
+}
+@media (max-width: 400px) {
+  #panel { width: 108px; padding: 6px 8px 7px; }
+  #score { font-size: 18px; }
+  .miniRow { font-size: 9.5px; }
+  .drow span { display: none; }
+}
