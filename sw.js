@@ -1,4 +1,4 @@
-const CACHE = 'neon-racer-v1';
+const CACHE = 'neon-racer-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -13,6 +13,7 @@ const ASSETS = [
   './vendor/three.module.js',
   './vendor/addons/postprocessing/EffectComposer.js',
   './vendor/addons/postprocessing/RenderPass.js',
+  './vendor/addons/postprocessing/UnrealBloomPass.js',
   './vendor/addons/postprocessing/Pass.js',
   './vendor/addons/postprocessing/ShaderPass.js',
   './vendor/addons/postprocessing/MaskPass.js',
