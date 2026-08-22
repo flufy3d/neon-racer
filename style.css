@@ -1,0 +1,78 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #05050f; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; user-select: none; -webkit-user-select: none; touch-action: none; overscroll-behavior: none; }
+canvas { display: block; }
+#hud { position: fixed; inset: 0; pointer-events: none; color: #fff; z-index: 10; font-variant-numeric: tabular-nums; }
+#topLeft { position: absolute; top: 16px; left: 22px; }
+#score { font-size: 36px; font-weight: 800; letter-spacing: 1px; color: #fff;
+  text-shadow: 0 0 6px #0ff, 0 0 22px rgba(0,255,255,.55); }
+.miniRow { display: flex; gap: 14px; margin-top: 4px; font-size: 13px; color: #8fd8e8;
+  text-shadow: 0 0 8px rgba(0,229,255,.5); letter-spacing: 1px; }
+#panel { position: absolute; top: 14px; right: 16px; width: 216px; padding: 12px 15px 13px;
+  background: linear-gradient(160deg, rgba(10,14,32,.72), rgba(8,10,24,.5));
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(0,255,255,.22); border-radius: 12px;
+  box-shadow: 0 0 30px rgba(0,229,255,.09), inset 0 0 24px rgba(0,229,255,.05); }
+.pTitle { font-size: 10px; letter-spacing: 4px; color: #58b7c9; margin: 11px 0 5px;
+  border-bottom: 1px solid rgba(88,183,201,.18); padding-bottom: 4px; font-weight: 600; }
+.pTitle.first { margin-top: 0; }
+#tierName { font-size: 15px; font-weight: 700; letter-spacing: 1px; color: #0ff; text-shadow: 0 0 10px currentColor; }
+.barWrap { height: 5px; background: rgba(0,255,255,.12); border-radius: 3px; margin-top: 7px; overflow: hidden; }
+#tierBar { height: 100%; width: 0%; border-radius: 3px; transition: width .25s ease-out;
+  background: linear-gradient(90deg, #00c8ff, #00ffc8); box-shadow: 0 0 10px #0ff; }
+.tiny { font-size: 10px; color: #4f8fa0; margin-top: 5px; letter-spacing: 1px; }
+.ab { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 2.5px 0; color: #d8f6ff; letter-spacing: 1px; }
+.ab i { width: 7px; height: 7px; border-radius: 50%; flex: none;
+  background: radial-gradient(circle at 35% 35%, #baffff, #00e5ff); box-shadow: 0 0 8px #00e5ff; }
+.ab.locked { opacity: .26; filter: grayscale(.8); }
+.ab b { margin-left: auto; font-size: 10px; font-weight: 400; color: #7fe3d4; letter-spacing: 0; }
+.ab.ready i { animation: dotPulse 1.2s infinite alternate; }
+@keyframes dotPulse { from { box-shadow: 0 0 4px #00e5ff; } to { box-shadow: 0 0 14px #00e5ff; } }
+.drow { display: flex; justify-content: space-between; font-size: 12.5px; padding: 2.5px 0; color: #8fb6c4; letter-spacing: 1px; }
+.drow b { color: #fff; font-weight: 700; }
+#comboBox { position: absolute; top: 13%; width: 100%; text-align: center; font-weight: bold;
+  font-size: clamp(30px, 5vw, 52px); letter-spacing: 3px; opacity: 0; transition: opacity .3s; }
+#comboBox.pop { animation: pop .22s ease-out; }
+@keyframes pop { 0% { transform: scale(1.55); } 100% { transform: scale(1); } }
+#comboBar { height: 4px; width: 130px; margin: 6px auto 0; border-radius: 2px; background: currentColor; box-shadow: 0 0 10px currentColor; }
+#toast { position: absolute; top: 30%; width: 100%; text-align: center; font-size: clamp(24px, 4vw, 40px);
+  font-weight: bold; letter-spacing: 8px; opacity: 0; }
+#toast.show { animation: toastAnim 1.5s ease-out forwards; }
+@keyframes toastAnim {
+  0% { opacity: 0; transform: scale(.5); }
+  15% { opacity: 1; transform: scale(1.15); }
+  28% { transform: scale(1); }
+  78% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.05); }
+}
+#flash { position: fixed; inset: 0; pointer-events: none; z-index: 12; opacity: 0; }
+#vig { position: fixed; inset: 0; pointer-events: none; z-index: 11; opacity: 0; transition: opacity .12s linear;
+  box-shadow: inset 0 0 140px 50px var(--vc, #00ffff); }
+#fsBtn { position: fixed; bottom: 18px; right: 18px; z-index: 14; width: 46px; height: 46px;
+  border-radius: 50%; border: 1.5px solid rgba(0,255,255,.5); background: rgba(8,12,28,.55);
+  backdrop-filter: blur(6px); color: #7fe9ff; font-size: 22px; line-height: 1; cursor: pointer;
+  pointer-events: auto; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 14px rgba(0,229,255,.25); transition: all .2s; padding: 0; }
+#fsBtn:hover { background: rgba(0,229,255,.18); box-shadow: 0 0 24px rgba(0,229,255,.5); }
+#score.bump { animation: bump .2s ease-out; }
+@keyframes bump { 0% { transform: scale(1.35); } 100% { transform: scale(1); } }
+.overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: rgba(5, 5, 15, 0.75); backdrop-filter: blur(4px); z-index: 20; color: #fff; text-align: center; }
+.overlay.hidden { display: none; }
+h1 { font-size: clamp(40px, 9vw, 90px); letter-spacing: 12px; color: #0ff; text-shadow: 0 0 20px #0ff, 0 0 60px #08a; margin-bottom: 10px; animation: pulse 2s infinite alternate; }
+@keyframes pulse { from { opacity: .85; } to { opacity: 1; } }
+h2 { font-size: clamp(28px, 6vw, 54px); letter-spacing: 8px; color: #f0f; text-shadow: 0 0 20px #f0f; margin-bottom: 14px; }
+.sub { font-size: 17px; line-height: 1.9; color: #9beaff; margin-bottom: 30px; }
+.sub b { color: #fff; }
+.final { font-size: 26px; color: #0f0; text-shadow: 0 0 12px #0f0; margin-bottom: 26px; }
+button { pointer-events: auto; padding: 14px 52px; font-size: 20px; letter-spacing: 4px; cursor: pointer;
+  background: transparent; color: #0ff; border: 2px solid #0ff; border-radius: 8px;
+  box-shadow: 0 0 15px #0ff88, inset 0 0 15px #0ff33; transition: all .2s; }
+button:hover { background: #0ff22; box-shadow: 0 0 30px #0ff, inset 0 0 25px #0ff55; transform: scale(1.05); }
+#newRecord { display: none; color: #ffd700; text-shadow: 0 0 15px #ffd700; font-size: 22px; letter-spacing: 3px; margin-bottom: 18px; animation: blink .6s infinite alternate; }
+@keyframes blink { from { opacity: 1; } to { opacity: .4; } }
+.float-label { position: fixed; pointer-events: none; color: #0ff; font-weight: bold; font-size: 20px;
+  text-shadow: 0 0 10px #0ff; z-index: 15; animation: floatUp .7s ease-out forwards; }
+@keyframes floatUp {
+  from { transform: translate(-50%, -50%); opacity: 1; }
+  to { transform: translate(-50%, calc(-50% - 60px)); opacity: 0; }
+}

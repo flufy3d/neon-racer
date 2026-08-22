@@ -42,10 +42,20 @@
 
 ## 本地运行
 
-直接双击 `index.html`，或：
-
 ```bash
 npx serve .
+```
+
+或 `python -m http.server 8000`，然后浏览器打开对应地址（ES 模块需通过 HTTP 访问）。
+
+## 项目结构
+
+```
+index.html      页面骨架
+style.css       全部样式
+js/game.js      主逻辑（场景、循环、碰撞、输入）
+js/audio.js     WebAudio 程序化音效
+js/ui.js        HUD 与视觉反馈
 ```
 
 ## License
