@@ -4,7 +4,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import {
   ensureAudio, beep, crashSound, whoosh,
-  startEngine, stopEngine, setEnginePitch, playBeat
+  startEngine, stopEngine, setEnginePitch, playBeat, setMusicIntensity
 } from './audio.js';
 import * as ui from './ui.js';
 
@@ -702,9 +702,11 @@ function animate() {
     const bpm = 92 + speed * 1.15;
     beatTimer -= dt;
     if (beatTimer <= 0) {
-      beatTimer = 60 / bpm;
+      const dur = 60 / bpm;
+      beatTimer = dur;
       beatGlow = 1;
-      playBeat(beatCount);
+      setMusicIntensity(Math.min(1, ((speed - 26) / 46) * 0.6 + tier * 0.1));
+      playBeat(beatCount, dur);
       beatCount++;
     }
     setEnginePitch(46 + speed * 1.5 + combo * 2);

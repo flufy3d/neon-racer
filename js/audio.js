@@ -1,5 +1,26 @@
 let audioCtx = null;
 let engineOsc = null, engineGain = null;
+let delayBus = null;
+let musicLevel = 0;
+
+const BASS_LINE = [55, 43.65, 65.41, 49];
+const MINOR_TRIAD = [2, 2 * Math.pow(2, 3 / 12), 2 * Math.pow(2, 7 / 12), 4];
+
+function getDelay() {
+  if (!delayBus && audioCtx) {
+    delayBus = audioCtx.createDelay(0.6);
+    delayBus.delayTime.value = 0.29;
+    const fb = audioCtx.createGain(); fb.gain.value = 0.34;
+    const wet = audioCtx.createGain(); wet.gain.value = 0.22;
+    delayBus.connect(fb); fb.connect(delayBus);
+    delayBus.connect(wet); wet.connect(audioCtx.destination);
+  }
+  return delayBus;
+}
+
+export function setMusicIntensity(v) {
+  musicLevel = Math.max(0, Math.min(1, v));
+}
 
 export function ensureAudio() {
   if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
@@ -42,19 +63,19 @@ export function whoosh() {
   s.start();
 }
 
-function kick() {
+function kick(t) {
   if (!audioCtx) return;
   const o = audioCtx.createOscillator(), g = audioCtx.createGain();
   o.type = 'sine';
-  o.frequency.setValueAtTime(150, audioCtx.currentTime);
-  o.frequency.exponentialRampToValueAtTime(42, audioCtx.currentTime + 0.12);
-  g.gain.setValueAtTime(0.28, audioCtx.currentTime);
-  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.14);
+  o.frequency.setValueAtTime(150, t);
+  o.frequency.exponentialRampToValueAtTime(42, t + 0.12);
+  g.gain.setValueAtTime(0.3, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
   o.connect(g); g.connect(audioCtx.destination);
-  o.start(); o.stop(audioCtx.currentTime + 0.15);
+  o.start(t); o.stop(t + 0.15);
 }
 
-function hat() {
+function hat(t, vol = 0.055) {
   if (!audioCtx) return;
   const len = audioCtx.sampleRate * 0.04;
   const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
@@ -64,24 +85,84 @@ function hat() {
   s.buffer = buf;
   const f = audioCtx.createBiquadFilter();
   f.type = 'highpass'; f.frequency.value = 6500;
-  const g = audioCtx.createGain(); g.gain.value = 0.055;
+  const g = audioCtx.createGain(); g.gain.value = vol;
   s.connect(f); f.connect(g); g.connect(audioCtx.destination);
-  s.start();
+  s.start(t);
 }
 
-const BASS_LINE = [55, 55, 65.41, 49];
-export function playBeat(count) {
+function snare(t) {
   if (!audioCtx) return;
-  kick();
-  if (count % 2 === 1) hat();
-  if (count % 4 === 0) {
-    const o = audioCtx.createOscillator(), g = audioCtx.createGain(), fl = audioCtx.createBiquadFilter();
-    o.type = 'sawtooth'; o.frequency.value = BASS_LINE[(count >> 2) % BASS_LINE.length];
-    fl.type = 'lowpass'; fl.frequency.value = 320;
-    g.gain.setValueAtTime(0.085, audioCtx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.38);
-    o.connect(fl); fl.connect(g); g.connect(audioCtx.destination);
-    o.start(); o.stop(audioCtx.currentTime + 0.4);
+  const len = audioCtx.sampleRate * 0.16;
+  const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2);
+  const s = audioCtx.createBufferSource();
+  s.buffer = buf;
+  const f = audioCtx.createBiquadFilter();
+  f.type = 'bandpass'; f.frequency.value = 1800; f.Q.value = 0.9;
+  const g = audioCtx.createGain(); g.gain.value = 0.17;
+  s.connect(f); f.connect(g); g.connect(audioCtx.destination);
+  s.start(t);
+}
+
+function bassNote(freq, t, dur) {
+  if (!audioCtx) return;
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain(), fl = audioCtx.createBiquadFilter();
+  o.type = 'sawtooth'; o.frequency.value = freq;
+  fl.type = 'lowpass'; fl.frequency.value = 320;
+  g.gain.setValueAtTime(0.085, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(fl); fl.connect(g); g.connect(audioCtx.destination);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+
+function pluck(freq, t, dur = 0.16, vol = 0.06) {
+  if (!audioCtx) return;
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain(), fl = audioCtx.createBiquadFilter();
+  o.type = 'square'; o.frequency.value = freq;
+  fl.type = 'lowpass'; fl.frequency.value = 2400;
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(fl); fl.connect(g);
+  g.connect(audioCtx.destination);
+  const dl = getDelay();
+  if (dl) g.connect(dl);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+
+export function playBeat(count, beatDur) {
+  if (!audioCtx || !beatDur) return;
+  const t0 = audioCtx.currentTime + 0.03;
+  const half = beatDur / 2, quarter = beatDur / 4;
+
+  kick(t0);
+
+  if (musicLevel >= 0.18 && count % 4 === 2) snare(t0);
+
+  hat(t0 + half);
+  if (musicLevel >= 0.45) {
+    hat(t0 + quarter, 0.03);
+    hat(t0 + quarter * 3, 0.03);
+  }
+
+  const bar = (count >> 2) % BASS_LINE.length;
+  const root = BASS_LINE[bar];
+  bassNote(root, t0, beatDur * 0.85);
+  bassNote(root, t0 + half, beatDur * 0.4);
+  if (musicLevel >= 0.32) bassNote(root * 2, t0 + quarter * 3, quarter * 0.9);
+
+  if (musicLevel >= 0.58) {
+    const seq = MINOR_TRIAD.concat([MINOR_TRIAD[2], MINOR_TRIAD[0]]);
+    for (let i = 0; i < 4; i++) {
+      if (i === 0 && musicLevel < 0.7 && count % 2 === 0) continue;
+      pluck(root * seq[(count * 2 + i) % seq.length], t0 + i * quarter, quarter * 0.9,
+        0.035 + musicLevel * 0.03);
+    }
+  }
+
+  if (musicLevel >= 0.82 && count % 8 === 6) {
+    pluck(root * 4, t0 + quarter * 2, 0.3, 0.05);
+    pluck(root * 4 * Math.pow(2, 3 / 12), t0 + quarter * 3, 0.24, 0.04);
   }
 }
 
