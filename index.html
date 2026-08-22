@@ -54,6 +54,12 @@
   #flash { position: fixed; inset: 0; pointer-events: none; z-index: 12; opacity: 0; }
   #vig { position: fixed; inset: 0; pointer-events: none; z-index: 11; opacity: 0; transition: opacity .12s linear;
     box-shadow: inset 0 0 140px 50px var(--vc, #00ffff); }
+  #fsBtn { position: fixed; bottom: 18px; right: 18px; z-index: 14; width: 46px; height: 46px;
+    border-radius: 50%; border: 1.5px solid rgba(0,255,255,.5); background: rgba(8,12,28,.55);
+    backdrop-filter: blur(6px); color: #7fe9ff; font-size: 22px; line-height: 1; cursor: pointer;
+    pointer-events: auto; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 14px rgba(0,229,255,.25); transition: all .2s; padding: 0; }
+  #fsBtn:hover { background: rgba(0,229,255,.18); box-shadow: 0 0 24px rgba(0,229,255,.5); }
   #score.bump { animation: bump .2s ease-out; }
   @keyframes bump { 0% { transform: scale(1.35); } 100% { transform: scale(1); } }
   .overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -110,12 +116,14 @@
 <div id="flash"></div>
 <div id="vig"></div>
 
+<button id="fsBtn" title="全屏">⛶</button>
+
 <div class="overlay" id="startScreen">
   <h1>NEON RACER</h1>
   <p class="sub">
     <b>← →</b> / <b>A D</b> 左右移动（按住连续滑动） &nbsp;&nbsp; <b>↑</b> / <b>空格</b> 跳跃<br>
     收集 <b style="color:#0ff">能量球</b> · 避开障碍 · 速度会越来越快<br>
-    手机：按住左右半屏平移，轻点一下变一条道，上滑跳跃
+    手机/平板：左右拖动或轻点目标位置控制飞船，上滑跳跃
   </p>
   <button id="startBtn">开 始</button>
 </div>
@@ -619,6 +627,7 @@ function resetGame() {
   beatTimer = 0; beatGlow = 0; timeScale = 1; lastSpeedMark = 26; camRoll = 0;
   shieldReady = false; invuln = 0; orbCountAtShieldEvent = 0;
   maxCombo = 0;
+  touchTargetX = null; prevShipX = 0;
   for (const s of shockwaves) scene.remove(s.m);
   shockwaves = [];
   vig.style.opacity = 0;
@@ -720,26 +729,29 @@ addEventListener('keyup', e => {
   else if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
 });
 
-let touchDir = 0, touchStartY = null, touchStartTime = 0;
+let touchTargetX = null, touchStartX = 0, touchStartY = null, touchStartTime = 0, prevShipX = 0;
+function screenToTrack(clientX) {
+  return Math.max(-TRACK_HALF, Math.min(TRACK_HALF, ((clientX / innerWidth) - 0.5) * 2.3 * TRACK_HALF));
+}
 addEventListener('touchstart', e => {
-  touchStartY = e.touches[0].clientY;
+  const t = e.touches[0];
+  touchStartX = t.clientX;
+  touchStartY = t.clientY;
   touchStartTime = performance.now();
-  touchDir = e.touches[0].clientX < innerWidth / 2 ? -1 : 1;
 }, { passive: true });
 addEventListener('touchmove', e => {
-  if (touchStartY !== null) touchDir = e.touches[0].clientX < innerWidth / 2 ? -1 : 1;
+  if (state === 'playing' && !paused) touchTargetX = screenToTrack(e.touches[0].clientX);
 }, { passive: true });
 addEventListener('touchend', e => {
   if (touchStartY === null) return;
-  const dy = e.changedTouches[0].clientY - touchStartY;
+  const t = e.changedTouches[0];
+  const dy = t.clientY - touchStartY, dx = t.clientX - touchStartX;
   const held = performance.now() - touchStartTime;
-  if (dy < -40) jump();
-  else if (held < 220 && state === 'playing') {
-    ship.position.x += touchDir * 2.5;
-    ship.position.x = Math.max(-TRACK_HALF, Math.min(TRACK_HALF, ship.position.x));
-    beep(320, 0.08, 'triangle', 0.08);
+  if (dy < -50 && Math.abs(dx) < 80) jump();
+  else if (held < 260 && Math.abs(dx) < 30 && Math.abs(dy) < 24 && state === 'playing' && !paused) {
+    touchTargetX = screenToTrack(t.clientX);
   }
-  touchDir = 0; touchStartY = null;
+  touchStartY = null;
 }, { passive: true });
 
 $('startBtn').onclick = startGame;
@@ -758,6 +770,30 @@ addEventListener('pointerdown', () => {
 function showPaused() {
   $('pauseScreen').classList.remove('hidden');
 }
+
+$('fsBtn').onclick = e => {
+  e.stopPropagation();
+  const d = document, de = d.documentElement;
+  try {
+    if (!d.fullscreenElement && !d.webkitFullscreenElement) {
+      const fn = de.requestFullscreen || de.webkitRequestFullscreen;
+      if (fn) { const r = fn.call(de); if (r && r.catch) r.catch(() => toast('请使用分享菜单添加到主屏幕', '#ff8822')); }
+    } else {
+      const fn = d.exitFullscreen || d.webkitExitFullscreen;
+      if (fn) fn.call(d);
+    }
+  } catch (err) {}
+};
+
+function onResize() {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  composer.setSize(innerWidth, innerHeight);
+}
+addEventListener('resize', onResize);
+addEventListener('orientationchange', () => setTimeout(onResize, 350));
 
 initScene();
 clock = new THREE.Clock();
@@ -792,13 +828,17 @@ function animate() {
       scene.add(p);
     }
 
-    let mv = 0;
-    if (keys.left) mv -= 1;
-    if (keys.right) mv += 1;
-    if (touchDir !== 0) mv = touchDir;
-    const latSpeed = (6 + speed * 0.33) * (1 + tier * 0.08);
-    ship.position.x = Math.max(-TRACK_HALF, Math.min(TRACK_HALF, ship.position.x + mv * latSpeed * dt));
-    const bankTarget = -mv * 0.4;
+    const kbd = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+    if (kbd !== 0) {
+      const latSpeed = (6 + speed * 0.33) * (1 + tier * 0.08);
+      ship.position.x = Math.max(-TRACK_HALF, Math.min(TRACK_HALF, ship.position.x + kbd * latSpeed * dt));
+      touchTargetX = ship.position.x;
+    } else if (touchTargetX !== null) {
+      ship.position.x += (touchTargetX - ship.position.x) * Math.min(1, dt * 12);
+    }
+    const vx = dt > 0 ? (ship.position.x - prevShipX) / dt : 0;
+    prevShipX = ship.position.x;
+    const bankTarget = Math.max(-0.5, Math.min(0.5, -vx * 0.0022));
     ship.rotation.z += (bankTarget - ship.rotation.z) * Math.min(1, dt * 10);
 
     if (!grounded) {
@@ -992,7 +1032,7 @@ function animate() {
 
     camera.position.x = ship.position.x * 0.35;
     camera.lookAt(ship.position.x * 0.5, 1, -12);
-    camRoll += (-mv * 0.05 - camRoll) * Math.min(1, dt * 8);
+    camRoll += (-vx * 0.0018 - camRoll) * Math.min(1, dt * 8);
     camera.rotation.z += camRoll;
 
     fovKick *= Math.exp(-dt * 5);
