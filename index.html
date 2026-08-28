@@ -53,13 +53,51 @@
 <button id="fsBtn" title="全屏">⛶</button>
 
 <div class="overlay" id="startScreen">
-  <h1>NEON RACER</h1>
-  <p class="sub">
-    <b>← →</b> / <b>A D</b> 左右移动（按住连续滑动） &nbsp;&nbsp; <b>↑</b> / <b>空格</b> 跳跃<br>
-    收集 <b style="color:#0ff">能量球</b> · 避开障碍 · 速度会越来越快<br>
-    手机/平板：按住左/右半屏移动 · 轻点微调 · 双指分按左右急停锁道 · 任意手指上甩跳跃
-  </p>
-  <button id="startBtn">开 始</button>
+  <div class="startScanlines" aria-hidden="true"></div>
+  <section class="startPanel">
+    <div class="startTopline">
+      <span><i></i> PILOT LINK READY</span>
+      <span>NEURAL SYNC // 100%</span>
+    </div>
+
+    <div class="startHero">
+      <div class="startCode" aria-hidden="true">NR // ∞</div>
+      <div class="startBrand">
+        <p>HIGH VELOCITY SURVIVAL PROTOCOL</p>
+        <h1><span>NEON</span> RACER</h1>
+        <div class="brandRule"><span></span><b>霓 虹 狂 飙</b></div>
+      </div>
+      <div class="reactorGlyph" aria-hidden="true"><span></span><span></span><i></i></div>
+    </div>
+
+    <div class="missionStrip">
+      <span class="orbMark" aria-hidden="true"><i></i></span>
+      <div><small>PRIMARY DIRECTIVE</small><b>收集能量球 · 突破机体形态 · 尽可能活下去</b></div>
+      <span class="missionTag">ENDLESS RUN</span>
+    </div>
+
+    <div class="controlGrid" aria-label="游戏操作">
+      <article class="controlCard keyboardCard">
+        <div class="controlHead"><span>01</span><b>键盘操控</b><small>KEYBOARD</small></div>
+        <div class="controlRows">
+          <div><span class="keyPair"><kbd>A</kbd><kbd>D</kbd></span><b>左右移动</b><small>按住连续滑动</small></div>
+          <div><span class="keyPair"><kbd>W</kbd><kbd class="wideKey">SPACE</kbd></span><b>跃过障碍</b><small>也可使用 ↑</small></div>
+        </div>
+      </article>
+      <article class="controlCard touchCard">
+        <div class="controlHead"><span>02</span><b>触屏操控</b><small>TOUCH CONTROL</small></div>
+        <div class="touchRows">
+          <span><i>◀ ▶</i><b>按住左右半屏移动</b></span>
+          <span><i>↑</i><b>任意手指上甩跳跃</b></span>
+          <span><i>L+R</i><b>双指急停并锁定跑道</b></span>
+        </div>
+      </article>
+    </div>
+
+    <div class="startTip"><span>!</span> 速度将持续提升 · 高风险擦身与完美跳跃可获得额外分数</div>
+
+    <button id="startBtn"><span>启 动 引 擎</span><small>INITIALIZE RUN</small></button>
+  </section>
 </div>
 
 <div class="overlay hidden" id="overScreen" role="dialog" aria-labelledby="crashTitle" aria-modal="true">

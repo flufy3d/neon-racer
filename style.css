@@ -58,8 +58,6 @@ canvas { display: block; }
 .overlay { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
   background: rgba(5, 5, 15, 0.75); backdrop-filter: blur(4px); z-index: 20; color: #fff; text-align: center; }
 .overlay.hidden { display: none; }
-h1 { font-size: clamp(40px, 9vw, 90px); letter-spacing: 12px; color: #0ff; text-shadow: 0 0 20px #0ff, 0 0 60px #08a; margin-bottom: 10px; animation: pulse 2s infinite alternate; }
-@keyframes pulse { from { opacity: .85; } to { opacity: 1; } }
 h2 { font-size: clamp(28px, 6vw, 54px); letter-spacing: 8px; color: #f0f; text-shadow: 0 0 20px #f0f; margin-bottom: 14px; }
 .sub { font-size: 17px; line-height: 1.9; color: #9beaff; margin-bottom: 30px; }
 .sub b { color: #fff; }
@@ -68,6 +66,118 @@ button { pointer-events: auto; padding: 14px 52px; font-size: 20px; letter-spaci
   box-shadow: 0 0 15px #0ff88, inset 0 0 15px #0ff33; transition: all .2s; }
 button:hover { background: #0ff22; box-shadow: 0 0 30px #0ff, inset 0 0 25px #0ff55; transform: scale(1.05); }
 @keyframes blink { from { opacity: 1; } to { opacity: .4; } }
+
+/* Start screen / pilot boot terminal */
+#startScreen { padding: 22px; overflow: hidden; isolation: isolate;
+  background:
+    radial-gradient(circle at 52% 37%, rgba(0, 229, 255, .12), transparent 34%),
+    radial-gradient(circle at 18% 78%, rgba(255, 34, 170, .07), transparent 28%),
+    linear-gradient(180deg, rgba(2, 5, 16, .7), rgba(2, 4, 14, .94));
+  backdrop-filter: blur(8px) saturate(1.35); -webkit-backdrop-filter: blur(8px) saturate(1.35); }
+#startScreen::before { content: ''; position: absolute; inset: 43% -15% -46%; z-index: -1;
+  background-image:
+    linear-gradient(rgba(0, 238, 255, .13) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 238, 255, .13) 1px, transparent 1px);
+  background-size: 46px 32px; transform: perspective(420px) rotateX(62deg);
+  mask-image: linear-gradient(to bottom, transparent, #000 20%, transparent 80%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 20%, transparent 80%); }
+.startScanlines { position: absolute; inset: 0; pointer-events: none; z-index: 2; opacity: .2;
+  background: repeating-linear-gradient(0deg, transparent 0 3px, rgba(0, 0, 0, .28) 4px); mix-blend-mode: multiply; }
+.startPanel { position: relative; z-index: 3; width: min(820px, 100%); padding: 18px 24px 22px; text-align: left; overflow: hidden;
+  background: linear-gradient(145deg, rgba(10, 18, 39, .96), rgba(5, 8, 24, .96));
+  border: 1px solid rgba(74, 230, 255, .42); border-radius: 3px;
+  box-shadow: 0 0 0 1px rgba(255, 43, 145, .08), 0 0 52px rgba(0, 229, 255, .15), inset 0 0 54px rgba(0, 229, 255, .04);
+  clip-path: polygon(0 13px, 13px 0, calc(100% - 78px) 0, calc(100% - 66px) 10px, 100% 10px, 100% calc(100% - 13px), calc(100% - 13px) 100%, 78px 100%, 66px calc(100% - 10px), 0 calc(100% - 10px));
+  animation: startPanelIn .55s cubic-bezier(.2,.8,.2,1) both; }
+.startPanel::before, .startPanel::after { content: ''; position: absolute; z-index: 4; height: 2px; width: 45%;
+  background: linear-gradient(90deg, transparent, #00f2ff, #fff, #ff2b91, transparent); box-shadow: 0 0 12px #00e5ff; }
+.startPanel::before { top: 0; animation: bootSweep 1.2s .08s ease-out both; }
+.startPanel::after { right: -45%; bottom: 9px; animation: bootSweepBack 1.05s .16s ease-out both; }
+@keyframes startPanelIn { from { opacity: 0; transform: translateY(12px) scale(.985); filter: brightness(1.7); } }
+@keyframes bootSweep { from { left: -45%; } to { left: 100%; } }
+@keyframes bootSweepBack { from { right: -45%; } to { right: 100%; } }
+.startTopline { display: flex; justify-content: space-between; align-items: center; padding-bottom: 9px;
+  border-bottom: 1px solid rgba(0, 229, 255, .17); color: #668f9d; font: 600 9px/1.2 Consolas, monospace; letter-spacing: 2px; }
+.startTopline span:first-child { color: #71fff0; }
+.startTopline i { display: inline-block; width: 6px; height: 6px; margin-right: 7px; border-radius: 50%;
+  background: #61ffb1; box-shadow: 0 0 10px #24ffc5; animation: onlineBlink 1s steps(1) infinite; }
+@keyframes onlineBlink { 50% { opacity: .38; } }
+.startHero { display: grid; grid-template-columns: 72px 1fr 94px; align-items: center; min-height: 126px;
+  opacity: 0; animation: startReveal .44s .12s ease-out forwards; }
+@keyframes startReveal { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.startCode { align-self: stretch; display: grid; place-items: center; border-right: 1px solid rgba(0, 229, 255, .17);
+  color: rgba(81, 225, 255, .46); font: 700 10px/1 Consolas, monospace; letter-spacing: 2px;
+  writing-mode: vertical-rl; transform: rotate(180deg); }
+.startBrand { padding-left: 24px; min-width: 0; }
+.startBrand > p { margin-bottom: 6px; color: #61f6ff; font: 700 9px/1 Consolas, monospace; letter-spacing: 4px; }
+#startScreen h1 { margin: 0; color: #f8feff; font: 900 clamp(43px, 7.4vw, 72px)/.85 'Segoe UI', sans-serif;
+  letter-spacing: 3px; white-space: nowrap; text-shadow: -3px 0 0 rgba(255, 35, 154, .7), 0 0 15px rgba(255,255,255,.3), 0 0 34px rgba(0,229,255,.34); }
+#startScreen h1 span { color: #00f1ff; text-shadow: 3px 0 0 rgba(255, 35, 154, .72), 0 0 16px rgba(0,241,255,.75); }
+.brandRule { display: flex; align-items: center; margin-top: 11px; }
+.brandRule span { width: min(190px, 38%); height: 2px; margin-right: 12px;
+  background: linear-gradient(90deg, #00eaff, rgba(0,234,255,.05)); box-shadow: 0 0 9px rgba(0,234,255,.7); }
+.brandRule b { color: #789aa5; font: 700 9px/1 'Microsoft YaHei', sans-serif; letter-spacing: 6px; white-space: nowrap; }
+.reactorGlyph { position: relative; width: 66px; height: 66px; justify-self: end; border: 1px solid rgba(0, 238, 255, .44);
+  border-radius: 50%; box-shadow: 0 0 22px rgba(0,229,255,.18), inset 0 0 20px rgba(0,229,255,.12); }
+.reactorGlyph::before, .reactorGlyph::after { content: ''; position: absolute; border-radius: 50%; }
+.reactorGlyph::before { inset: 9px; border: 1px dashed rgba(255, 42, 164, .52); animation: reactorSpin 3.4s linear infinite; }
+.reactorGlyph::after { inset: 21px; background: #00f0ff; box-shadow: 0 0 18px #00eaff, 0 0 30px rgba(0,229,255,.6); animation: corePulse .8s ease-in-out infinite alternate; }
+.reactorGlyph span { position: absolute; left: 50%; top: -5px; width: 1px; height: 76px; background: rgba(0,238,255,.45); }
+.reactorGlyph span:nth-child(2) { transform: rotate(90deg); }
+.reactorGlyph i { position: absolute; inset: 15px; border: 1px solid rgba(0,238,255,.26); border-radius: 50%; }
+@keyframes reactorSpin { to { transform: rotate(360deg); } }
+@keyframes corePulse { to { transform: scale(.76); opacity: .7; } }
+.missionStrip { display: grid; grid-template-columns: 42px 1fr auto; align-items: center; min-height: 52px; padding: 8px 12px;
+  border: 1px solid rgba(0,229,255,.2); border-left: 3px solid #00eaff;
+  background: linear-gradient(90deg, rgba(0,229,255,.09), rgba(255,43,145,.035), transparent);
+  opacity: 0; animation: startReveal .4s .2s ease-out forwards; }
+.orbMark { position: relative; width: 25px; height: 25px; border: 1px solid #00efff; border-radius: 50%; box-shadow: 0 0 12px rgba(0,238,255,.55); }
+.orbMark::before { content: ''; position: absolute; inset: 5px; border: 1px dashed #00efff; border-radius: 50%; animation: reactorSpin 2s linear infinite; }
+.orbMark i { position: absolute; inset: 9px; border-radius: 50%; background: #caffff; box-shadow: 0 0 11px #00efff; }
+.missionStrip div { min-width: 0; }
+.missionStrip small { display: block; margin-bottom: 4px; color: #5d8d99; font: 700 7px/1 Consolas, monospace; letter-spacing: 3px; }
+.missionStrip b { color: #d8faff; font-size: 12px; letter-spacing: 2px; font-weight: 650; }
+.missionTag { color: #59ffb4; font: 700 8px/1 Consolas, monospace; letter-spacing: 2px; white-space: nowrap; }
+.controlGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 9px; opacity: 0;
+  animation: startReveal .4s .28s ease-out forwards; }
+.controlCard { min-width: 0; padding: 11px 12px 10px; background: rgba(7,14,31,.82); border: 1px solid rgba(0,229,255,.2); }
+.touchCard { border-color: rgba(255,59,163,.24); background: linear-gradient(145deg, rgba(255,43,145,.065), rgba(7,14,31,.82)); }
+.controlHead { display: flex; align-items: center; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(105,188,205,.13); }
+.controlHead span { color: rgba(0,238,255,.48); font: 700 8px/1 Consolas, monospace; }
+.touchCard .controlHead span { color: rgba(255,71,165,.62); }
+.controlHead b { color: #d8faff; font-size: 11px; letter-spacing: 2px; }
+.controlHead small { margin-left: auto; color: #4f7680; font: 700 7px/1 Consolas, monospace; letter-spacing: 1px; }
+.controlRows { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 9px; }
+.controlRows > div { min-width: 0; }
+.keyPair { display: flex; min-height: 24px; align-items: center; gap: 4px; margin-bottom: 5px; }
+kbd { display: inline-grid; place-items: center; min-width: 24px; height: 22px; padding: 0 6px; color: #aefaff; font: 700 9px/1 Consolas, monospace;
+  border: 1px solid rgba(0,229,255,.4); border-bottom-width: 2px; background: rgba(0,229,255,.07); box-shadow: inset 0 0 9px rgba(0,229,255,.06); }
+kbd.wideKey { min-width: 44px; font-size: 7px; }
+.controlRows b { display: block; color: #c3eaf0; font-size: 10px; letter-spacing: 1px; }
+.controlRows small { display: block; margin-top: 3px; color: #507680; font-size: 8px; }
+.touchRows { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 9px; }
+.touchRows span { min-width: 0; }
+.touchRows i { display: grid; place-items: center; height: 24px; margin-bottom: 5px; color: #ff70b5; font: 700 9px/1 Consolas, monospace;
+  border: 1px solid rgba(255,55,156,.3); background: rgba(255,43,145,.055); }
+.touchRows b { display: block; color: #c3eaf0; font-size: 9px; line-height: 1.35; font-weight: 600; text-align: center; }
+.startTip { display: flex; align-items: center; justify-content: center; min-height: 31px; margin-top: 7px; color: #597e88;
+  font: 600 9px/1.3 'Microsoft YaHei', sans-serif; letter-spacing: 1px; opacity: 0; animation: startReveal .4s .38s ease-out forwards; }
+.startTip span { display: inline-grid; place-items: center; width: 16px; height: 16px; margin-right: 7px; color: #ffdd54;
+  border: 1px solid rgba(255,221,84,.4); font: 800 9px/1 Consolas, monospace; }
+#startBtn { position: relative; display: flex; width: min(290px, 82%); height: 58px; margin: 10px auto 0; padding: 7px 46px;
+  align-items: center; justify-content: center; flex-direction: column; overflow: hidden; color: #efffff;
+  background: linear-gradient(90deg, rgba(0,229,255,.13), rgba(255,43,145,.07)); border: 1px solid #00eaff; border-radius: 2px;
+  box-shadow: 0 0 22px rgba(0,229,255,.23), inset 0 0 20px rgba(0,229,255,.07);
+  clip-path: polygon(11px 0, 100% 0, 100% calc(100% - 11px), calc(100% - 11px) 100%, 0 100%, 0 11px);
+  opacity: 0; animation: startReveal .45s .48s ease-out forwards; }
+#startBtn::before { content: ''; position: absolute; top: -50%; left: -42%; width: 32%; height: 200%; transform: skewX(-20deg);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.22), transparent); animation: startBtnSweep 2.6s 1.2s ease-in-out infinite; }
+#startBtn::after { content: ''; position: absolute; inset: 5px; border: 1px solid rgba(0,229,255,.12); pointer-events: none; }
+@keyframes startBtnSweep { 0%, 55% { left: -42%; } 82%, 100% { left: 112%; } }
+#startBtn span { position: relative; z-index: 1; font: 800 17px/1.1 'Segoe UI', 'Microsoft YaHei', sans-serif; letter-spacing: 7px; }
+#startBtn small { position: relative; z-index: 1; margin-top: 5px; color: #64adb7; font: 700 7px/1 Consolas, monospace; letter-spacing: 3px; }
+#startBtn:hover { color: #fff; background: rgba(0,229,255,.2); border-color: #fff;
+  box-shadow: 0 0 34px rgba(0,229,255,.5), inset 0 0 26px rgba(0,229,255,.13); transform: scale(1.025); }
 
 /* Run summary / game-over debrief */
 #overScreen { padding: 22px; overflow: hidden; isolation: isolate;
@@ -274,6 +384,88 @@ button:hover { background: #0ff22; box-shadow: 0 0 30px #0ff, inset 0 0 25px #0f
   #restartBtn span { font-size: 13px; }
   #restartBtn small { margin-top: 2px; }
 }
+@media (max-width: 640px) {
+  #startScreen { padding: 10px; }
+  .startPanel { padding: 14px 12px 16px; }
+  .startTopline span:last-child { display: none; }
+  .startHero { grid-template-columns: 40px 1fr 48px; min-height: 82px; }
+  .startBrand { padding-left: 11px; }
+  .startBrand > p { margin-bottom: 4px; font-size: 6px; letter-spacing: 2px; }
+  #startScreen h1 { font-size: clamp(31px, 10vw, 42px); letter-spacing: 1px; }
+  .brandRule { margin-top: 7px; }
+  .brandRule span { width: 28%; margin-right: 7px; }
+  .brandRule b { font-size: 7px; letter-spacing: 3px; }
+  .reactorGlyph { width: 40px; height: 40px; }
+  .reactorGlyph::before { inset: 6px; }
+  .reactorGlyph::after { inset: 13px; }
+  .reactorGlyph i { inset: 10px; }
+  .reactorGlyph span { top: -4px; height: 46px; }
+  .missionStrip { grid-template-columns: 32px 1fr; min-height: 44px; padding: 6px 8px; }
+  .orbMark { width: 22px; height: 22px; }
+  .missionStrip small { margin-bottom: 3px; font-size: 6px; letter-spacing: 2px; }
+  .missionStrip b { font-size: 9px; letter-spacing: 1px; }
+  .missionTag { display: none; }
+  .controlCard { padding: 8px; }
+  .controlHead { padding-bottom: 6px; }
+  .controlRows, .touchRows { margin-top: 7px; }
+  .controlRows b { font-size: 9px; }
+  .controlRows small { font-size: 7px; }
+  .touchRows b { font-size: 8px; }
+  .startTip { min-height: 27px; font-size: 8px; text-align: center; }
+  #startBtn { height: 52px; margin-top: 7px; }
+  #startBtn span { font-size: 15px; }
+}
+@media (max-width: 640px) and (orientation: portrait) {
+  .controlGrid { grid-template-columns: 1fr; gap: 6px; margin-top: 6px; }
+  .touchRows { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 370px) and (orientation: portrait) {
+  .startPanel { padding: 10px 9px 12px; }
+  .startHero { grid-template-columns: 30px 1fr 38px; min-height: 72px; }
+  .startBrand { padding-left: 8px; }
+  #startScreen h1 { font-size: 28px; }
+  .startCode { font-size: 8px; }
+  .reactorGlyph { width: 34px; height: 34px; }
+  .reactorGlyph span { height: 40px; }
+  .brandRule b { letter-spacing: 2px; }
+  .missionStrip b { font-size: 8px; }
+  .startTip { font-size: 7px; }
+}
+@media (max-height: 560px) and (orientation: landscape) {
+  #startScreen { padding: 6px 14px; }
+  .startPanel { width: min(850px, 100%); padding: 8px 16px 11px; }
+  .startTopline { padding-bottom: 5px; }
+  .startHero { grid-template-columns: 45px 1fr 48px; min-height: 54px; }
+  .startBrand { padding-left: 13px; }
+  .startBrand > p { margin-bottom: 3px; font-size: 6px; letter-spacing: 2px; }
+  #startScreen h1 { font-size: 31px; }
+  .brandRule { margin-top: 4px; }
+  .brandRule b { font-size: 6px; }
+  .reactorGlyph { width: 36px; height: 36px; }
+  .reactorGlyph::before { inset: 5px; }
+  .reactorGlyph::after { inset: 12px; }
+  .reactorGlyph i { inset: 9px; }
+  .reactorGlyph span { top: -3px; height: 40px; }
+  .missionStrip { min-height: 35px; padding: 4px 8px; }
+  .orbMark { width: 20px; height: 20px; }
+  .missionStrip b { font-size: 9px; }
+  .controlGrid { grid-template-columns: 1fr 1fr; margin-top: 5px; }
+  .controlCard { padding: 6px 8px; }
+  .controlHead { padding-bottom: 4px; }
+  .controlRows, .touchRows { margin-top: 5px; }
+  .keyPair { min-height: 18px; margin-bottom: 2px; }
+  kbd { height: 17px; min-width: 19px; padding: 0 4px; font-size: 7px; }
+  kbd.wideKey { min-width: 36px; font-size: 6px; }
+  .controlRows b, .touchRows b { font-size: 7px; }
+  .controlRows small { display: none; }
+  .touchRows i { height: 18px; margin-bottom: 2px; }
+  .startTip { min-height: 20px; margin-top: 3px; font-size: 7px; }
+  .startTip span { width: 13px; height: 13px; }
+  #startBtn { width: 250px; height: 40px; margin-top: 4px; padding: 4px 38px; }
+  #startBtn span { font-size: 13px; }
+  #startBtn small { margin-top: 2px; }
+}
 @media (prefers-reduced-motion: reduce) {
-  #overScreen *, #overScreen *::before, #overScreen *::after { animation-duration: .001ms !important; animation-delay: 0s !important; }
+  #overScreen *, #overScreen *::before, #overScreen *::after,
+  #startScreen *, #startScreen *::before, #startScreen *::after { animation-duration: .001ms !important; animation-delay: 0s !important; }
 }
