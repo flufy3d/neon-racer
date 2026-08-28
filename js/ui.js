@@ -2,8 +2,9 @@ import * as THREE from 'three';
 
 export const COMBO_COLORS = ['#00ffff', '#7fff00', '#ffee00', '#ff8800', '#ff22aa', '#ff2244'];
 export const SHIELD_RECHARGE = 30;
-const TIERS_UI = ['初始形态', '引擎过载', '能量护盾', '磁力场', '究极形态'];
-const TIER_THRESHOLDS = [15, 35, 65, 100];
+const TIERS_UI = ['初始形态', '引擎过载', '能量护盾', '磁力场', '超载核心', '量子跃迁'];
+export const TIER_THRESHOLDS = [18, 45, 85, 140, 215];
+const MAX_TIER = TIER_THRESHOLDS.length;
 
 const $ = id => document.getElementById(id);
 const els = {
@@ -12,7 +13,8 @@ const els = {
   toastEl: $('toast'), vig: $('vig'), flashEl: $('flash'),
   distStat: $('distStat'), orbStat: $('orbStat'), tierNameEl: $('tierName'),
   tierBar: $('tierBar'), tierNext: $('tierNext'), maxComboEl: $('maxCombo'),
-  shieldState: $('shieldState'), abEls: [$('ab1'), $('ab2'), $('ab3'), $('ab4')]
+  shieldState: $('shieldState'), jumpState: $('jumpState'),
+  abEls: [$('ab1'), $('ab2'), $('ab3'), $('ab4'), $('ab5')]
 };
 export { els };
 
@@ -65,7 +67,7 @@ export function updateHUD(s) {
   els.maxComboEl.textContent = '×' + multOf(Math.max(s.maxCombo, 1)) + ' · ' + s.maxCombo + ' 连';
   els.tierNameEl.textContent = 'TIER ' + s.tier + ' · ' + TIERS_UI[s.tier];
   els.tierNameEl.style.color = '#' + s.tierColorHex;
-  if (s.tier >= 4) {
+  if (s.tier >= MAX_TIER) {
     els.tierBar.style.width = '100%';
     els.tierNext.textContent = '已达最高形态';
   } else {
@@ -77,9 +79,10 @@ export function updateHUD(s) {
   els.abEls.forEach((el, i) => {
     const active = s.tier >= i + 1;
     el.classList.toggle('locked', !active);
-    el.classList.toggle('ready', active && i === 0 ? true : active && i === 1 ? s.shieldReady : false);
+    el.classList.toggle('ready', active && (i === 1 ? s.shieldReady : i === 4 ? s.airJumpReady : true));
   });
   els.shieldState.textContent = s.tier < 2 ? '' : s.shieldReady ? '[就绪]' : `[充能 ${s.charge}/${SHIELD_RECHARGE}]`;
+  els.jumpState.textContent = s.tier < MAX_TIER ? '' : s.airJumpReady ? '[就绪]' : '[已用]';
 }
 
 const resultEls = {

@@ -18,8 +18,19 @@ const MIN_OUTER_SWAP_TIME = 0.32;
 const STABILIZER_ACCEL = 340;
 const STABILIZER_GAIN = 16;
 const TOASTS = { 5: '手感来了!', 10: '连击狂潮!', 15: '火力全开!', 20: '超神操作!', 30: '登峰造极!!' };
-const TIER_COLORS = [0x00ffff, 0x66ff22, 0xffee00, 0xff8822, 0xff22cc];
-const TIER_NAMES = ['', '引擎过载 · 横移强化!', '能量护盾展开!', '磁力场激活!', '究极形态 · 双倍得分!!'];
+const TIER_COLORS = [0x00ffff, 0x66ff22, 0xffee00, 0xff8822, 0xff22cc, 0xb066ff];
+const TIER_NAMES = ['', '引擎过载 · 鸭翼展开!', '能量护盾 · 装甲环绕!', '磁力场 · 磁叉伸展!', '超载核心 · 双倍得分!!', '量子跃迁 · 空中二段跳!!!'];
+const MAX_TIER = TIER_COLORS.length - 1;
+// 各形态的连续形变参数（下标 = 形态等级，帧间按 shipMorph 插值）
+const MORPH = {
+  noseLen:   [1, 1.05, 1.09, 1.14, 1.20, 1.32],
+  hullBulk:  [1, 1.05, 1.14, 1.20, 1.26, 1.34],
+  wingSpan:  [1, 1.03, 1.07, 1.12, 1.17, 1.24],
+  wingSweep: [0.03, 0.11, 0.17, 0.23, 0.31, 0.42],
+  wingRise:  [0, 0.05, 0.10, 0.14, 0.19, 0.27],
+  tipFin:    [1, 1.15, 1.30, 1.50, 1.85, 2.70],
+  flameLen:  [1, 1.30, 1.50, 1.75, 2.05, 2.50]
+};
 
 let scene, camera, renderer, composer, clock, bloomPass, railMat;
 let grid, ship, shipGlowMat;
@@ -34,6 +45,8 @@ let beatTimer = 0, beatGlow = 0, beatCount = 0, timeScale = 1, lastSpeedMark = 2
 let overTimerId = null;
 let shieldReady = false, invuln = 0, orbCountAtShieldEvent = 0;
 let tier = 0;
+let shipMorph = 0, morphRoll = 0, shipBank = 0, airFlip = 0;
+let airJumps = 0;
 let latVel = 0;
 let stabilizerEngaged = false;
 let lastGuidedLane = null, lastGuidedDist = -Infinity;
@@ -47,12 +60,15 @@ function addScore(base) {
 }
 
 function calcTier() {
-  return orbCount >= 100 ? 4 : orbCount >= 65 ? 3 : orbCount >= 35 ? 2 : orbCount >= 15 ? 1 : 0;
+  let t = 0;
+  for (let i = 0; i < ui.TIER_THRESHOLDS.length; i++) if (orbCount >= ui.TIER_THRESHOLDS[i]) t = i + 1;
+  return t;
 }
 
 function updateHUD() {
   ui.updateHUD({
     dist, bonus: score, speed, orbCount, maxCombo, tier,
+    airJumpReady: tier >= MAX_TIER && (grounded || airJumps > 0),
     shieldReady, charge: orbCount - orbCountAtShieldEvent,
     tierColorHex: TIER_COLORS[tier].toString(16).padStart(6, '0')
   });
@@ -107,46 +123,182 @@ function initScene() {
 
 function buildShip() {
   ship = new THREE.Group();
-  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x14142a, metalness: 0.9, roughness: 0.25 });
-  shipGlowMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x14142a, metalness: 0.9, roughness: 0.25, emissive: 0x000000 });
+  const plateMat = new THREE.MeshStandardMaterial({ color: 0x1c1c3a, metalness: 0.85, roughness: 0.3, emissive: 0x000000 });
+  shipGlowMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, fog: false });
+  const trimMat = new THREE.MeshBasicMaterial({ color: 0xff00ff, fog: false });
+  const flameMat = () => new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.62, fog: false });
+  const p = { bodyMat, plateMat };
 
+  // ── 主体: 机腹 + 机首(可拉长) + 座舱 ──
+  const fuselage = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.3, 1.5), bodyMat);
+  fuselage.position.set(0, 0, 0.35);
+  ship.add(fuselage);
+  p.fuselage = fuselage;
+
+  const noseGroup = new THREE.Group();
   const nose = new THREE.Mesh(new THREE.ConeGeometry(0.42, 1.7, 4), bodyMat);
   nose.rotation.x = -Math.PI / 2;
-  ship.add(nose);
+  noseGroup.add(nose);
+  const lance = new THREE.Mesh(new THREE.ConeGeometry(0.09, 1.6, 6), shipGlowMat); // T5 破风长矛
+  lance.rotation.x = -Math.PI / 2;
+  noseGroup.add(lance);
+  ship.add(noseGroup);
+  p.noseGroup = noseGroup;
+  p.lance = lance;
 
-  const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 12), shipGlowMat.clone());
-  cockpit.material.color.set(0x66ffff);
+  const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 12),
+    new THREE.MeshBasicMaterial({ color: 0x66ffff, fog: false }));
   cockpit.position.set(0, 0.22, 0.1);
   ship.add(cockpit);
+  p.cockpit = cockpit;
 
-  const wing = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.09, 0.62), bodyMat);
-  wing.position.y = -0.06;
-  ship.add(wing);
+  // ── 主翼: 后掠 / 展开 / 上反, 并挂载副翼、引擎荚、磁力叉 ──
+  p.wings = [];
+  for (const side of [-1, 1]) {
+    const g = new THREE.Group();
+    g.position.set(side * 0.24, -0.06, 0.05);
 
-  const tipMat = new THREE.MeshBasicMaterial({ color: 0xff00ff });
-  const tips = [];
-  for (const x of [-0.95, 0.95]) {
-    const tip = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.14, 0.66), tipMat);
-    tip.position.set(x, -0.04, 0);
-    ship.add(tip);
-    tips.push(tip);
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.09, 0.62), bodyMat);
+    panel.position.x = side * 0.36;
+    g.add(panel);
+
+    const tip = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.14, 0.66), trimMat);
+    tip.position.set(side * 0.72, 0.02, 0);
+    g.add(tip);
+
+    const blade = new THREE.Group();                       // T4 副翼下张
+    const bladePanel = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.07, 0.44), plateMat);
+    bladePanel.position.x = side * 0.32;
+    blade.add(bladePanel);
+    const bladeEdge = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.025, 0.07), shipGlowMat);
+    bladeEdge.position.set(side * 0.32, 0.05, -0.2);
+    blade.add(bladeEdge);
+    blade.position.set(side * 0.38, -0.03, 0.08);
+    g.add(blade);
+
+    const pod = new THREE.Group();                         // T3 外侧引擎荚
+    const podShell = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.13, 0.62, 10), bodyMat);
+    podShell.rotation.x = Math.PI / 2;
+    pod.add(podShell);
+    const podLip = new THREE.Mesh(new THREE.CylinderGeometry(0.115, 0.115, 0.06, 10), shipGlowMat);
+    podLip.rotation.x = Math.PI / 2;
+    podLip.position.z = 0.3;
+    pod.add(podLip);
+    const podFlame = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.9, 8), flameMat());
+    podFlame.rotation.x = -Math.PI / 2;
+    podFlame.position.z = 0.82;
+    pod.add(podFlame);
+    g.add(pod);
+
+    const prong = new THREE.Group();                       // T3 磁力叉
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.95), bodyMat);
+    arm.position.z = -0.48;
+    prong.add(arm);
+    const coil = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.035, 6, 18), shipGlowMat);
+    coil.position.z = -0.95;
+    prong.add(coil);
+    prong.position.set(side * 0.5, 0.02, -0.15);
+    g.add(prong);
+
+    ship.add(g);
+    p.wings.push({ g, side, tip, blade, pod, podFlame, prong, coil });
   }
-  ship.userData.tips = tips;
 
-  const flames = [];
-  for (const x of [-0.32, 0.32]) {
+  // ── T1 鸭翼(从机身折出) + 过载散热鳍 ──
+  p.canards = [];
+  for (const side of [-1, 1]) {
+    const c = new THREE.Group();
+    const fin = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.05, 0.26), bodyMat);
+    fin.position.x = side * 0.23;
+    c.add(fin);
+    const edge = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.02, 0.06), shipGlowMat);
+    edge.position.set(side * 0.23, 0.04, -0.1);
+    c.add(edge);
+    c.position.set(side * 0.16, 0.06, -0.52);
+    ship.add(c);
+    p.canards.push({ g: c, side });
+  }
+
+  p.vents = [];
+  for (const side of [-1, 1]) {
+    const v = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.32, 0.46), plateMat);
+    ship.add(v);
+    p.vents.push({ m: v, side });
+  }
+
+  // ── T2 铰接式装甲板(上下左右四片, 沿机身张开) ──
+  p.plates = [];
+  for (let i = 0; i < 4; i++) {
+    const sx = i < 2 ? -1 : 1, sy = i % 2 ? 1 : -1;
+    const hinge = new THREE.Group();
+    const pl = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.06, 0.86), plateMat);
+    pl.position.x = sx * 0.2;
+    const edge = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.03, 0.88), shipGlowMat);
+    edge.position.set(sx * 0.38, sy * 0.04, 0);
+    pl.add(edge);
+    hinge.add(pl);
+    ship.add(hinge);
+    p.plates.push({ g: hinge, sx, sy });
+  }
+
+  // ── T4 背鳍 + 外露反应堆 ──
+  const spine = new THREE.Group();
+  const dorsal = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.66, 0.9), plateMat);
+  dorsal.position.y = 0.33;
+  spine.add(dorsal);
+  const core = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.86, 8), shipGlowMat);
+  core.rotation.x = Math.PI / 2;
+  core.position.y = 0.12;
+  spine.add(core);
+  spine.position.set(0, 0.04, 0.46);
+  ship.add(spine);
+  p.spine = spine;
+
+  // ── T5 背部量子推进器 ──
+  p.boosters = [];
+  for (const side of [-1, 1]) {
+    const b = new THREE.Group();
+    const shell = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 0.52, 8), bodyMat);
+    shell.rotation.x = Math.PI / 2;
+    b.add(shell);
+    const lip = new THREE.Mesh(new THREE.CylinderGeometry(0.105, 0.105, 0.05, 8), shipGlowMat);
+    lip.rotation.x = Math.PI / 2;
+    lip.position.z = 0.25;
+    b.add(lip);
+    const bf = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.85, 8), flameMat());
+    bf.rotation.x = -Math.PI / 2;
+    bf.position.z = 0.68;
+    b.add(bf);
+    ship.add(b);
+    p.boosters.push({ g: b, side, flame: bf });
+  }
+
+  // ── T5 量子光环 + 环绕晶体 ──
+  const halo = new THREE.Mesh(new THREE.TorusGeometry(0.46, 0.028, 8, 32), shipGlowMat);
+  halo.rotation.x = Math.PI / 2;
+  ship.add(halo);
+  p.halo = halo;
+
+  p.shards = [];
+  for (let i = 0; i < 4; i++) {
+    const sh = new THREE.Mesh(new THREE.OctahedronGeometry(0.13), shipGlowMat);
+    ship.add(sh);
+    p.shards.push({ m: sh, i });
+  }
+
+  // ── 主引擎 ──
+  p.flames = [];
+  for (const x of [-0.3, 0.3]) {
     const engine = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 10), shipGlowMat);
-    engine.position.set(x, 0, 0.82);
+    engine.position.set(x, 0, 1.02);
     ship.add(engine);
-    const flame = new THREE.Mesh(new THREE.ConeGeometry(0.11, 1.1, 8), shipGlowMat.clone());
-    flame.material.transparent = true; flame.material.opacity = 0.65;
+    const flame = new THREE.Mesh(new THREE.ConeGeometry(0.12, 1.1, 8), flameMat());
     flame.rotation.x = -Math.PI / 2;
-    flame.position.set(x, 0, 1.45);
+    flame.position.set(x, 0, 1.62);
     ship.add(flame);
-    flames.push(flame);
+    p.flames.push(flame);
   }
-  ship.userData.flames = flames;
-  ship.userData.cockpit = cockpit;
 
   const shieldBubble = new THREE.Mesh(
     new THREE.SphereGeometry(1.55, 24, 24),
@@ -154,18 +306,169 @@ function buildShip() {
   );
   shieldBubble.visible = false;
   ship.add(shieldBubble);
-  ship.userData.shieldBubble = shieldBubble;
+  p.shieldBubble = shieldBubble;
 
   const aura = new THREE.Mesh(
-    new THREE.TorusGeometry(1.3, 0.06, 8, 48),
+    new THREE.TorusGeometry(0.95, 0.04, 8, 48),
     new THREE.MeshBasicMaterial({ color: 0x00ffff, fog: false })
   );
   aura.visible = false;
   ship.add(aura);
-  ship.userData.aura = aura;
+  p.aura = aura;
+  p.trimMat = trimMat;
 
+  ship.userData = p;
   ship.position.set(0, 0.95, 0);
   scene.add(ship);
+  poseShip(0, 0);
+}
+
+const WHITE = new THREE.Color(0xffffff);
+const BG_BASE = new THREE.Color(0x05050f);
+const tmpColA = new THREE.Color(), tmpColB = new THREE.Color();
+
+function curve(arr, m) {
+  const i = Math.max(0, Math.min(arr.length - 1, Math.floor(m)));
+  const j = Math.min(arr.length - 1, i + 1);
+  return arr[i] + (arr[j] - arr[i]) * Math.max(0, Math.min(1, m - i));
+}
+// 模块在 at-1 → at 之间完成展开
+function seg(m, at) { return Math.max(0, Math.min(1, m - at + 1)); }
+function tierColorAt(m, out) {
+  const i = Math.max(0, Math.min(MAX_TIER, Math.floor(m)));
+  const j = Math.min(MAX_TIER, i + 1);
+  return out.setHex(TIER_COLORS[i]).lerp(tmpColB.setHex(TIER_COLORS[j]), Math.max(0, Math.min(1, m - i)));
+}
+
+// 按连续形态值 m 摆放机体每个部件 —— 形态切换是真正的机械变形
+function poseShip(m, t) {
+  const p = ship.userData;
+  const col = tierColorAt(m, tmpColA);
+  shipGlowMat.color.copy(col);
+  p.bodyMat.emissive.copy(col).multiplyScalar(0.07);
+  p.plateMat.emissive.copy(col).multiplyScalar(0.1);
+  p.trimMat.color.copy(col).lerp(WHITE, 0.18);
+  p.cockpit.material.color.copy(col).lerp(WHITE, 0.45);
+
+  const bulk = curve(MORPH.hullBulk, m);
+  p.fuselage.scale.set(1 + (bulk - 1) * 0.8, bulk, 1 + (bulk - 1) * 0.35);
+  p.noseGroup.scale.set(1 + (bulk - 1) * 0.6, 1 + (bulk - 1) * 0.6, curve(MORPH.noseLen, m));
+
+  const lanceK = seg(m, 5);
+  p.lance.visible = lanceK > 0.01;
+  p.lance.scale.set(0.5 + 0.5 * lanceK, lanceK, 0.5 + 0.5 * lanceK);
+  p.lance.position.z = -0.85 - 0.8 * lanceK;
+
+  const span = curve(MORPH.wingSpan, m), sweep = curve(MORPH.wingSweep, m), rise = curve(MORPH.wingRise, m);
+  const fin = curve(MORPH.tipFin, m);
+  const flameLen = curve(MORPH.flameLen, m) * (0.8 + (speed / 72) * 0.45) + Math.sin(t * 24) * 0.07;
+  const podK = seg(m, 3), bladeK = seg(m, 4);
+
+  for (const w of p.wings) {
+    w.g.rotation.y = -w.side * sweep;
+    w.g.rotation.z = w.side * rise;
+    w.g.scale.x = span;
+    w.tip.scale.y = fin;
+    w.tip.position.y = 0.02 + (fin - 1) * 0.055;
+
+    w.pod.visible = podK > 0.01;
+    w.pod.scale.setScalar(0.35 + 0.65 * podK);
+    w.pod.position.set(w.side * (0.38 + 0.2 * podK), -0.12 + 0.12 * podK, 0.2);
+    w.podFlame.material.color.copy(col);
+    w.podFlame.scale.set(1, flameLen * 0.8, 1);
+
+    w.prong.visible = podK > 0.01;
+    w.prong.scale.set(0.4 + 0.6 * podK, 0.4 + 0.6 * podK, podK);
+    w.coil.rotation.z = t * 4;
+
+    w.blade.visible = bladeK > 0.01;
+    w.blade.scale.setScalar(0.3 + 0.7 * bladeK);
+    w.blade.rotation.z = -w.side * 0.95 * bladeK;
+  }
+
+  const canK = seg(m, 1);
+  for (const c of p.canards) {
+    c.g.visible = canK > 0.01;
+    c.g.scale.setScalar(0.25 + 0.75 * canK);
+    c.g.rotation.z = c.side * (-1.15 + 1.4 * canK);
+    c.g.rotation.y = -c.side * (0.5 - 0.32 * canK);
+  }
+  for (const v of p.vents) {
+    v.m.visible = canK > 0.01;
+    v.m.scale.set(1, 0.15 + 0.85 * canK, 1);
+    v.m.rotation.z = v.side * 0.45 * canK;
+    v.m.position.set(v.side * 0.2, 0.1 + 0.09 * canK, 0.68);
+  }
+
+  const plateK = seg(m, 2);
+  const breathe = Math.sin(t * (shieldReady ? 3.4 : 1.6)) * (shieldReady ? 0.16 : 0.07);
+  for (const pl of p.plates) {
+    pl.g.visible = plateK > 0.01;
+    pl.g.scale.setScalar(0.4 + 0.6 * plateK);
+    pl.g.rotation.z = pl.sx * pl.sy * plateK * (0.5 + breathe);
+    pl.g.rotation.y = -pl.sx * 0.14 * plateK;
+    pl.g.position.set(pl.sx * (0.22 + 0.1 * plateK), pl.sy * (0.13 + 0.16 * plateK), 0.45);
+  }
+
+  const spineK = seg(m, 4);
+  p.spine.visible = spineK > 0.01;
+  p.spine.scale.set(1, spineK, 0.5 + 0.5 * spineK);
+  p.spine.position.y = 0.04 - 0.14 * (1 - spineK);
+
+  p.halo.visible = lanceK > 0.01;
+  p.halo.scale.setScalar(0.3 + 0.7 * lanceK);
+  p.halo.rotation.z = t * 1.4;
+  p.halo.rotation.x = Math.PI / 2 + Math.sin(t * 1.1) * 0.55;
+  p.halo.position.set(0, 0.62 + 0.24 * lanceK + Math.sin(t * 2.2) * 0.03, 0.3);
+  for (const sh of p.shards) {
+    sh.m.visible = lanceK > 0.01;
+    const a = t * 1.7 + sh.i * Math.PI / 2;
+    const r = 0.75 + 0.45 * lanceK;
+    sh.m.position.set(Math.cos(a) * r, 0.3 + Math.sin(t * 2.4 + sh.i) * 0.22, 0.3 + Math.sin(a) * r * 0.7);
+    sh.m.rotation.set(t * 2, t * 2.6, 0);
+    sh.m.scale.setScalar(lanceK);
+  }
+
+  for (const b of p.boosters) {
+    b.g.visible = lanceK > 0.01;
+    b.g.scale.setScalar(0.3 + 0.7 * lanceK);
+    b.g.position.set(b.side * (0.3 + 0.16 * lanceK), 0.18 + 0.18 * lanceK, 0.75);
+    b.g.rotation.z = -b.side * 0.18 * lanceK;
+    b.flame.material.color.copy(col);
+    b.flame.scale.set(1, flameLen * 0.7, 1);
+  }
+
+  for (const f of p.flames) {
+    f.material.color.copy(col);
+    f.scale.set(1 + m * 0.05, flameLen, 1 + m * 0.05);
+  }
+
+  const aura = p.aura;
+  aura.visible = plateK > 0.01;
+  aura.material.color.copy(col);
+  aura.rotation.x = Math.PI / 2;
+  aura.rotation.z = t * 1.2;
+  aura.position.set(0, -0.06, 0.25);
+  aura.scale.setScalar((0.5 + 0.5 * plateK) * (1 + Math.sin(t * 5) * 0.05 + m * 0.02));
+
+  const sb = p.shieldBubble;
+  if (sb.visible) {
+    sb.material.color.copy(col);
+    sb.scale.setScalar(1 + Math.sin(t * 4) * 0.04 + (invuln > 0 ? Math.sin(t * 30) * 0.12 : 0));
+    sb.material.opacity = invuln > 0 ? 0.35 : 0.16;
+  }
+
+  if (grid) {
+    grid.material.color.copy(col).multiplyScalar(0.5);
+    railMat.color.copy(col).multiplyScalar(0.9);
+    scene.background.copy(BG_BASE).lerp(col, 0.05);
+  }
+}
+
+function updateShipMorph(dt, t) {
+  shipMorph += (tier - shipMorph) * Math.min(1, dt * 3.2);
+  if (Math.abs(tier - shipMorph) < 0.002) shipMorph = tier;
+  poseShip(shipMorph, t);
 }
 
 const wallMat = new THREE.MeshBasicMaterial({ color: 0xff2255 });
@@ -342,20 +645,7 @@ function shieldBreakFx() {
 }
 
 function applyShipTier() {
-  const c = TIER_COLORS[tier];
-  shipGlowMat.color.setHex(c);
-  ship.userData.cockpit.material.color.setHex(c).lerp(new THREE.Color(0xffffff), 0.35);
-  for (const t of ship.userData.tips) t.material.color.setHex(c);
-  const aura = ship.userData.aura;
-  aura.visible = tier >= 2;
-  aura.material.color.setHex(c);
-  if (ship.userData.shieldBubble) ship.userData.shieldBubble.visible = tier >= 2 && shieldReady;
-  if (scene && grid) {
-    const tc = new THREE.Color(TIER_COLORS[tier]);
-    grid.material.color.copy(tc).multiplyScalar(0.5);
-    if (railMat) railMat.color.copy(tc).multiplyScalar(0.9);
-    scene.background.copy(new THREE.Color(0x05050f)).lerp(tc, 0.05);
-  }
+  ship.userData.shieldBubble.visible = tier >= 2 && shieldReady;
 }
 
 function resetGame() {
@@ -376,11 +666,13 @@ function resetGame() {
   ui.els.vig.style.opacity = 0;
   ui.els.comboBox.style.opacity = 0;
   tier = 0;
+  airJumps = 0; airFlip = 0; morphRoll = 0; shipBank = 0; shipMorph = 0;
   applyShipTier();
+  poseShip(0, 0);
   camera.fov = 70;
   camera.updateProjectionMatrix();
   ship.position.set(0, 0.95, 0);
-  ship.rotation.z = 0;
+  ship.rotation.set(0, 0, 0);
   ship.visible = true;
   updateHUD();
 }
@@ -429,12 +721,28 @@ function gameOver() {
 }
 
 function jump() {
-  if (state !== 'playing' || paused || !grounded) return;
-  vy = JUMP_V;
-  grounded = false;
-  ship.scale.set(0.8, 1.35, 0.8);
-  beep(500, 0.15, 'sine', 0.1);
-  setTimeout(() => beep(750, 0.12, 'sine', 0.08), 70);
+  if (state !== 'playing' || paused) return;
+  if (grounded) {
+    vy = JUMP_V;
+    grounded = false;
+    airJumps = tier >= MAX_TIER ? 1 : 0;
+    ship.scale.set(0.8, 1.35, 0.8);
+    beep(500, 0.15, 'sine', 0.1);
+    setTimeout(() => beep(750, 0.12, 'sine', 0.08), 70);
+  } else if (airJumps > 0) {
+    // T5 量子跃迁: 空中二段跳
+    airJumps--;
+    vy = JUMP_V * 0.88;
+    airFlip = Math.PI * 2;
+    ship.scale.set(1.22, 0.74, 1.22);
+    const at = new THREE.Vector3(ship.position.x, ship.position.y - 0.35, ship.position.z);
+    spawnShockwave(at, TIER_COLORS[MAX_TIER], 0.5);
+    burst(at, TIER_COLORS[MAX_TIER], 0.2, 0.45, 0.8, 28);
+    ui.floatLabel('量子跃迁', ship.position, '#c08cff', 16);
+    beep(760, 0.12, 'triangle', 0.11);
+    setTimeout(() => beep(1180, 0.14, 'triangle', 0.09), 60);
+    updateHUD();
+  }
 }
 
 addEventListener('keydown', e => {
@@ -522,9 +830,16 @@ function animate() {
 
   grid.position.z = (grid.position.z + (state === 'playing' ? speed : 8) * dt) % 4;
 
+  morphRoll *= Math.exp(-dt * 3.4);
+  if (Math.abs(morphRoll) < 0.004) morphRoll = 0;
+  airFlip *= Math.exp(-dt * 4.6);
+  if (Math.abs(airFlip) < 0.004) airFlip = 0;
+  updateShipMorph(dt, t);
+
   if (state === 'menu') {
     ship.position.x = Math.sin(t) * 2.5;
-    ship.rotation.z = -Math.cos(t) * 0.35;
+    shipBank = -Math.cos(t) * 0.35;
+    ship.rotation.set(0, 0, shipBank);
     ship.position.y = 0.95 + Math.sin(t * 3) * 0.1;
     camera.lookAt(ship.position.x * 0.4, 1, -12);
   }
@@ -593,13 +908,16 @@ function animate() {
     if ((nx <= -TRACK_HALF && latVel < 0) || (nx >= TRACK_HALF && latVel > 0)) latVel = 0;
     ship.position.x = Math.max(-TRACK_HALF, Math.min(TRACK_HALF, nx));
     const bankTarget = Math.max(-0.45, Math.min(0.45, -latVel * 0.02));
-    ship.rotation.z += (bankTarget - ship.rotation.z) * Math.min(1, dt * 10);
+    shipBank += (bankTarget - shipBank) * Math.min(1, dt * 10);
+    ship.rotation.z = shipBank + morphRoll;
+    ship.rotation.x = -airFlip;
 
     if (!grounded) {
       vy += GRAVITY * dt;
       ship.position.y += vy * dt;
       if (ship.position.y <= 0.95) {
         ship.position.y = 0.95; grounded = true; vy = 0;
+        airJumps = tier >= MAX_TIER ? 1 : 0;
         ship.scale.set(1.3, 0.65, 1.3);
         burst(new THREE.Vector3(ship.position.x, 0.25, 0.5), 0x66ccff, 0.16, 0.35, 0.4, 14);
         beep(170, 0.09, 'sine', 0.1);
@@ -742,11 +1060,13 @@ function animate() {
         if (nt > tier) {
           tier = nt;
           applyShipTier();
+          morphRoll = Math.PI * 2;
+          if (tier >= MAX_TIER) airJumps = 1;
           if (tier >= 2 && !shieldReady) { shieldReady = true; orbCountAtShieldEvent = orbCount; }
           timeScale = 0.35;
           shakeTime = Math.max(shakeTime, 0.45);
           ui.flash('#ffffff', 0.35, 550);
-          ui.toast(TIER_NAMES[tier], '#ffee00');
+          ui.toast(TIER_NAMES[tier], '#' + TIER_COLORS[tier].toString(16).padStart(6, '0'));
           spawnShockwave(ship.position, TIER_COLORS[tier], 1);
           setTimeout(() => { if (state === 'playing') spawnShockwave(ship.position, 0xffffff, 0.7); }, 130);
           for (let k = 0; k < 4; k++) {
@@ -796,23 +1116,6 @@ function animate() {
     camera.fov = 70 + ((speed - 26) / 46) * 12 + fovKick;
     camera.updateProjectionMatrix();
 
-    const flamesArr = ship.userData.flames;
-    if (flamesArr) {
-      const fs = (1 + tier * 0.35) * (0.85 + (speed / 72) * 0.5) + Math.sin(t * 24) * 0.07;
-      for (const f of flamesArr) f.scale.set(1 + tier * 0.15, fs, 1 + tier * 0.15);
-    }
-    const aura = ship.userData.aura;
-    if (aura && aura.visible) {
-      aura.rotation.x = Math.PI / 2 + Math.sin(t * 1.8) * 0.45;
-      aura.rotation.y = t * 2.2;
-      aura.scale.setScalar(1 + Math.sin(t * 6) * 0.08 + tier * 0.05);
-    }
-    const sb = ship.userData.shieldBubble;
-    if (sb && sb.visible) {
-      const p = 1 + Math.sin(t * 4) * 0.04 + (invuln > 0 ? Math.sin(t * 30) * 0.12 : 0);
-      sb.scale.setScalar(p);
-      sb.material.opacity = invuln > 0 ? 0.35 : 0.16;
-    }
   }
 
   const pdt = dt * timeScale;
