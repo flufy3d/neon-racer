@@ -10,6 +10,7 @@ import * as ui from './ui.js';
 
 const $ = id => document.getElementById(id);
 const LANES = [-2.5, 0, 2.5];
+const CENTER_X = LANES[1];
 const GRAVITY = -38, JUMP_V = 13;
 const COMBO_WINDOW = 2.5;
 const TRACK_HALF = 2.5;
@@ -34,7 +35,7 @@ let overTimerId = null;
 let shieldReady = false, invuln = 0, orbCountAtShieldEvent = 0;
 let tier = 0;
 let latVel = 0;
-let stabilizerTarget = null;
+let stabilizerEngaged = false;
 let lastGuidedLane = null, lastGuidedDist = -Infinity;
 const activePointers = new Map();
 const keys = { left: false, right: false };
@@ -368,7 +369,7 @@ function resetGame() {
   beatTimer = 0; beatGlow = 0; timeScale = 1; lastSpeedMark = 26; camRoll = 0;
   shieldReady = false; invuln = 0; orbCountAtShieldEvent = 0;
   maxCombo = 0;
-  latVel = 0; stabilizerTarget = null; activePointers.clear();
+  latVel = 0; stabilizerEngaged = false; activePointers.clear();
   lastGuidedLane = null; lastGuidedDist = -Infinity;
   for (const s of shockwaves) scene.remove(s.m);
   shockwaves = [];
@@ -557,32 +558,28 @@ function animate() {
       if (hasL && hasR) {
         stabilizing = true;
         dir = 0;
-        if (stabilizerTarget === null) {
-          let laneIndex = 1;
-          for (let i = 0; i < LANES.length; i++) {
-            if (Math.abs(LANES[i] - ship.position.x) < Math.abs(LANES[laneIndex] - ship.position.x)) laneIndex = i;
-          }
-          stabilizerTarget = LANES[laneIndex];
+        if (!stabilizerEngaged) {
+          stabilizerEngaged = true;
           latVel *= 0.25;
-          ui.floatLabel(['左轨锁定', '中线锁定', '右轨锁定'][laneIndex], ship.position, '#66ffff', 14);
-          beep(620 + laneIndex * 90, 0.07, 'triangle', 0.065);
+          ui.floatLabel('中线锁定', ship.position, '#66ffff', 14);
+          beep(710, 0.07, 'triangle', 0.065);
         }
       } else {
-        stabilizerTarget = null;
+        stabilizerEngaged = false;
         dir += s;
       }
     } else {
-      stabilizerTarget = null;
+      stabilizerEngaged = false;
     }
     dir = Math.max(-1, Math.min(1, dir));
     const maxV = (5 + speed * 0.27) * (1 + tier * 0.08);
     if (stabilizing) {
-      const error = stabilizerTarget - ship.position.x;
+      const error = CENTER_X - ship.position.x;
       const targetVel = Math.max(-maxV, Math.min(maxV, error * STABILIZER_GAIN));
       const step = STABILIZER_ACCEL * dt;
       latVel += Math.max(-step, Math.min(step, targetVel - latVel));
       if (Math.abs(error) < 0.012 && Math.abs(latVel) < 0.45) {
-        ship.position.x = stabilizerTarget;
+        ship.position.x = CENTER_X;
         latVel = 0;
       }
     } else if (dir !== 0) {
