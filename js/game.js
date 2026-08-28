@@ -17,6 +17,8 @@ const TRACK_HALF = 2.5;
 const MIN_OUTER_SWAP_TIME = 0.32;
 const STABILIZER_ACCEL = 340;
 const STABILIZER_GAIN = 16;
+const SWIPE_JUMP = 55;      // 地面起跳所需上滑距离
+const SWIPE_AIRJUMP = 30;   // 滞空二段跳: 阈值放宽, 否则 0.7 秒内滑不完
 const TOASTS = { 5: '手感来了!', 10: '连击狂潮!', 15: '火力全开!', 20: '超神操作!', 30: '登峰造极!!' };
 const TIER_COLORS = [0x00ffff, 0x66ff22, 0xffee00, 0xff8822, 0xff22cc, 0xb066ff];
 const TIER_NAMES = ['', '引擎过载 · 鸭翼展开!', '能量护盾 · 装甲环绕!', '磁力场 · 磁叉伸展!', '超载核心 · 双倍得分!!', '量子跃迁 · 空中二段跳!!!'];
@@ -770,8 +772,9 @@ addEventListener('pointermove', e => {
   const p = activePointers.get(e.pointerId);
   if (!p) return;
   p.x = e.clientX;
+  const need = grounded ? SWIPE_JUMP : SWIPE_AIRJUMP;
   if (e.clientY > p.baseY) p.baseY = e.clientY;
-  else if (p.baseY - e.clientY >= 55) { jump(); p.baseY = e.clientY; }
+  else if (p.baseY - e.clientY >= need && (grounded || airJumps > 0)) { jump(); p.baseY = e.clientY; }
 });
 const releasePointer = e => activePointers.delete(e.pointerId);
 addEventListener('pointerup', releasePointer);

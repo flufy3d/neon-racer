@@ -320,6 +320,7 @@ kbd.wideKey { min-width: 44px; font-size: 7px; }
   .drow { font-size: 10px; padding: 1.5px 0; }
   #comboBox { top: 22%; font-size: clamp(24px, 7vw, 36px); }
   #comboBar { width: 90px; }
+  #toast { font-size: clamp(17px, 5vw, 28px); letter-spacing: 3px; }
   #overScreen { padding: 10px; }
   .resultPanel { padding: 14px 12px 16px; }
   .resultTopline span:last-child { display: none; }
@@ -350,13 +351,14 @@ kbd.wideKey { min-width: 44px; font-size: 7px; }
 }
 @media (max-width: 640px) and (orientation: portrait) {
   #topLeft { max-width: calc(100% - 118px); }
-  #panel { width: 104px; padding: 6px 8px 7px; }
+  #panel { width: 104px; padding: 6px 8px 7px; font-size: 0; }
   .pTitle, .tiny, .drow { display: none; }
   #tierName { font-size: 10px; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .barWrap { margin-top: 4px; height: 3px; }
-  .ab { display: inline-flex; font-size: 0; gap: 3px; padding: 2px 3px 0 0; }
+  .ab { display: inline-flex; font-size: 0; letter-spacing: 0; gap: 0; padding: 3px 5px 0 0; }
   .ab b { display: none; }
-  #comboBox { top: 30%; }
+  #comboBox { top: 27%; }
+  #toast { top: 40%; }
 }
 @media (max-height: 560px) and (orientation: landscape) {
   #overScreen { padding: 6px 14px; }
