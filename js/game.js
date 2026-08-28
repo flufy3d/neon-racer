@@ -22,7 +22,7 @@ let grid, ship, shipGlowMat;
 let obstacles = [], orbs = [], pillars = [], particles = [], streaks = [], shockwaves = [];
 let state = 'menu', paused = false;
 let vy = 0, grounded = true;
-let speed = 26, dist = 0, spawnDist = 0, orbCount = 0, elapsed = 0, score = 0;
+let speed = 26, maxSpeed = 26, dist = 0, spawnDist = 0, orbCount = 0, elapsed = 0, score = 0;
 let shakeTime = 0, best = +(localStorage.getItem('neonRacerBest') || 0);
 let combo = 0, comboTimer = 0, maxCombo = 0;
 let streakTimer = 0, fovKick = 0;
@@ -331,7 +331,7 @@ function resetGame() {
   obstacles = []; orbs = []; pillars = []; particles = []; streaks = [];
   vy = 0; grounded = true;
   keys.left = keys.right = false;
-  speed = 26; dist = 0; spawnDist = 0; orbCount = 0; elapsed = 0; shakeTime = 0;
+  speed = 26; maxSpeed = 26; dist = 0; spawnDist = 0; orbCount = 0; elapsed = 0; shakeTime = 0;
   combo = 0; comboTimer = 0; score = 0; streakTimer = 0; fovKick = 0;
   beatTimer = 0; beatGlow = 0; timeScale = 1; lastSpeedMark = 26; camRoll = 0;
   shieldReady = false; invuln = 0; orbCountAtShieldEvent = 0;
@@ -354,6 +354,7 @@ function resetGame() {
 function startGame() {
   ensureAudio();
   if (overTimerId) { clearTimeout(overTimerId); overTimerId = null; }
+  ui.resetRunSummary();
   resetGame();
   beatCount = 0;
   startEngine();
@@ -374,17 +375,22 @@ function gameOver() {
   stopEngine();
   timeScale = 0.25;
   const sc = Math.floor(dist) + score;
-  if (sc > best) {
+  const isRecord = sc > best;
+  if (isRecord) {
     best = sc;
     localStorage.setItem('neonRacerBest', best);
-    $('newRecord').style.display = 'block';
-  } else {
-    $('newRecord').style.display = 'none';
   }
   ui.els.bestEl.textContent = best;
-  $('finalScore').textContent = `得分 ${sc}`;
+  ui.prepareRunSummary({
+    score: sc, distanceMeters: dist, orbCount, maxCombo,
+    topSpeedKmh: maxSpeed * 3.6, elapsed, tier, isRecord,
+    tierColorHex: TIER_COLORS[tier].toString(16).padStart(6, '0')
+  });
   overTimerId = setTimeout(() => {
-    if (state === 'over') $('overScreen').classList.remove('hidden');
+    if (state === 'over') {
+      $('overScreen').classList.remove('hidden');
+      ui.playRunSummary(index => beep(420 + index * 105, 0.055, 'square', 0.045));
+    }
   }, 900);
 }
 
@@ -492,6 +498,7 @@ function animate() {
   if (state === 'playing' && !paused) {
     elapsed += dt;
     speed = Math.min(72, 26 + elapsed * 0.55);
+    maxSpeed = Math.max(maxSpeed, speed);
     const move = speed * dt;
     dist += move;
     spawnDist += move;

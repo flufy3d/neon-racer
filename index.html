@@ -62,11 +62,57 @@
   <button id="startBtn">开 始</button>
 </div>
 
-<div class="overlay hidden" id="overScreen">
-  <h2>坠 毁</h2>
-  <div id="newRecord">★ 新纪录 ★</div>
-  <div class="final" id="finalScore">得分 0</div>
-  <button id="restartBtn">再 来 一 局</button>
+<div class="overlay hidden" id="overScreen" role="dialog" aria-labelledby="crashTitle" aria-modal="true">
+  <div class="resultScanlines" aria-hidden="true"></div>
+  <section class="resultPanel">
+    <div class="resultTopline">
+      <span><i></i> RUN TERMINATED</span>
+      <span>DATA RECOVERY // 100%</span>
+    </div>
+
+    <div class="crashHeading">
+      <div class="crashCode" aria-hidden="true">NR-77</div>
+      <div>
+        <p>CRITICAL SYSTEM FAILURE</p>
+        <h2 id="crashTitle">坠 毁</h2>
+      </div>
+      <div class="crashGlyph" aria-hidden="true"><span></span><span></span></div>
+    </div>
+
+    <div id="newRecord" hidden><span>★</span> NEW HIGH SCORE / 新纪录 <span>★</span></div>
+
+    <div class="scoreCore">
+      <span class="scoreLabel">FINAL SCORE</span>
+      <strong id="finalScore">0</strong>
+      <span class="scoreRule"></span>
+    </div>
+
+    <div class="resultGrid" aria-label="本局数据">
+      <article class="resultStat statDistance">
+        <span class="statIndex">01</span>
+        <div><span class="statLabel">行驶距离</span><strong><span id="finalDistance">0.00</span><small>KM</small></strong></div>
+      </article>
+      <article class="resultStat statOrbs">
+        <span class="statIndex">02</span>
+        <div><span class="statLabel">能量球</span><strong><span id="finalOrbs">0</span><small>ORB</small></strong></div>
+      </article>
+      <article class="resultStat statCombo">
+        <span class="statIndex">03</span>
+        <div><span class="statLabel">最高连击</span><strong><span class="statPrefix">×</span><span id="finalCombo">0</span><small>CHAIN</small></strong></div>
+      </article>
+      <article class="resultStat statSpeed">
+        <span class="statIndex">04</span>
+        <div><span class="statLabel">极速</span><strong><span id="finalSpeed">0</span><small>KM/H</small></strong></div>
+      </article>
+    </div>
+
+    <div class="resultMeta">
+      <span>存活时间 <b id="finalTime">00:00.0</b></span>
+      <span>最终形态 <b id="finalTier">TIER 0 · 初始形态</b></span>
+    </div>
+
+    <button id="restartBtn"><span>再 来 一 局</span><small>REBOOT RUN</small></button>
+  </section>
 </div>
 
 <div class="overlay hidden" id="pauseScreen">

@@ -81,3 +81,105 @@ export function updateHUD(s) {
   });
   els.shieldState.textContent = s.tier < 2 ? '' : s.shieldReady ? '[就绪]' : `[充能 ${s.charge}/${SHIELD_RECHARGE}]`;
 }
+
+const resultEls = {
+  screen: $('overScreen'), panel: document.querySelector('.resultPanel'),
+  score: $('finalScore'), distance: $('finalDistance'), orbs: $('finalOrbs'),
+  combo: $('finalCombo'), speed: $('finalSpeed'), time: $('finalTime'),
+  tier: $('finalTier'), record: $('newRecord')
+};
+
+let resultRun = 0;
+let resultTimers = [];
+let resultFrames = [];
+let pendingSummary = null;
+
+function cancelResultAnimations() {
+  resultRun++;
+  for (const timer of resultTimers) clearTimeout(timer);
+  for (const frame of resultFrames) cancelAnimationFrame(frame);
+  resultTimers = [];
+  resultFrames = [];
+}
+
+function formatRunTime(seconds) {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.max(0, seconds - mins * 60);
+  return `${String(mins).padStart(2, '0')}:${secs.toFixed(1).padStart(4, '0')}`;
+}
+
+function animateResultValue(el, target, duration, delay, formatter, run, onStart) {
+  const timer = setTimeout(() => {
+    if (run !== resultRun) return;
+    if (onStart) onStart();
+    const started = performance.now();
+    const frame = now => {
+      if (run !== resultRun) return;
+      const progress = Math.min(1, (now - started) / duration);
+      const eased = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
+      el.textContent = formatter(target * eased);
+      if (progress < 1) resultFrames.push(requestAnimationFrame(frame));
+      else el.textContent = formatter(target);
+    };
+    resultFrames.push(requestAnimationFrame(frame));
+  }, delay);
+  resultTimers.push(timer);
+}
+
+export function prepareRunSummary(summary) {
+  cancelResultAnimations();
+  pendingSummary = summary;
+  resultEls.screen.classList.remove('resultsActive');
+  resultEls.panel.classList.remove('scoreLocked');
+  resultEls.score.textContent = '0';
+  resultEls.distance.textContent = '0.00';
+  resultEls.orbs.textContent = '0';
+  resultEls.combo.textContent = '0';
+  resultEls.speed.textContent = '0';
+  resultEls.time.textContent = '00:00.0';
+  resultEls.tier.textContent = `TIER ${summary.tier} · ${TIERS_UI[summary.tier]}`;
+  resultEls.tier.style.color = '#' + summary.tierColorHex;
+  resultEls.record.hidden = !summary.isRecord;
+}
+
+export function playRunSummary(onStatStart) {
+  if (!pendingSummary) return;
+  cancelResultAnimations();
+  const run = resultRun;
+  const s = pendingSummary;
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  resultEls.screen.classList.remove('resultsActive');
+  void resultEls.screen.offsetWidth;
+  resultEls.screen.classList.add('resultsActive');
+
+  const stats = [
+    [resultEls.score, s.score, 880, 160, n => Math.round(n).toLocaleString('zh-CN')],
+    [resultEls.distance, s.distanceMeters / 1000, 680, 390, n => n.toFixed(2)],
+    [resultEls.orbs, s.orbCount, 540, 500, n => Math.round(n).toLocaleString('zh-CN')],
+    [resultEls.combo, s.maxCombo, 560, 610, n => Math.round(n).toLocaleString('zh-CN')],
+    [resultEls.speed, s.topSpeedKmh, 650, 720, n => Math.round(n).toLocaleString('zh-CN')],
+    [resultEls.time, s.elapsed, 560, 830, formatRunTime]
+  ];
+
+  if (reducedMotion) {
+    for (const [el, target, , , formatter] of stats) el.textContent = formatter(target);
+    resultEls.panel.classList.add('scoreLocked');
+    return;
+  }
+
+  stats.forEach(([el, target, duration, delay, formatter], index) => {
+    animateResultValue(el, target, duration, delay, formatter, run,
+      () => { if (onStatStart) onStatStart(index); });
+  });
+  resultTimers.push(setTimeout(() => {
+    if (run === resultRun) resultEls.panel.classList.add('scoreLocked');
+  }, 1100));
+}
+
+export function resetRunSummary() {
+  cancelResultAnimations();
+  pendingSummary = null;
+  resultEls.screen.classList.remove('resultsActive');
+  resultEls.panel.classList.remove('scoreLocked');
+}
