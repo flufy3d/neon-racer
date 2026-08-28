@@ -13,6 +13,9 @@ const LANES = [-2.5, 0, 2.5];
 const GRAVITY = -38, JUMP_V = 13;
 const COMBO_WINDOW = 2.5;
 const TRACK_HALF = 2.5;
+const MIN_OUTER_SWAP_TIME = 0.32;
+const STABILIZER_ACCEL = 340;
+const STABILIZER_GAIN = 16;
 const TOASTS = { 5: '手感来了!', 10: '连击狂潮!', 15: '火力全开!', 20: '超神操作!', 30: '登峰造极!!' };
 const TIER_COLORS = [0x00ffff, 0x66ff22, 0xffee00, 0xff8822, 0xff22cc];
 const TIER_NAMES = ['', '引擎过载 · 横移强化!', '能量护盾展开!', '磁力场激活!', '究极形态 · 双倍得分!!'];
@@ -31,6 +34,8 @@ let overTimerId = null;
 let shieldReady = false, invuln = 0, orbCountAtShieldEvent = 0;
 let tier = 0;
 let latVel = 0;
+let stabilizerTarget = null;
+let lastGuidedLane = null, lastGuidedDist = -Infinity;
 const activePointers = new Map();
 const keys = { left: false, right: false };
 
@@ -230,9 +235,25 @@ function makePillar(z) {
   return p;
 }
 
+function buildPatternPlan(freeLane) {
+  const plan = [];
+  for (let lane = 0; lane < 3; lane++) {
+    if (lane === freeLane) continue;
+    if (Math.random() < 0.75) {
+      plan.push({ lane, type: Math.random() < 0.4 ? 'low' : 'wall' });
+    } else if (Math.random() < 0.5) {
+      plan.push({ lane, type: 'orb' });
+    }
+  }
+  return plan;
+}
+
+function isGuidedPattern(plan) {
+  return plan.filter(item => item.type === 'wall' || item.type === 'low').length === 2;
+}
+
 function spawnPattern() {
-  const roll = Math.random();
-  if (roll < 0.18) {
+  if (Math.random() < 0.18) {
     const lane = (Math.random() * 3) | 0;
     for (let i = 0; i < 5; i++) {
       const o = makeOrb(LANES[lane], 1.2, -140 - i * 2);
@@ -241,19 +262,30 @@ function spawnPattern() {
     }
     return;
   }
-  const freeLane = (Math.random() * 3) | 0;
-  for (let lane = 0; lane < 3; lane++) {
-    if (lane === freeLane) continue;
-    if (Math.random() < 0.75) {
-      const isLow = Math.random() < 0.4;
-      const obj = isLow ? makeLow(lane, -140) : makeWall(lane, -140);
+  let freeLane = (Math.random() * 3) | 0;
+  let plan = buildPatternPlan(freeLane);
+  let guided = isGuidedPattern(plan);
+  const outerSwap = lastGuidedLane !== null && Math.abs(freeLane - lastGuidedLane) === 2;
+  const transitionTime = (dist - lastGuidedDist) / Math.max(speed, 1);
+  if (guided && outerSwap && transitionTime < MIN_OUTER_SWAP_TIME) {
+    freeLane = 1;
+    plan = buildPatternPlan(freeLane);
+    guided = isGuidedPattern(plan);
+  }
+  for (const item of plan) {
+    if (item.type === 'wall' || item.type === 'low') {
+      const obj = item.type === 'low' ? makeLow(item.lane, -140) : makeWall(item.lane, -140);
       obstacles.push(obj);
       scene.add(obj);
-    } else if (Math.random() < 0.5) {
-      const o = makeOrb(LANES[lane], 1.2, -140);
+    } else {
+      const o = makeOrb(LANES[item.lane], 1.2, -140);
       orbs.push(o);
       scene.add(o);
     }
+  }
+  if (guided) {
+    lastGuidedLane = freeLane;
+    lastGuidedDist = dist;
   }
   if (Math.random() < 0.6) {
     for (let i = 1; i <= 3 + ((Math.random() * 3) | 0); i++) {
@@ -336,7 +368,8 @@ function resetGame() {
   beatTimer = 0; beatGlow = 0; timeScale = 1; lastSpeedMark = 26; camRoll = 0;
   shieldReady = false; invuln = 0; orbCountAtShieldEvent = 0;
   maxCombo = 0;
-  latVel = 0; activePointers.clear();
+  latVel = 0; stabilizerTarget = null; activePointers.clear();
+  lastGuidedLane = null; lastGuidedDist = -Infinity;
   for (const s of shockwaves) scene.remove(s.m);
   shockwaves = [];
   ui.els.vig.style.opacity = 0;
@@ -513,7 +546,7 @@ function animate() {
     }
 
     let dir = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
-    let braking = false;
+    let stabilizing = false;
     if (activePointers.size) {
       let s = 0, hasL = false, hasR = false;
       for (const p of activePointers.values()) {
@@ -521,15 +554,41 @@ function animate() {
         s += side;
         if (side < 0) hasL = true; else hasR = true;
       }
-      if (hasL && hasR) braking = true;
-      dir += s;
+      if (hasL && hasR) {
+        stabilizing = true;
+        dir = 0;
+        if (stabilizerTarget === null) {
+          let laneIndex = 1;
+          for (let i = 0; i < LANES.length; i++) {
+            if (Math.abs(LANES[i] - ship.position.x) < Math.abs(LANES[laneIndex] - ship.position.x)) laneIndex = i;
+          }
+          stabilizerTarget = LANES[laneIndex];
+          latVel *= 0.25;
+          ui.floatLabel(['左轨锁定', '中线锁定', '右轨锁定'][laneIndex], ship.position, '#66ffff', 14);
+          beep(620 + laneIndex * 90, 0.07, 'triangle', 0.065);
+        }
+      } else {
+        stabilizerTarget = null;
+        dir += s;
+      }
+    } else {
+      stabilizerTarget = null;
     }
     dir = Math.max(-1, Math.min(1, dir));
     const maxV = (5 + speed * 0.27) * (1 + tier * 0.08);
-    if (dir !== 0) {
+    if (stabilizing) {
+      const error = stabilizerTarget - ship.position.x;
+      const targetVel = Math.max(-maxV, Math.min(maxV, error * STABILIZER_GAIN));
+      const step = STABILIZER_ACCEL * dt;
+      latVel += Math.max(-step, Math.min(step, targetVel - latVel));
+      if (Math.abs(error) < 0.012 && Math.abs(latVel) < 0.45) {
+        ship.position.x = stabilizerTarget;
+        latVel = 0;
+      }
+    } else if (dir !== 0) {
       latVel += dir * 150 * dt;
     } else {
-      const decel = (braking ? 340 : 175) * dt;
+      const decel = 175 * dt;
       latVel = Math.abs(latVel) <= decel ? 0 : latVel - Math.sign(latVel) * decel;
     }
     latVel = Math.max(-maxV, Math.min(maxV, latVel));
