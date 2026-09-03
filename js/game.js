@@ -67,6 +67,7 @@ let airJumps = 0;
 let latVel = 0;
 let stabilizerEngaged = false, dualHoldTime = 0;
 let lastGuidedLane = null, lastGuidedDist = -Infinity;
+let validPrevLanes = new Set([0, 1, 2]), lastPatternDist = -Infinity;
 const activePointers = new Map();
 const keys = { left: false, right: false };
 
@@ -909,18 +910,51 @@ function spawnPattern() {
       orbs.push(o);
       scene.add(o);
     }
+    validPrevLanes = new Set([0, 1, 2]);
+    lastPatternDist = dist;
     return;
   }
   let freeLane = (Math.random() * 3) | 0;
   let plan = buildPatternPlan(freeLane);
-  let guided = isGuidedPattern(plan);
-  const outerSwap = lastGuidedLane !== null && Math.abs(freeLane - lastGuidedLane) === 2;
-  const transitionTime = (dist - lastGuidedDist) / Math.max(speed, 1);
-  if (guided && outerSwap && transitionTime < MIN_OUTER_SWAP_TIME) {
-    freeLane = 1;
-    plan = buildPatternPlan(freeLane);
-    guided = isGuidedPattern(plan);
+
+  const maxV_safe = 5 + speed * 0.27;
+  const a = 150;
+  const t_acc = maxV_safe / a;
+  const x_acc = 0.5 * a * t_acc * t_acc;
+  const dx_min_swap = 4.35;
+  const t_double_min = dx_min_swap <= x_acc ? Math.sqrt(2 * dx_min_swap / a) : (t_acc + (dx_min_swap - x_acc) / maxV_safe);
+  const transTime = lastPatternDist === -Infinity ? Infinity : (dist - lastPatternDist) / Math.max(speed, 1);
+  const cannotDoubleSwap = transTime < t_double_min;
+
+  let obsSet = new Set(
+    plan.filter(item => item.type === 'wall' || item.type === 'low').map(item => item.lane)
+  );
+
+  if (cannotDoubleSwap) {
+    const needFrom0 = validPrevLanes.has(0);
+    const canReachFrom0 = !obsSet.has(0) || !obsSet.has(1);
+    const needFrom2 = validPrevLanes.has(2);
+    const canReachFrom2 = !obsSet.has(2) || !obsSet.has(1);
+    if ((needFrom0 && !canReachFrom0) || (needFrom2 && !canReachFrom2)) {
+      plan = plan.filter(item => item.lane !== 1 || (item.type !== 'wall' && item.type !== 'low'));
+      plan.push({ lane: 1, type: 'orb' });
+      obsSet.delete(1);
+    }
   }
+
+  const openLanes = [0, 1, 2].filter(l => !obsSet.has(l));
+  const nextValid = new Set();
+  for (const cur of openLanes) {
+    for (const prev of validPrevLanes) {
+      if (!cannotDoubleSwap || Math.abs(cur - prev) <= 1) {
+        nextValid.add(cur);
+        break;
+      }
+    }
+  }
+  validPrevLanes = nextValid.size > 0 ? nextValid : new Set(openLanes);
+  lastPatternDist = dist;
+
   for (const item of plan) {
     if (item.type === 'wall' || item.type === 'low') {
       const obj = item.type === 'low' ? makeLow(item.lane, -140) : makeWall(item.lane, -140);
@@ -931,10 +965,6 @@ function spawnPattern() {
       orbs.push(o);
       scene.add(o);
     }
-  }
-  if (guided) {
-    lastGuidedLane = freeLane;
-    lastGuidedDist = dist;
   }
   if (Math.random() < 0.6) {
     for (let i = 1; i <= 3 + ((Math.random() * 3) | 0); i++) {
@@ -1085,6 +1115,7 @@ function resetGame() {
   maxCombo = 0;
   latVel = 0; stabilizerEngaged = false; dualHoldTime = 0; activePointers.clear();
   lastGuidedLane = null; lastGuidedDist = -Infinity;
+  validPrevLanes = new Set([0, 1, 2]); lastPatternDist = -Infinity;
   for (const s of shockwaves) scene.remove(s.m);
   shockwaves = [];
   for (const met of meteors) {
