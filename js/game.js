@@ -35,7 +35,7 @@ const MORPH = {
 };
 
 let scene, camera, renderer, composer, clock, bloomPass, railMat;
-let grid, ship, shipGlowMat;
+let grid, ship, shipGlowMat, groundGlow, groundGlowMat;
 let obstacles = [], orbs = [], pillars = [], particles = [], streaks = [], shockwaves = [];
 let state = 'menu', paused = false;
 let vy = 0, grounded = true;
@@ -127,6 +127,12 @@ function initScene() {
   }
   starGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0x88ccff, size: 0.35, transparent: true, opacity: 0.7 })));
+
+  groundGlow = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 2.6), groundGlowMat);
+  groundGlow.name = 'groundGlow';
+  groundGlow.rotation.x = -Math.PI / 2;
+  groundGlow.position.set(0, 0.02, 0.35);
+  scene.add(groundGlow);
 
   buildShip();
 }
@@ -472,6 +478,7 @@ function poseShip(m, t) {
     grid.material.color.copy(col).multiplyScalar(0.5);
     railMat.color.copy(col).multiplyScalar(0.9);
     scene.background.copy(BG_BASE).lerp(col, 0.05);
+    if (groundGlowMat) groundGlowMat.color.copy(col);
   }
 }
 
@@ -481,9 +488,36 @@ function updateShipMorph(dt, t) {
   poseShip(shipMorph, t);
 }
 
-const wallMat = new THREE.MeshBasicMaterial({ color: 0xff2255 });
-const lowMat = new THREE.MeshBasicMaterial({ color: 0xff8800 });
-const orbMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, fog: false });
+function updateGroundGlow() {
+  if (!groundGlow) return;
+  groundGlow.position.x = ship.position.x;
+  groundGlow.position.z = ship.position.z + 0.35;
+  const h = Math.max(0, ship.position.y - 0.95);
+  const scaleFactor = 1 + h * 0.4;
+  groundGlow.scale.set(scaleFactor, scaleFactor, 1);
+  groundGlowMat.opacity = Math.max(0.06, 0.45 - h * 0.16);
+  groundGlow.visible = ship.visible && state !== 'over';
+}
+
+// 障碍物单例几何体与材质（消除重复分配与内存泄漏，纯正交赛博边框）
+const wallBoxGeo = new THREE.BoxGeometry(2.4, 3.2, 0.5);
+const wallEdgesGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(2.44, 3.24, 0.52));
+const lowBoxGeo = new THREE.BoxGeometry(2.4, 0.75, 0.5);
+const lowEdgesGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(2.44, 0.77, 0.52));
+
+const wallBodyMat = new THREE.MeshBasicMaterial({ color: 0x160610, transparent: true, opacity: 0.92, depthWrite: true });
+const lowBodyMat = new THREE.MeshBasicMaterial({ color: 0x160d04, transparent: true, opacity: 0.92, depthWrite: true });
+const wallEdgeMat = new THREE.LineBasicMaterial({ color: 0xff1155 });
+const lowEdgeMat = new THREE.LineBasicMaterial({ color: 0xffaa00 });
+
+// 能量球共享单例组件（白炽高能核心 + 青金正交双轴陀螺环，杜绝几何体重复实例化）
+const orbCoreGeo = new THREE.SphereGeometry(0.24, 16, 16);
+const orbCoreMat = new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false });
+const orbInnerRingGeo = new THREE.TorusGeometry(0.46, 0.035, 8, 24);
+const orbRingMat1 = new THREE.MeshBasicMaterial({ color: 0x00ffff, fog: false });
+const orbOuterRingGeo = new THREE.TorusGeometry(0.68, 0.026, 8, 24);
+const orbRingMat2 = new THREE.MeshBasicMaterial({ color: 0xffd700, fog: false });
+
 const pillarMat = new THREE.MeshBasicMaterial({ color: 0x2244ff });
 const streakMat = new THREE.MeshBasicMaterial({ color: 0x66ddff, transparent: true, opacity: 0.35, fog: false });
 
@@ -501,12 +535,33 @@ function makeGlowTexture() {
 }
 const orbHaloMat = new THREE.SpriteMaterial({ map: makeGlowTexture(), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
 
+function makeGroundGlowTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.35, 'rgba(255,255,255,0.55)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+  const tex = new THREE.CanvasTexture(c);
+  tex.__isPureWhiteGradient = true;
+  return tex;
+}
+groundGlowMat = new THREE.MeshBasicMaterial({
+  map: makeGroundGlowTexture(),
+  transparent: true,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  opacity: 0.45
+});
+
 function makeWall(lane, z) {
   const g = new THREE.Group();
-  const w = new THREE.Mesh(new THREE.BoxGeometry(2.4, 3.2, 0.5), wallMat);
+  const w = new THREE.Mesh(wallBoxGeo, wallBodyMat);
   w.position.y = 1.6;
-  const e = new THREE.Mesh(new THREE.BoxGeometry(2.55, 3.35, 0.56),
-    new THREE.MeshBasicMaterial({ color: 0xff2255, wireframe: true }));
+  const e = new THREE.LineSegments(wallEdgesGeo, wallEdgeMat);
   e.position.y = 1.6;
   g.add(w, e);
   g.position.set(LANES[lane], 0, z);
@@ -516,10 +571,9 @@ function makeWall(lane, z) {
 
 function makeLow(lane, z) {
   const g = new THREE.Group();
-  const b = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.75, 0.5), lowMat);
+  const b = new THREE.Mesh(lowBoxGeo, lowBodyMat);
   b.position.y = 0.38;
-  const e = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.85, 0.55),
-    new THREE.MeshBasicMaterial({ color: 0xff8800, wireframe: true }));
+  const e = new THREE.LineSegments(lowEdgesGeo, lowEdgeMat);
   e.position.y = 0.38;
   g.add(b, e);
   g.position.set(LANES[lane], 0, z);
@@ -528,19 +582,27 @@ function makeLow(lane, z) {
 }
 
 function makeOrb(x, y, z) {
-  const m = new THREE.Mesh(new THREE.SphereGeometry(0.36, 16, 16), orbMat);
+  const g = new THREE.Group();
+  const core = new THREE.Mesh(orbCoreGeo, orbCoreMat);
   const halo = new THREE.Sprite(orbHaloMat);
   halo.scale.set(1.9, 1.9, 1);
-  m.add(halo);
-  const ring = new THREE.Mesh(
-    new THREE.TorusGeometry(0.6, 0.05, 8, 26),
-    new THREE.MeshBasicMaterial({ color: 0x00ffff, fog: false })
-  );
-  ring.rotation.x = Math.PI / 2;
-  m.add(ring);
-  m.userData = { baseY: y, phase: Math.random() * Math.PI * 2, ring };
-  m.position.set(x, y, z);
-  return m;
+  core.add(halo);
+
+  const innerRing = new THREE.Mesh(orbInnerRingGeo, orbRingMat1);
+  innerRing.rotation.x = Math.PI / 2;
+  const outerRing = new THREE.Mesh(orbOuterRingGeo, orbRingMat2);
+  outerRing.rotation.y = Math.PI / 4;
+
+  g.add(core, innerRing, outerRing);
+  g.userData = {
+    baseY: y,
+    phase: Math.random() * Math.PI * 2,
+    core,
+    innerRing,
+    outerRing
+  };
+  g.position.set(x, y, z);
+  return g;
 }
 
 function makePillar(z) {
@@ -684,6 +746,12 @@ function resetGame() {
   ship.position.set(0, 0.95, 0);
   ship.rotation.set(0, 0, 0);
   ship.visible = true;
+  if (groundGlow) {
+    groundGlow.visible = true;
+    groundGlow.position.set(0, 0.02, 0.35);
+    groundGlow.scale.set(1, 1, 1);
+    if (groundGlowMat) groundGlowMat.opacity = 0.45;
+  }
   updateHUD();
 }
 
@@ -704,6 +772,7 @@ function gameOver() {
   crashSound();
   explode(ship.position);
   ship.visible = false;
+  if (groundGlow) groundGlow.visible = false;
   shakeTime = 0.9;
   ui.flash('#ffffff', 0.5, 500);
   ui.els.comboBox.style.opacity = 0;
@@ -853,6 +922,7 @@ function animate() {
     ship.rotation.set(0, 0, shipBank);
     ship.position.y = 0.95 + Math.sin(t * 3) * 0.1;
     camera.lookAt(ship.position.x * 0.4, 1, -12);
+    updateGroundGlow();
   }
 
   if (state === 'playing' && !paused) {
@@ -946,6 +1016,7 @@ function animate() {
       ship.visible = Math.floor(t * 18) % 2 === 0;
       if (invuln <= 0) ship.visible = true;
     }
+    updateGroundGlow();
 
     for (let i = pillars.length - 1; i >= 0; i--) {
       pillars[i].position.z += move;
@@ -1023,7 +1094,14 @@ function animate() {
       o.position.z += move;
       o.position.y = o.userData.baseY + Math.sin(t * 4 + o.userData.phase) * 0.15;
       o.rotation.y += dt * 3;
-      if (o.userData.ring) {
+      if (o.userData.innerRing) {
+        o.userData.innerRing.rotation.x = t * 2.8 + o.userData.phase;
+        o.userData.innerRing.rotation.z = Math.sin(t * 1.8 + o.userData.phase) * 0.4;
+      }
+      if (o.userData.outerRing) {
+        o.userData.outerRing.rotation.y = t * -2.1 + o.userData.phase;
+        o.userData.outerRing.rotation.x = Math.cos(t * 1.5 + o.userData.phase) * 0.5;
+      } else if (o.userData.ring) {
         o.userData.ring.rotation.x = t * 2 + o.userData.phase;
         o.userData.ring.rotation.y = Math.sin(t * 3 + o.userData.phase) * 0.6;
       }
@@ -1183,3 +1261,21 @@ function bumpScore() {
 }
 
 animate();
+
+window.__neon = {
+  get scene() { return scene; },
+  get camera() { return camera; },
+  get renderer() { return renderer; },
+  get composer() { return composer; },
+  get bloomPass() { return bloomPass; },
+  get ship() { return ship; },
+  get state() { return state; },
+  get tier() { return tier; },
+  get groundGlow() { return groundGlow; },
+  get groundGlowMat() { return groundGlowMat; },
+  updateGroundGlow,
+  makeWall,
+  makeLow,
+  makeOrb,
+  TIER_COLORS
+};
