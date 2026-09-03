@@ -24,13 +24,14 @@ import { LuminosityHighPassShader } from '../shaders/LuminosityHighPassShader.js
  */
 class UnrealBloomPass extends Pass {
 
-	constructor( resolution, strength, radius, threshold ) {
+	constructor( resolution, strength, radius, threshold, resolutionScale = 0.5 ) {
 
 		super();
 
 		this.strength = ( strength !== undefined ) ? strength : 1;
 		this.radius = radius;
 		this.threshold = threshold;
+		this.resolutionScale = ( resolutionScale !== undefined ) ? resolutionScale : 0.5;
 		this.resolution = ( resolution !== undefined ) ? new Vector2( resolution.x, resolution.y ) : new Vector2( 256, 256 );
 
 		// create color only once here, reuse it later inside the render function
@@ -40,8 +41,8 @@ class UnrealBloomPass extends Pass {
 		this.renderTargetsHorizontal = [];
 		this.renderTargetsVertical = [];
 		this.nMips = 5;
-		let resx = Math.round( this.resolution.x / 2 );
-		let resy = Math.round( this.resolution.y / 2 );
+		let resx = Math.round( ( this.resolution.x * this.resolutionScale ) / 2 );
+		let resy = Math.round( ( this.resolution.y * this.resolutionScale ) / 2 );
 
 		this.renderTargetBright = new WebGLRenderTarget( resx, resy, { type: HalfFloatType } );
 		this.renderTargetBright.texture.name = 'UnrealBloomPass.bright';
@@ -87,8 +88,8 @@ class UnrealBloomPass extends Pass {
 
 		this.separableBlurMaterials = [];
 		const kernelSizeArray = [ 3, 5, 7, 9, 11 ];
-		resx = Math.round( this.resolution.x / 2 );
-		resy = Math.round( this.resolution.y / 2 );
+		resx = Math.round( ( this.resolution.x * this.resolutionScale ) / 2 );
+		resy = Math.round( ( this.resolution.y * this.resolutionScale ) / 2 );
 
 		for ( let i = 0; i < this.nMips; i ++ ) {
 
@@ -134,6 +135,29 @@ class UnrealBloomPass extends Pass {
 			transparent: true
 		} );
 
+		// Single-pass direct screen composite material (eliminates TBDR tile store/load ping-pong)
+		this.screenCompositeMaterial = new ShaderMaterial( {
+			uniforms: {
+				tBase: { value: null },
+				tBloom: { value: null }
+			},
+			vertexShader:
+				`varying vec2 vUv;
+				void main() {
+					vUv = uv;
+					gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+				}`,
+			fragmentShader:
+				`varying vec2 vUv;
+				uniform sampler2D tBase;
+				uniform sampler2D tBloom;
+				void main() {
+					gl_FragColor = texture2D( tBase, vUv ) + texture2D( tBloom, vUv );
+				}`,
+			depthTest: false,
+			depthWrite: false
+		} );
+
 		this.enabled = true;
 		this.needsSwap = false;
 
@@ -172,6 +196,7 @@ class UnrealBloomPass extends Pass {
 
 		this.compositeMaterial.dispose();
 		this.blendMaterial.dispose();
+		this.screenCompositeMaterial.dispose();
 		this.basic.dispose();
 
 		//
@@ -182,8 +207,8 @@ class UnrealBloomPass extends Pass {
 
 	setSize( width, height ) {
 
-		let resx = Math.round( width / 2 );
-		let resy = Math.round( height / 2 );
+		let resx = Math.round( ( width * this.resolutionScale ) / 2 );
+		let resy = Math.round( ( height * this.resolutionScale ) / 2 );
 
 		this.renderTargetBright.setSize( resx, resy );
 
@@ -211,19 +236,6 @@ class UnrealBloomPass extends Pass {
 		renderer.setClearColor( this.clearColor, 0 );
 
 		if ( maskActive ) renderer.state.buffers.stencil.setTest( false );
-
-		// Render input to screen
-
-		if ( this.renderToScreen ) {
-
-			this.fsQuad.material = this.basic;
-			this.basic.map = readBuffer.texture;
-
-			renderer.setRenderTarget( null );
-			renderer.clear();
-			this.fsQuad.render( renderer );
-
-		}
 
 		// 1. Extract Bright Areas
 
@@ -270,20 +282,21 @@ class UnrealBloomPass extends Pass {
 		renderer.clear();
 		this.fsQuad.render( renderer );
 
-		// Blend it additively over the input texture
-
-		this.fsQuad.material = this.blendMaterial;
-		this.copyUniforms[ 'tDiffuse' ].value = this.renderTargetsHorizontal[ 0 ].texture;
-
+		// Blend it over the input texture: single-pass direct to screen when renderToScreen is true
 		if ( maskActive ) renderer.state.buffers.stencil.setTest( true );
 
 		if ( this.renderToScreen ) {
 
+			this.screenCompositeMaterial.uniforms[ 'tBase' ].value = readBuffer.texture;
+			this.screenCompositeMaterial.uniforms[ 'tBloom' ].value = this.renderTargetsHorizontal[ 0 ].texture;
+			this.fsQuad.material = this.screenCompositeMaterial;
 			renderer.setRenderTarget( null );
 			this.fsQuad.render( renderer );
 
 		} else {
 
+			this.fsQuad.material = this.blendMaterial;
+			this.copyUniforms[ 'tDiffuse' ].value = this.renderTargetsHorizontal[ 0 ].texture;
 			renderer.setRenderTarget( readBuffer );
 			this.fsQuad.render( renderer );
 

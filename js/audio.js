@@ -22,9 +22,25 @@ export function setMusicIntensity(v) {
   musicLevel = Math.max(0, Math.min(1, v));
 }
 
+let hatBuffer = null, snareBuffer = null;
+
+function initAudioBuffers() {
+  if (!audioCtx || hatBuffer) return;
+  const hatLen = Math.floor(audioCtx.sampleRate * 0.04);
+  hatBuffer = audioCtx.createBuffer(1, hatLen, audioCtx.sampleRate);
+  const hd = hatBuffer.getChannelData(0);
+  for (let i = 0; i < hatLen; i++) hd[i] = (Math.random() * 2 - 1) * (1 - i / hatLen);
+
+  const snareLen = Math.floor(audioCtx.sampleRate * 0.16);
+  snareBuffer = audioCtx.createBuffer(1, snareLen, audioCtx.sampleRate);
+  const sd = snareBuffer.getChannelData(0);
+  for (let i = 0; i < snareLen; i++) sd[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / snareLen, 2);
+}
+
 export function ensureAudio() {
   if (!audioCtx) { try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} }
   if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  if (audioCtx && !hatBuffer) initAudioBuffers();
 }
 
 export function beep(freq, dur, type = 'square', vol = 0.15) {
@@ -77,12 +93,9 @@ function kick(t) {
 
 function hat(t, vol = 0.055) {
   if (!audioCtx) return;
-  const len = audioCtx.sampleRate * 0.04;
-  const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
-  const d = buf.getChannelData(0);
-  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  if (!hatBuffer) initAudioBuffers();
   const s = audioCtx.createBufferSource();
-  s.buffer = buf;
+  s.buffer = hatBuffer;
   const f = audioCtx.createBiquadFilter();
   f.type = 'highpass'; f.frequency.value = 6500;
   const g = audioCtx.createGain(); g.gain.value = vol;
@@ -92,12 +105,9 @@ function hat(t, vol = 0.055) {
 
 function snare(t) {
   if (!audioCtx) return;
-  const len = audioCtx.sampleRate * 0.16;
-  const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
-  const d = buf.getChannelData(0);
-  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2);
+  if (!snareBuffer) initAudioBuffers();
   const s = audioCtx.createBufferSource();
-  s.buffer = buf;
+  s.buffer = snareBuffer;
   const f = audioCtx.createBiquadFilter();
   f.type = 'bandpass'; f.frequency.value = 1800; f.Q.value = 0.9;
   const g = audioCtx.createGain(); g.gain.value = 0.17;

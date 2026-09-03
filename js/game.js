@@ -100,7 +100,7 @@ function initScene() {
   camera.position.set(0, 4.6, 8.5);
   camera.lookAt(0, 1, -12);
 
-  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer = new THREE.WebGLRenderer({ antialias: false });
   renderer.setSize(innerWidth, innerHeight);
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   document.body.appendChild(renderer.domElement);
@@ -108,7 +108,7 @@ function initScene() {
   const pr = Math.min(devicePixelRatio, 2);
   const renderTarget = new THREE.WebGLRenderTarget(innerWidth * pr, innerHeight * pr, {
     type: THREE.HalfFloatType,
-    samples: 4
+    samples: 0
   });
   composer = new EffectComposer(renderer, renderTarget);
   composer.setSize(innerWidth, innerHeight);
@@ -578,6 +578,8 @@ const orbRingMat1 = new THREE.MeshBasicMaterial({ color: 0x00ffff, fog: false })
 const orbOuterRingGeo = new THREE.TorusGeometry(0.68, 0.026, 8, 24);
 const orbRingMat2 = new THREE.MeshBasicMaterial({ color: 0xffd700, fog: false });
 
+const pillarGeo = new THREE.BoxGeometry(0.3, 5, 0.3);
+const streakGeo = new THREE.BoxGeometry(0.05, 0.05, 1);
 const pillarMat = new THREE.MeshBasicMaterial({ color: 0x2244ff });
 const streakMat = new THREE.MeshBasicMaterial({ color: 0x66ddff, transparent: true, opacity: 0.35, fog: false });
 function makeCyberSun() {
@@ -724,7 +726,7 @@ function makeOrb(x, y, z) {
 }
 
 function makePillar(z) {
-  const p = new THREE.Mesh(new THREE.BoxGeometry(0.3, 5, 0.3), pillarMat);
+  const p = new THREE.Mesh(pillarGeo, pillarMat);
   p.position.set(Math.random() < 0.5 ? -7.5 : 7.5, 2.5, z);
   return p;
 }
@@ -943,22 +945,79 @@ function spawnPattern() {
   }
 }
 
+const PARTICLE_POOL_SIZE = 24;
+const MAX_PARTICLES_PER_BURST = 240;
+const particlePool = [];
+
+function initParticlePool() {
+  if (particlePool.length > 0) return;
+  for (let i = 0; i < PARTICLE_POOL_SIZE; i++) {
+    const geo = new THREE.BufferGeometry();
+    const posArr = new Float32Array(MAX_PARTICLES_PER_BURST * 3);
+    const posAttr = new THREE.BufferAttribute(posArr, 3);
+    posAttr.setUsage(THREE.DynamicDrawUsage);
+    geo.setAttribute('position', posAttr);
+    geo.setDrawRange(0, 0);
+    const mat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.2, transparent: true, fog: false });
+    const pts = new THREE.Points(geo, mat);
+    pts.visible = false;
+    pts.frustumCulled = false;
+    scene.add(pts);
+
+    const vel = [];
+    for (let j = 0; j < MAX_PARTICLES_PER_BURST; j++) {
+      vel.push(new THREE.Vector3());
+    }
+
+    particlePool.push({
+      pts,
+      geo,
+      posArr,
+      posAttr,
+      mat,
+      vel,
+      count: 0,
+      life: 0,
+      maxLife: 1,
+      active: false
+    });
+  }
+}
+
 function burst(pos, color, size, maxLife, power, count = 140) {
-  const geo = new THREE.BufferGeometry();
-  const posArr = new Float32Array(count * 3), vel = [];
-  for (let i = 0; i < count; i++) {
-    posArr[i * 3] = pos.x; posArr[i * 3 + 1] = pos.y; posArr[i * 3 + 2] = pos.z;
-    vel.push(new THREE.Vector3(
+  if (particlePool.length === 0) initParticlePool();
+  let item = particlePool.find(p => !p.active);
+  if (!item) {
+    let minLife = Infinity;
+    for (const p of particlePool) {
+      if (p.life < minLife) { minLife = p.life; item = p; }
+    }
+  }
+  if (!item) return;
+
+  const actualCount = Math.min(count, MAX_PARTICLES_PER_BURST);
+  item.count = actualCount;
+  item.life = maxLife;
+  item.maxLife = maxLife;
+  item.mat.color.set(color);
+  item.mat.size = size;
+  item.mat.opacity = 1;
+
+  const posArr = item.posArr;
+  for (let i = 0; i < actualCount; i++) {
+    posArr[i * 3] = pos.x;
+    posArr[i * 3 + 1] = pos.y;
+    posArr[i * 3 + 2] = pos.z;
+    item.vel[i].set(
       (Math.random() - 0.5) * 16 * power,
       Math.random() * 12 * power + 2,
       (Math.random() - 0.5) * 16 * power
-    ));
+    );
   }
-  geo.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
-  const mat = new THREE.PointsMaterial({ color, size, transparent: true, fog: false });
-  const pts = new THREE.Points(geo, mat);
-  scene.add(pts);
-  particles.push({ pts, vel, life: maxLife, maxLife });
+  item.geo.setDrawRange(0, actualCount);
+  item.posAttr.needsUpdate = true;
+  item.pts.visible = true;
+  item.active = true;
 }
 
 function explode(pos) {
@@ -993,7 +1052,10 @@ function applyShipTier() {
 
 function resetGame() {
   for (const o of [...obstacles, ...orbs, ...pillars, ...streaks, ...roadside, ...arches, ...warpBeacons]) scene.remove(o);
-  for (const p of particles) scene.remove(p.pts);
+  for (const p of particlePool) {
+    p.active = false;
+    p.pts.visible = false;
+  }
   obstacles = []; orbs = []; pillars = []; roadside = []; arches = []; warpBeacons = []; particles = []; streaks = [];
   if (singularityHalo) {
     singularityHalo.material.opacity = 0;
@@ -1397,7 +1459,8 @@ function animate() {
     streakTimer -= dt;
     if (speed > 40 && streakTimer <= 0) {
       streakTimer = 0.05 + Math.random() * 0.07;
-      const s = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 4 + Math.random() * 5), streakMat);
+      const s = new THREE.Mesh(streakGeo, streakMat);
+      s.scale.set(1, 1, 4 + Math.random() * 5);
       s.position.set((Math.random() - 0.5) * 18, Math.random() * 7 + 0.5, -120);
       streaks.push(s);
       scene.add(s);
@@ -1612,19 +1675,26 @@ function animate() {
   }
 
   const pdt = dt * timeScale;
-  for (let i = particles.length - 1; i >= 0; i--) {
-    const p = particles[i];
+  for (let i = 0; i < particlePool.length; i++) {
+    const p = particlePool[i];
+    if (!p.active) continue;
     p.life -= pdt;
-    const arr = p.pts.geometry.attributes.position.array;
-    for (let j = 0; j < p.vel.length; j++) {
-      p.vel[j].y -= 20 * pdt;
-      arr[j * 3] += p.vel[j].x * pdt;
-      arr[j * 3 + 1] = Math.max(0.05, arr[j * 3 + 1] + p.vel[j].y * pdt);
-      arr[j * 3 + 2] += p.vel[j].z * pdt;
+    if (p.life <= 0) {
+      p.active = false;
+      p.pts.visible = false;
+      continue;
     }
-    p.pts.geometry.attributes.position.needsUpdate = true;
-    p.pts.material.opacity = Math.max(0, p.life / p.maxLife);
-    if (p.life <= 0) { scene.remove(p.pts); particles.splice(i, 1); }
+    const arr = p.posArr;
+    const cnt = p.count;
+    for (let j = 0; j < cnt; j++) {
+      const v = p.vel[j];
+      v.y -= 20 * pdt;
+      arr[j * 3] += v.x * pdt;
+      arr[j * 3 + 1] = Math.max(0.05, arr[j * 3 + 1] + v.y * pdt);
+      arr[j * 3 + 2] += v.z * pdt;
+    }
+    p.posAttr.needsUpdate = true;
+    p.mat.opacity = Math.max(0, p.life / p.maxLife);
   }
 
   beatGlow *= Math.exp(-dt * 6);
