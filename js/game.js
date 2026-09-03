@@ -90,10 +90,18 @@ function initScene() {
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
   document.body.appendChild(renderer.domElement);
 
-  composer = new EffectComposer(renderer);
+  const pr = Math.min(devicePixelRatio, 2);
+  const renderTarget = new THREE.WebGLRenderTarget(innerWidth * pr, innerHeight * pr, {
+    type: THREE.HalfFloatType,
+    samples: 4
+  });
+  composer = new EffectComposer(renderer, renderTarget);
+  composer.setSize(innerWidth, innerHeight);
   composer.addPass(new RenderPass(scene, camera));
   bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 1.1, 0.6, 0.25);
   composer.addPass(bloomPass);
+  window.composer = composer;
+  window.bloomPass = bloomPass;
 
   scene.add(new THREE.AmbientLight(0x5566aa, 1.6));
   const dir = new THREE.DirectionalLight(0xffffff, 2);
