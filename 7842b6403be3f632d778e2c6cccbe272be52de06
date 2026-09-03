@@ -1,0 +1,38 @@
+更正：本次提交信息正文里的「第 2 轮：中止」是错的。
+
+第 2 轮验证者并没有中止，它跑完了。agy 返回 status=ERROR 加上
+"The stream was interrupted. Please continue the task you were working on."，
+但 returncode=0、structured_output 完整、response 里连收尾总结都写完了 ——
+中断的只是中途某一段流，agy 自己接上继续跑完，信封上的 status 没改回来。
+
+hypoloop 当时只看 status 就把这份完整产出丢弃了（已修，flufy3d/hypoloop@fc1cb76）。
+本次提交里的 js/audio.js 与 vendor/addons/postprocessing/UnrealBloomPass.js
+不是「没有证据的改动」，证据一直存在，只是被 hypoloop 自己扔了。
+
+第 2 轮真实裁决（4 实证 1 证伪）：
+
+[refuted]   h1-bloom-pass-mips-bandwidth  —— 已回滚
+  砍 UnrealBloomPass 的 nMips 后游戏初始化直接崩溃：
+  TypeError: Cannot read properties of undefined (reading 'texture')。
+  且金字塔 Mip 3+4 仅占全部 Mip 像素面积的 1.48%，「省 40% 带宽」前提不成立。
+
+[supported] ch1-bloom-resolution-decoupling
+  移动视口 390x844 DPR=2：bloom FBO 由 390x844 降为 195x422（面积 -75%），
+  FPS 6.69 -> 11.69（+74.7%），完整保留 5 级 Mip，
+  neonCyan 像素维持 38273 不变（观感未被牺牲）。
+
+[supported] ch2-tbdr-canvas-fbo-pingpong-elimination
+  bindFramebuffer(null) 由 2.00 次/帧 降为 1.00 次/帧，
+  totalBindFramebuffer 15.00 -> 14.00 次/帧。
+
+[supported] h2-particle-system-buffer-pooling
+  10 秒内 createBufferCount 60 -> 44（粒子几何体创建归零），
+  deleteBufferCount 3 -> 0。
+
+[supported] h3-webaudio-noise-buffer-caching
+  10 秒内 audioCreateBufferCount 6 -> 0（预烘焙单例白噪声缓冲）。
+
+独立复核（与 agent 分开的一套 harness，手机视口 390x844 DPR=2）：
+  帧率 2.82 -> 12.38；跑到 800m 耗时 187s -> 44s；
+  几何体按里程对齐 master 49/81/101/134（200/400/600/800m 线性爬升）
+  对比新版 41/44/63/63（600m 后持平）；console 零报错。
