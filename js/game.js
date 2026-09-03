@@ -35,17 +35,22 @@ const MORPH = {
 };
 
 const MILESTONE_ZONES = [
-  { dist: 0,    name: 'ZONE 1 · 赛博黎明', color: '#00ffff', bgHex: 0x05050f, fogHex: 0x05050f, archFreq: 0 },
-  { dist: 400,  name: 'ZONE 2 · 霓虹拱门', color: '#ff00aa', bgHex: 0x0e051a, fogHex: 0x0e051a, archFreq: 110 },
-  { dist: 1200, name: 'ZONE 3 · 跃迁信标', color: '#ffaa00', bgHex: 0x180812, fogHex: 0x180812, archFreq: 85 },
-  { dist: 2500, name: 'ZONE 4 · 极光奇点', color: '#00ff88', bgHex: 0x041614, fogHex: 0x041614, archFreq: 65 },
-  { dist: 4000, name: 'ZONE 5 · 量子深空', color: '#b066ff', bgHex: 0x120428, fogHex: 0x120428, archFreq: 50 }
+  { dist: 0,    name: 'ZONE 1 · 赛博黎明', color: '#00ffff', bgHex: 0x05050f, fogHex: 0x05050f, archFreq: 0,
+    wallEdgeHex: 0xff1155, wallCoreHex: 0xff0055, lowEdgeHex: 0xffaa00, lowCoreHex: 0xffaa00 },
+  { dist: 400,  name: 'ZONE 2 · 霓虹拱门', color: '#ff00aa', bgHex: 0x0e051a, fogHex: 0x0e051a, archFreq: 110,
+    wallEdgeHex: 0xff00aa, wallCoreHex: 0xff0088, lowEdgeHex: 0x00ffff, lowCoreHex: 0x00ddff },
+  { dist: 1200, name: 'ZONE 3 · 跃迁信标', color: '#ffaa00', bgHex: 0x180812, fogHex: 0x180812, archFreq: 85,
+    wallEdgeHex: 0xffaa00, wallCoreHex: 0xff8800, lowEdgeHex: 0xff00ff, lowCoreHex: 0xee00ee },
+  { dist: 2500, name: 'ZONE 4 · 极光奇点', color: '#00ff88', bgHex: 0x041614, fogHex: 0x041614, archFreq: 65,
+    wallEdgeHex: 0x00ff88, wallCoreHex: 0x00dd66, lowEdgeHex: 0xffee00, lowCoreHex: 0xffcc00 },
+  { dist: 4000, name: 'ZONE 5 · 量子深空', color: '#b066ff', bgHex: 0x120428, fogHex: 0x120428, archFreq: 50,
+    wallEdgeHex: 0xb066ff, wallCoreHex: 0x9944ff, lowEdgeHex: 0x00ffcc, lowCoreHex: 0x00ddbb }
 ];
 
 let scene, camera, renderer, composer, clock, bloomPass, railMat;
 let grid, ship, shipGlowMat, groundGlow, groundGlowMat;
-let cyberSun, deepStars, warpStars;
-let obstacles = [], orbs = [], pillars = [], roadside = [], arches = [], particles = [], streaks = [], shockwaves = [];
+let cyberSun, deepStars, warpStars, singularityHalo;
+let obstacles = [], orbs = [], pillars = [], roadside = [], arches = [], warpBeacons = [], sideFibres = [], particles = [], streaks = [], shockwaves = [];
 let lastArchDist = 0, currentZoneIndex = 0;
 let state = 'menu', paused = false;
 let vy = 0, grounded = true;
@@ -130,6 +135,23 @@ function initScene() {
     scene.add(rail);
   }
 
+  const sideFibreGeo = new THREE.BoxGeometry(0.12, 0.08, 400);
+  const sideFibreMat = new THREE.MeshBasicMaterial({
+    color: 0x9944ff,
+    transparent: true,
+    opacity: 0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
+  });
+  sideFibres = [];
+  for (const x of [-6.4, 6.4]) {
+    const sf = new THREE.Mesh(sideFibreGeo, sideFibreMat);
+    sf.position.set(x, 0.12, -150);
+    sf.visible = false;
+    scene.add(sf);
+    sideFibres.push(sf);
+  }
+
   const starGeo1 = new THREE.BufferGeometry();
   const pos1 = [];
   for (let i = 0; i < 1300; i++) {
@@ -150,6 +172,7 @@ function initScene() {
 
   cyberSun = makeCyberSun();
   scene.add(cyberSun);
+  initMeteors();
 
   groundGlow = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 2.6), groundGlowMat);
   groundGlow.name = 'groundGlow';
@@ -365,6 +388,14 @@ function buildShip() {
 const WHITE = new THREE.Color(0xffffff);
 const BG_BASE = new THREE.Color(0x05050f);
 const tmpColA = new THREE.Color(), tmpColB = new THREE.Color();
+const currentWallEdgeCol = new THREE.Color(0xff1155);
+const currentLowEdgeCol = new THREE.Color(0xffaa00);
+const currentWallCoreCol = new THREE.Color(0xff0055);
+const currentLowCoreCol = new THREE.Color(0xffaa00);
+const targetWallEdgeCol = new THREE.Color(0xff1155);
+const targetLowEdgeCol = new THREE.Color(0xffaa00);
+const targetWallCoreCol = new THREE.Color(0xff0055);
+const targetLowCoreCol = new THREE.Color(0xffaa00);
 
 function curve(arr, m) {
   const i = Math.max(0, Math.min(arr.length - 1, Math.floor(m)));
@@ -529,6 +560,8 @@ const lowBoxGeo = new THREE.BoxGeometry(2.4, 0.75, 0.5);
 const lowEdgesGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(2.44, 0.77, 0.52));
 const wallScanGeo = new THREE.BoxGeometry(2.38, 0.08, 0.54);
 const lowScanGeo = new THREE.BoxGeometry(2.38, 0.06, 0.54);
+const wallPylonGeo = new THREE.BoxGeometry(0.06, 3.2, 0.54);
+const lowGuideGeo = new THREE.BoxGeometry(2.4, 0.04, 0.52);
 
 const wallBodyMat = new THREE.MeshBasicMaterial({ color: 0x160610, transparent: true, opacity: 0.92, depthWrite: true });
 const lowBodyMat = new THREE.MeshBasicMaterial({ color: 0x160d04, transparent: true, opacity: 0.92, depthWrite: true });
@@ -576,6 +609,23 @@ function makeCyberSun() {
   const plane = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), mat);
   plane.position.set(0, 22, -260);
   plane.name = 'cyberSun';
+
+  const haloGeo = new THREE.RingGeometry(42, 60, 48);
+  const haloMat = new THREE.MeshBasicMaterial({
+    color: 0x00ffaa,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0,
+    fog: false,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending
+  });
+  singularityHalo = new THREE.Mesh(haloGeo, haloMat);
+  singularityHalo.position.set(0, 0, -1);
+  singularityHalo.name = 'singularityHalo';
+  singularityHalo.visible = false;
+  plane.add(singularityHalo);
+
   return plane;
 }
 
@@ -623,9 +673,13 @@ function makeWall(lane, z) {
   e.position.y = 1.6;
   const scan = new THREE.Mesh(wallScanGeo, wallCoreMat);
   scan.position.y = 1.6;
-  g.add(w, e, scan);
+  const leftPylon = new THREE.Mesh(wallPylonGeo, wallCoreMat);
+  leftPylon.position.set(-1.21, 1.6, 0);
+  const rightPylon = new THREE.Mesh(wallPylonGeo, wallCoreMat);
+  rightPylon.position.set(1.21, 1.6, 0);
+  g.add(w, e, scan, leftPylon, rightPylon);
   g.position.set(LANES[lane], 0, z);
-  g.userData = { type: 'wall', lane, scan, phase: Math.random() * Math.PI * 2 };
+  g.userData = { type: 'wall', lane, scan, leftPylon, rightPylon, phase: Math.random() * Math.PI * 2 };
   return g;
 }
 
@@ -637,9 +691,11 @@ function makeLow(lane, z) {
   e.position.y = 0.38;
   const scan = new THREE.Mesh(lowScanGeo, lowCoreMat);
   scan.position.y = 0.38;
-  g.add(b, e, scan);
+  const guide = new THREE.Mesh(lowGuideGeo, lowCoreMat);
+  guide.position.set(0, 0.74, 0);
+  g.add(b, e, scan, guide);
   g.position.set(LANES[lane], 0, z);
-  g.userData = { type: 'low', lane, scan, phase: Math.random() * Math.PI * 2 };
+  g.userData = { type: 'low', lane, scan, guide, phase: Math.random() * Math.PI * 2 };
   return g;
 }
 
@@ -695,6 +751,85 @@ function makeRoadsideStructure(side, z) {
   return g;
 }
 
+const relayBaseGeo = new THREE.CylinderGeometry(2.2, 3.4, 5, 6);
+const relayPillarGeo = new THREE.CylinderGeometry(0.8, 1.2, 14, 8);
+const relayRingGeo = new THREE.TorusGeometry(2.8, 0.16, 8, 24);
+const relayCoreGeo = new THREE.OctahedronGeometry(0.9);
+
+function makeRoadsideRelay(side, z) {
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(relayBaseGeo, towerBodyMat);
+  base.position.y = 2.5;
+  const pillar = new THREE.Mesh(relayPillarGeo, towerBodyMat);
+  pillar.position.y = 12;
+  const ring = new THREE.Mesh(relayRingGeo, towerCapMat);
+  ring.position.y = 19;
+  const core = new THREE.Mesh(relayCoreGeo, towerSpireMat);
+  core.position.y = 19;
+  g.add(base, pillar, ring, core);
+  const xDist = side * (15 + Math.random() * 7);
+  g.position.set(xDist, 0, z);
+  g.userData = { type: 'roadsideRelay', ring, core, phase: Math.random() * Math.PI * 2 };
+  return g;
+}
+
+const meteorGeo = new THREE.BoxGeometry(0.18, 0.18, 9.0);
+const meteorMat = new THREE.MeshBasicMaterial({ color: 0xaaffff, transparent: true, opacity: 0, fog: false });
+const meteors = [];
+function initMeteors() {
+  for (let i = 0; i < 2; i++) {
+    const m = new THREE.Mesh(meteorGeo, meteorMat.clone());
+    m.visible = false;
+    scene.add(m);
+    meteors.push({
+      mesh: m,
+      active: false,
+      timer: 1.2 + i * 2.4,
+      progress: 0,
+      startX: 0, startY: 0, startZ: 0,
+      endX: 0, endY: 0, endZ: 0
+    });
+  }
+}
+
+function updateMeteors(dt) {
+  for (const met of meteors) {
+    if (!met.active) {
+      met.timer -= dt;
+      if (met.timer <= 0) {
+        met.active = true;
+        met.progress = 0;
+        const side = Math.random() < 0.5 ? -1 : 1;
+        met.startX = side * (32 + Math.random() * 38);
+        met.startY = 22 + Math.random() * 14;
+        met.startZ = -210 - Math.random() * 40;
+        met.endX = met.startX * 0.15;
+        met.endY = 12 + Math.random() * 6;
+        met.endZ = met.startZ + 70 + Math.random() * 30;
+        met.mesh.position.set(met.startX, met.startY, met.startZ);
+        met.mesh.lookAt(met.endX, met.endY, met.endZ);
+        met.mesh.visible = true;
+      }
+    } else {
+      met.progress += dt * 1.8;
+      if (met.progress >= 1) {
+        met.active = false;
+        met.mesh.visible = false;
+        met.timer = 2.0 + Math.random() * 3.5;
+      } else {
+        const k = met.progress;
+        met.mesh.position.set(
+          met.startX + (met.endX - met.startX) * k,
+          met.startY + (met.endY - met.startY) * k,
+          met.startZ + (met.endZ - met.startZ) * k
+        );
+        const alpha = Math.sin(k * Math.PI);
+        met.mesh.material.opacity = alpha * 0.85;
+      }
+    }
+  }
+}
+
 const archBeamGeo = new THREE.BoxGeometry(12.4, 0.45, 0.7);
 const archPillarGeo = new THREE.BoxGeometry(0.55, 5.6, 0.7);
 const archNeonGeo = new THREE.BoxGeometry(12.2, 0.12, 0.76);
@@ -715,6 +850,35 @@ function makeOverheadArch(z) {
   g.add(leftPillar, rightPillar, topBeam, neonBar);
   g.position.set(0, 0, z);
   g.userData = { type: 'overheadArch' };
+  return g;
+}
+
+const beaconPillarGeo = new THREE.CylinderGeometry(0.35, 0.9, 70, 8);
+beaconPillarGeo.translate(0, 35, 0);
+const beaconBaseGeo = new THREE.BoxGeometry(3.2, 2.0, 3.2);
+const beaconCoreGeo = new THREE.SphereGeometry(1.2, 12, 12);
+const beaconBeamMat = new THREE.MeshBasicMaterial({
+  color: 0xffaa00,
+  transparent: true,
+  opacity: 0.45,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  fog: false
+});
+const beaconRingMat = new THREE.MeshBasicMaterial({ color: 0xffdd44, fog: false });
+
+function makeWarpBeacon(side, z) {
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(beaconBaseGeo, towerBodyMat);
+  base.position.y = 1.0;
+  const core = new THREE.Mesh(beaconCoreGeo, beaconRingMat);
+  core.position.y = 2.2;
+  const beam = new THREE.Mesh(beaconPillarGeo, beaconBeamMat);
+  beam.position.y = 0;
+  g.add(base, core, beam);
+  const xDist = side * (16 + Math.random() * 6);
+  g.position.set(xDist, 0, z);
+  g.userData = { type: 'warpBeacon', core, beam, phase: Math.random() * Math.PI * 2 };
   return g;
 }
 
@@ -828,12 +992,28 @@ function applyShipTier() {
 }
 
 function resetGame() {
-  for (const o of [...obstacles, ...orbs, ...pillars, ...streaks, ...roadside, ...arches]) scene.remove(o);
+  for (const o of [...obstacles, ...orbs, ...pillars, ...streaks, ...roadside, ...arches, ...warpBeacons]) scene.remove(o);
   for (const p of particles) scene.remove(p.pts);
-  obstacles = []; orbs = []; pillars = []; roadside = []; arches = []; particles = []; streaks = [];
+  obstacles = []; orbs = []; pillars = []; roadside = []; arches = []; warpBeacons = []; particles = []; streaks = [];
+  if (singularityHalo) {
+    singularityHalo.material.opacity = 0;
+    singularityHalo.visible = false;
+  }
+  for (const sf of sideFibres) {
+    sf.visible = false;
+    sf.material.opacity = 0;
+  }
   lastArchDist = 0; currentZoneIndex = 0;
   BG_BASE.setHex(MILESTONE_ZONES[0].bgHex);
   if (scene && scene.fog) scene.fog.color.setHex(MILESTONE_ZONES[0].fogHex);
+  currentWallEdgeCol.setHex(MILESTONE_ZONES[0].wallEdgeHex);
+  currentLowEdgeCol.setHex(MILESTONE_ZONES[0].lowEdgeHex);
+  currentWallCoreCol.setHex(MILESTONE_ZONES[0].wallCoreHex);
+  currentLowCoreCol.setHex(MILESTONE_ZONES[0].lowCoreHex);
+  wallCoreMat.color.setHex(MILESTONE_ZONES[0].wallCoreHex);
+  lowCoreMat.color.setHex(MILESTONE_ZONES[0].lowCoreHex);
+  wallEdgeMat.color.setHex(MILESTONE_ZONES[0].wallEdgeHex);
+  lowEdgeMat.color.setHex(MILESTONE_ZONES[0].lowEdgeHex);
   vy = 0; grounded = true;
   keys.left = keys.right = false;
   speed = 26; maxSpeed = 26; dist = 0; spawnDist = 0; orbCount = 0; elapsed = 0; shakeTime = 0;
@@ -845,6 +1025,11 @@ function resetGame() {
   lastGuidedLane = null; lastGuidedDist = -Infinity;
   for (const s of shockwaves) scene.remove(s.m);
   shockwaves = [];
+  for (const met of meteors) {
+    met.active = false;
+    met.mesh.visible = false;
+    met.timer = 1.2 + Math.random() * 2;
+  }
   ui.els.vig.style.opacity = 0;
   ui.els.comboBox.style.opacity = 0;
   tier = 0;
@@ -1025,6 +1210,21 @@ function animate() {
   if (deepStars) {
     deepStars.material.opacity = 0.68 + Math.sin(t * 1.5) * 0.12;
   }
+  updateMeteors(dt);
+
+  if (singularityHalo) {
+    singularityHalo.rotation.z += dt * 0.35;
+    const targetHaloOp = currentZoneIndex >= 3 ? 0.62 : 0;
+    singularityHalo.material.opacity += (targetHaloOp - singularityHalo.material.opacity) * Math.min(1, dt * 2.5);
+    singularityHalo.visible = singularityHalo.material.opacity > 0.01;
+  }
+  const isZone5 = currentZoneIndex >= 4;
+  for (const sf of sideFibres) {
+    sf.visible = isZone5;
+    if (isZone5) {
+      sf.material.opacity = 0.5 + Math.sin(t * 14 + sf.position.x) * 0.35;
+    }
+  }
 
   morphRoll *= Math.exp(-dt * 3.4);
   if (Math.abs(morphRoll) < 0.004) morphRoll = 0;
@@ -1060,9 +1260,16 @@ function animate() {
     }
     if ((dist % 24) < move) {
       const side = Math.random() < 0.5 ? -1 : 1;
-      const rs = makeRoadsideStructure(side, -150);
+      const relayChance = currentZoneIndex === 0 ? 0 : (currentZoneIndex === 1 ? 0.35 : 0.55);
+      const rs = Math.random() < relayChance ? makeRoadsideRelay(side, -150) : makeRoadsideStructure(side, -150);
       roadside.push(rs);
       scene.add(rs);
+    }
+    if (currentZoneIndex >= 2 && (dist % 45) < move) {
+      const side = Math.random() < 0.5 ? -1 : 1;
+      const wb = makeWarpBeacon(side, -150);
+      warpBeacons.push(wb);
+      scene.add(wb);
     }
 
     while (currentZoneIndex + 1 < MILESTONE_ZONES.length && dist >= MILESTONE_ZONES[currentZoneIndex + 1].dist) {
@@ -1162,12 +1369,29 @@ function animate() {
       if (pillars[i].position.z > 12) { scene.remove(pillars[i]); pillars.splice(i, 1); }
     }
     for (let i = roadside.length - 1; i >= 0; i--) {
-      roadside[i].position.z += move;
-      if (roadside[i].position.z > 15) { scene.remove(roadside[i]); roadside.splice(i, 1); }
+      const rs = roadside[i];
+      rs.position.z += move;
+      if (rs.userData.ring) {
+        rs.userData.ring.rotation.z += dt * 1.8;
+        rs.userData.ring.rotation.x = Math.sin(t * 2.2 + rs.userData.phase) * 0.35;
+      }
+      if (rs.userData.core) {
+        rs.userData.core.rotation.y += dt * 2.5;
+        rs.userData.core.rotation.x += dt * 1.2;
+      }
+      if (rs.position.z > 15) { scene.remove(rs); roadside.splice(i, 1); }
     }
     for (let i = arches.length - 1; i >= 0; i--) {
       arches[i].position.z += move;
       if (arches[i].position.z > 15) { scene.remove(arches[i]); arches.splice(i, 1); }
+    }
+    for (let i = warpBeacons.length - 1; i >= 0; i--) {
+      const wb = warpBeacons[i];
+      wb.position.z += move;
+      if (wb.userData.core) {
+        wb.userData.core.scale.setScalar(0.9 + Math.sin(t * 6 + wb.userData.phase) * 0.15);
+      }
+      if (wb.position.z > 15) { scene.remove(wb); warpBeacons.splice(i, 1); }
     }
 
     streakTimer -= dt;
@@ -1191,8 +1415,16 @@ function animate() {
       if (o.userData.scan) {
         if (o.userData.type === 'wall') {
           o.userData.scan.position.y = 1.6 + Math.sin(t * 7 + o.userData.phase) * 1.1;
+          if (o.userData.leftPylon && o.userData.rightPylon) {
+            const pulse = 0.85 + Math.sin(t * 10 + o.userData.phase) * 0.15;
+            o.userData.leftPylon.scale.x = pulse;
+            o.userData.rightPylon.scale.x = pulse;
+          }
         } else if (o.userData.type === 'low') {
           o.userData.scan.scale.x = 0.88 + Math.sin(t * 8 + o.userData.phase) * 0.12;
+          if (o.userData.guide) {
+            o.userData.guide.scale.x = 0.94 + Math.sin(t * 11 + o.userData.phase) * 0.06;
+          }
         }
       }
       if (o.position.z > 12) { scene.remove(o); obstacles.splice(i, 1); continue; }
@@ -1362,11 +1594,20 @@ function animate() {
     camera.fov = 70 + ((speed - 26) / 46) * 12 + fovKick;
     camera.updateProjectionMatrix();
 
-    // 随里程平滑过渡环境基色与远景雾效
-    const targetBgHex = MILESTONE_ZONES[currentZoneIndex].bgHex;
-    tmpColB.setHex(targetBgHex);
+    // 随里程平滑过渡环境基色、远景雾效与障碍物主题配色
+    const curZoneCfg = MILESTONE_ZONES[currentZoneIndex];
+    tmpColB.setHex(curZoneCfg.bgHex);
     BG_BASE.lerp(tmpColB, dt * 1.5);
     if (scene.fog) scene.fog.color.lerp(tmpColB, dt * 1.5);
+
+    targetWallEdgeCol.setHex(curZoneCfg.wallEdgeHex);
+    targetLowEdgeCol.setHex(curZoneCfg.lowEdgeHex);
+    targetWallCoreCol.setHex(curZoneCfg.wallCoreHex);
+    targetLowCoreCol.setHex(curZoneCfg.lowCoreHex);
+    currentWallEdgeCol.lerp(targetWallEdgeCol, dt * 2.0);
+    currentLowEdgeCol.lerp(targetLowEdgeCol, dt * 2.0);
+    currentWallCoreCol.lerp(targetWallCoreCol, dt * 2.0);
+    currentLowCoreCol.lerp(targetLowCoreCol, dt * 2.0);
 
   }
 
@@ -1391,8 +1632,10 @@ function animate() {
   if (bloomPass) bloomPass.strength = 1.1 + beatGlow * 0.35;
   wallCoreMat.opacity = 0.65 + beatGlow * 0.35;
   lowCoreMat.opacity = 0.65 + beatGlow * 0.35;
-  wallEdgeMat.color.setHex(0xff1155).lerp(WHITE, beatGlow * 0.35);
-  lowEdgeMat.color.setHex(0xffaa00).lerp(WHITE, beatGlow * 0.35);
+  wallCoreMat.color.copy(currentWallCoreCol);
+  lowCoreMat.color.copy(currentLowCoreCol);
+  wallEdgeMat.color.copy(currentWallEdgeCol).lerp(WHITE, beatGlow * 0.35);
+  lowEdgeMat.color.copy(currentLowEdgeCol).lerp(WHITE, beatGlow * 0.35);
   towerCapMat.color.setHex(0x00ffff).lerp(WHITE, beatGlow * 0.35);
   towerSpireMat.color.setHex(0xff0088).lerp(WHITE, beatGlow * 0.35);
   archNeonMat.color.setHex(0xff00aa).lerp(WHITE, beatGlow * 0.35);
@@ -1448,7 +1691,17 @@ window.__neon = {
   makeLow,
   makeOrb,
   makeOverheadArch,
+  makeRoadsideRelay,
+  makeWarpBeacon,
+  get warpBeacons() { return warpBeacons; },
+  get singularityHalo() { return singularityHalo; },
+  get sideFibres() { return sideFibres; },
+  get meteors() { return meteors; },
   get currentZoneIndex() { return currentZoneIndex; },
+  get wallEdgeMat() { return wallEdgeMat; },
+  get lowEdgeMat() { return lowEdgeMat; },
+  get wallCoreMat() { return wallCoreMat; },
+  get lowCoreMat() { return lowCoreMat; },
   MILESTONE_ZONES,
   TIER_COLORS
 };
