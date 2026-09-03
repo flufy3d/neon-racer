@@ -17,7 +17,7 @@ const TRACK_HALF = 2.5;
 const MIN_OUTER_SWAP_TIME = 0.32;
 const STABILIZER_ACCEL = 340;
 const STABILIZER_GAIN = 16;
-const SWIPE_JUMP = 55;      // 地面起跳所需上滑距离
+const SWIPE_JUMP = 40;      // 地面起跳所需上滑距离 (优化为 40px, 兼顾 flick 灵敏度与防误跳)
 const SWIPE_AIRJUMP = 30;   // 滞空二段跳: 阈值放宽, 否则 0.7 秒内滑不完
 const TOASTS = { 5: '手感来了!', 10: '连击狂潮!', 15: '火力全开!', 20: '超神操作!', 30: '登峰造极!!' };
 const TIER_COLORS = [0x00ffff, 0x66ff22, 0xffee00, 0xff8822, 0xff22cc, 0xb066ff];
@@ -65,7 +65,7 @@ let tier = 0;
 let shipMorph = 0, morphRoll = 0, shipBank = 0, airFlip = 0;
 let airJumps = 0;
 let latVel = 0;
-let stabilizerEngaged = false;
+let stabilizerEngaged = false, dualHoldTime = 0;
 let lastGuidedLane = null, lastGuidedDist = -Infinity;
 const activePointers = new Map();
 const keys = { left: false, right: false };
@@ -1083,7 +1083,7 @@ function resetGame() {
   beatTimer = 0; beatGlow = 0; timeScale = 1; lastSpeedMark = 26; camRoll = 0;
   shieldReady = false; invuln = 0; orbCountAtShieldEvent = 0;
   maxCombo = 0;
-  latVel = 0; stabilizerEngaged = false; activePointers.clear();
+  latVel = 0; stabilizerEngaged = false; dualHoldTime = 0; activePointers.clear();
   lastGuidedLane = null; lastGuidedDist = -Infinity;
   for (const s of shockwaves) scene.remove(s.m);
   shockwaves = [];
@@ -1112,6 +1112,11 @@ function resetGame() {
   updateHUD();
 }
 
+function updateFsBtn() {
+  const btn = $('fsBtn');
+  if (btn) btn.style.display = (state === 'playing' && !paused) ? 'none' : 'flex';
+}
+
 function startGame() {
   ensureAudio();
   if (overTimerId) { clearTimeout(overTimerId); overTimerId = null; }
@@ -1120,12 +1125,14 @@ function startGame() {
   beatCount = 0;
   startEngine();
   state = 'playing'; paused = false;
+  updateFsBtn();
   $('startScreen').classList.add('hidden');
   $('overScreen').classList.add('hidden');
 }
 
 function gameOver() {
   state = 'over';
+  updateFsBtn();
   crashSound();
   explode(ship.position);
   ship.visible = false;
@@ -1197,20 +1204,96 @@ addEventListener('keyup', e => {
   else if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
 });
 
+function hasOtherActiveSteering(currId = null) {
+  if (keys.left || keys.right) return true;
+  for (const [id, p] of activePointers.entries()) {
+    if (id !== currId && !p.isJump) return true;
+  }
+  return false;
+}
+
+function clearInputState() {
+  activePointers.clear();
+  dualHoldTime = 0;
+  stabilizerEngaged = false;
+  keys.left = false;
+  keys.right = false;
+}
+
 addEventListener('pointerdown', e => {
-  if (e.pointerType !== 'touch' || e.target.closest('button')) return;
-  if (state !== 'playing' || paused) return;
-  activePointers.set(e.pointerId, { x: e.clientX, baseY: e.clientY });
+  if (e.target.closest('button')) return;
+  if (paused && state === 'playing') {
+    paused = false;
+    $('pauseScreen').classList.add('hidden');
+    updateFsBtn();
+  }
+  if (e.pointerType !== 'touch' || state !== 'playing' || paused) return;
+  activePointers.set(e.pointerId, {
+    x: e.clientX,
+    startX: e.clientX,
+    baseY: e.clientY,
+    isJump: false,
+    jumpTriggered: false,
+    origShipX: ship ? ship.position.x : 0
+  });
 });
 addEventListener('pointermove', e => {
   const p = activePointers.get(e.pointerId);
   if (!p) return;
   p.x = e.clientX;
+  const dy = p.baseY - e.clientY;
+  const dx = Math.abs(e.clientX - p.startX);
+  if (dy > 12 && dy > dx * 0.8) {
+    if (!p.isJump && !hasOtherActiveSteering(e.pointerId) && p.origShipX !== undefined) {
+      ship.position.x = p.origShipX;
+      latVel = 0;
+    }
+    p.isJump = true;
+  }
   const need = grounded ? SWIPE_JUMP : SWIPE_AIRJUMP;
-  if (e.clientY > p.baseY) p.baseY = e.clientY;
-  else if (p.baseY - e.clientY >= need && (grounded || airJumps > 0)) { jump(); p.baseY = e.clientY; }
+  if (e.clientY > p.baseY) {
+    p.baseY = e.clientY;
+  } else if (dx > dy * 1.2) {
+    if (!p.jumpTriggered && dx >= 16) {
+      p.isJump = false;
+      p.origShipX = ship ? ship.position.x : 0;
+    } else {
+      p.origShipX = undefined;
+    }
+    p.baseY = e.clientY;
+    p.startX = e.clientX;
+  } else if (dy >= need && dy > dx * 1.1 && (grounded || airJumps > 0)) {
+    if (!p.isJump && !hasOtherActiveSteering(e.pointerId) && p.origShipX !== undefined) {
+      ship.position.x = p.origShipX;
+    }
+    p.isJump = true;
+    p.jumpTriggered = true;
+    if (!hasOtherActiveSteering(e.pointerId)) latVel = 0;
+    jump();
+    p.baseY = e.clientY;
+    p.startX = e.clientX;
+    p.origShipX = undefined;
+  }
 });
-const releasePointer = e => activePointers.delete(e.pointerId);
+const releasePointer = e => {
+  const p = activePointers.get(e.pointerId);
+  if (p) {
+    const dy = p.baseY - e.clientY;
+    const dx = Math.abs(e.clientX - p.startX);
+    const need = grounded ? SWIPE_JUMP : SWIPE_AIRJUMP;
+    if (dy >= need && dy > dx * 1.1 && (grounded || airJumps > 0)) {
+      if (!p.isJump && !hasOtherActiveSteering(e.pointerId) && p.origShipX !== undefined) {
+        ship.position.x = p.origShipX;
+      }
+      p.isJump = true;
+      p.jumpTriggered = true;
+      jump();
+      p.origShipX = undefined;
+    }
+    if (p.isJump && !hasOtherActiveSteering(e.pointerId)) latVel = 0;
+    activePointers.delete(e.pointerId);
+  }
+};
 addEventListener('pointerup', releasePointer);
 addEventListener('pointercancel', releasePointer);
 
@@ -1218,17 +1301,27 @@ $('startBtn').onclick = startGame;
 $('restartBtn').onclick = startGame;
 
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && state === 'playing') paused = true;
+  if (document.hidden && state === 'playing') {
+    paused = true;
+    updateFsBtn();
+    clearInputState();
+  }
 });
+window.addEventListener('blur', () => {
+  if (state === 'playing') {
+    paused = true;
+    updateFsBtn();
+    clearInputState();
+  }
+});
+window.addEventListener('pagehide', clearInputState);
 addEventListener('keydown', () => {
-  if (paused && state === 'playing') { paused = false; $('pauseScreen').classList.add('hidden'); }
-});
-addEventListener('pointerdown', () => {
-  if (paused && state === 'playing') { paused = false; $('pauseScreen').classList.add('hidden'); }
+  if (paused && state === 'playing') { paused = false; $('pauseScreen').classList.add('hidden'); updateFsBtn(); }
 });
 
 function showPaused() {
   $('pauseScreen').classList.remove('hidden');
+  updateFsBtn();
 }
 
 $('fsBtn').onclick = e => {
@@ -1355,24 +1448,30 @@ function animate() {
     if (activePointers.size) {
       let s = 0, hasL = false, hasR = false;
       for (const p of activePointers.values()) {
+        if (p.isJump) continue;
         const side = p.x < innerWidth / 2 ? -1 : 1;
         s += side;
         if (side < 0) hasL = true; else hasR = true;
       }
       if (hasL && hasR) {
-        stabilizing = true;
-        dir = 0;
-        if (!stabilizerEngaged) {
-          stabilizerEngaged = true;
-          latVel *= 0.25;
-          ui.floatLabel('中线锁定', ship.position, '#66ffff', 14);
-          beep(710, 0.07, 'triangle', 0.065);
+        dualHoldTime += dt;
+        if (dualHoldTime >= 0.08) {
+          stabilizing = true;
+          dir = 0;
+          if (!stabilizerEngaged) {
+            stabilizerEngaged = true;
+            latVel *= 0.25;
+            ui.floatLabel('中线锁定', ship.position, '#66ffff', 14);
+            beep(710, 0.07, 'triangle', 0.065);
+          }
         }
       } else {
+        dualHoldTime = 0;
         stabilizerEngaged = false;
         dir += s;
       }
     } else {
+      dualHoldTime = 0;
       stabilizerEngaged = false;
     }
     dir = Math.max(-1, Math.min(1, dir));
