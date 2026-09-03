@@ -34,9 +34,19 @@ const MORPH = {
   flameLen:  [1, 1.30, 1.50, 1.75, 2.05, 2.50]
 };
 
+const MILESTONE_ZONES = [
+  { dist: 0,    name: 'ZONE 1 · 赛博黎明', color: '#00ffff', bgHex: 0x05050f, fogHex: 0x05050f, archFreq: 0 },
+  { dist: 400,  name: 'ZONE 2 · 霓虹拱门', color: '#ff00aa', bgHex: 0x0e051a, fogHex: 0x0e051a, archFreq: 110 },
+  { dist: 1200, name: 'ZONE 3 · 跃迁信标', color: '#ffaa00', bgHex: 0x180812, fogHex: 0x180812, archFreq: 85 },
+  { dist: 2500, name: 'ZONE 4 · 极光奇点', color: '#00ff88', bgHex: 0x041614, fogHex: 0x041614, archFreq: 65 },
+  { dist: 4000, name: 'ZONE 5 · 量子深空', color: '#b066ff', bgHex: 0x120428, fogHex: 0x120428, archFreq: 50 }
+];
+
 let scene, camera, renderer, composer, clock, bloomPass, railMat;
 let grid, ship, shipGlowMat, groundGlow, groundGlowMat;
-let obstacles = [], orbs = [], pillars = [], particles = [], streaks = [], shockwaves = [];
+let cyberSun, deepStars, warpStars;
+let obstacles = [], orbs = [], pillars = [], roadside = [], arches = [], particles = [], streaks = [], shockwaves = [];
+let lastArchDist = 0, currentZoneIndex = 0;
 let state = 'menu', paused = false;
 let vy = 0, grounded = true;
 let speed = 26, maxSpeed = 26, dist = 0, spawnDist = 0, orbCount = 0, elapsed = 0, score = 0;
@@ -120,13 +130,26 @@ function initScene() {
     scene.add(rail);
   }
 
-  const starGeo = new THREE.BufferGeometry();
-  const pos = [];
-  for (let i = 0; i < 600; i++) {
-    pos.push((Math.random() - 0.5) * 300, Math.random() * 80 + 10, -Math.random() * 250 - 20);
+  const starGeo1 = new THREE.BufferGeometry();
+  const pos1 = [];
+  for (let i = 0; i < 1300; i++) {
+    pos1.push((Math.random() - 0.5) * 320, Math.random() * 85 + 4, -Math.random() * 240 - 20);
   }
-  starGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0x88ccff, size: 0.35, transparent: true, opacity: 0.7 })));
+  starGeo1.setAttribute('position', new THREE.Float32BufferAttribute(pos1, 3));
+  deepStars = new THREE.Points(starGeo1, new THREE.PointsMaterial({ color: 0x88ccff, size: 0.42, transparent: true, opacity: 0.75 }));
+  scene.add(deepStars);
+
+  const starGeo2 = new THREE.BufferGeometry();
+  const pos2 = [];
+  for (let i = 0; i < 700; i++) {
+    pos2.push((Math.random() - 0.5) * 160, Math.random() * 65 + 3, -Math.random() * 200 - 10);
+  }
+  starGeo2.setAttribute('position', new THREE.Float32BufferAttribute(pos2, 3));
+  warpStars = new THREE.Points(starGeo2, new THREE.PointsMaterial({ color: 0xee77ff, size: 0.65, transparent: true, opacity: 0.6 }));
+  scene.add(warpStars);
+
+  cyberSun = makeCyberSun();
+  scene.add(cyberSun);
 
   groundGlow = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 2.6), groundGlowMat);
   groundGlow.name = 'groundGlow';
@@ -504,11 +527,15 @@ const wallBoxGeo = new THREE.BoxGeometry(2.4, 3.2, 0.5);
 const wallEdgesGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(2.44, 3.24, 0.52));
 const lowBoxGeo = new THREE.BoxGeometry(2.4, 0.75, 0.5);
 const lowEdgesGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(2.44, 0.77, 0.52));
+const wallScanGeo = new THREE.BoxGeometry(2.38, 0.08, 0.54);
+const lowScanGeo = new THREE.BoxGeometry(2.38, 0.06, 0.54);
 
 const wallBodyMat = new THREE.MeshBasicMaterial({ color: 0x160610, transparent: true, opacity: 0.92, depthWrite: true });
 const lowBodyMat = new THREE.MeshBasicMaterial({ color: 0x160d04, transparent: true, opacity: 0.92, depthWrite: true });
 const wallEdgeMat = new THREE.LineBasicMaterial({ color: 0xff1155 });
 const lowEdgeMat = new THREE.LineBasicMaterial({ color: 0xffaa00 });
+const wallCoreMat = new THREE.MeshBasicMaterial({ color: 0xff0055, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
+const lowCoreMat = new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
 
 // 能量球共享单例组件（白炽高能核心 + 青金正交双轴陀螺环，杜绝几何体重复实例化）
 const orbCoreGeo = new THREE.SphereGeometry(0.24, 16, 16);
@@ -520,6 +547,37 @@ const orbRingMat2 = new THREE.MeshBasicMaterial({ color: 0xffd700, fog: false })
 
 const pillarMat = new THREE.MeshBasicMaterial({ color: 0x2244ff });
 const streakMat = new THREE.MeshBasicMaterial({ color: 0x66ddff, transparent: true, opacity: 0.35, fog: false });
+function makeCyberSun() {
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 256;
+  const g = c.getContext('2d');
+  const grad = g.createLinearGradient(0, 0, 0, 256);
+  grad.addColorStop(0, '#ffee33');
+  grad.addColorStop(0.5, '#ff2277');
+  grad.addColorStop(1.0, '#7700aa');
+  g.fillStyle = grad;
+  g.beginPath();
+  g.arc(128, 128, 120, 0, Math.PI * 2);
+  g.fill();
+
+  g.globalCompositeOperation = 'destination-out';
+  for (let i = 0; i < 9; i++) {
+    const y = 138 + i * 12;
+    const h = 2 + i * 1.5;
+    g.fillRect(0, y, 256, h);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  const mat = new THREE.MeshBasicMaterial({
+    map: tex,
+    transparent: true,
+    fog: false,
+    depthWrite: false
+  });
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), mat);
+  plane.position.set(0, 22, -260);
+  plane.name = 'cyberSun';
+  return plane;
+}
 
 function makeGlowTexture() {
   const c = document.createElement('canvas');
@@ -563,9 +621,11 @@ function makeWall(lane, z) {
   w.position.y = 1.6;
   const e = new THREE.LineSegments(wallEdgesGeo, wallEdgeMat);
   e.position.y = 1.6;
-  g.add(w, e);
+  const scan = new THREE.Mesh(wallScanGeo, wallCoreMat);
+  scan.position.y = 1.6;
+  g.add(w, e, scan);
   g.position.set(LANES[lane], 0, z);
-  g.userData = { type: 'wall', lane };
+  g.userData = { type: 'wall', lane, scan, phase: Math.random() * Math.PI * 2 };
   return g;
 }
 
@@ -575,9 +635,11 @@ function makeLow(lane, z) {
   b.position.y = 0.38;
   const e = new THREE.LineSegments(lowEdgesGeo, lowEdgeMat);
   e.position.y = 0.38;
-  g.add(b, e);
+  const scan = new THREE.Mesh(lowScanGeo, lowCoreMat);
+  scan.position.y = 0.38;
+  g.add(b, e, scan);
   g.position.set(LANES[lane], 0, z);
-  g.userData = { type: 'low', lane };
+  g.userData = { type: 'low', lane, scan, phase: Math.random() * Math.PI * 2 };
   return g;
 }
 
@@ -609,6 +671,51 @@ function makePillar(z) {
   const p = new THREE.Mesh(new THREE.BoxGeometry(0.3, 5, 0.3), pillarMat);
   p.position.set(Math.random() < 0.5 ? -7.5 : 7.5, 2.5, z);
   return p;
+}
+
+const towerGeo1 = new THREE.BoxGeometry(3.6, 26, 3.6);
+const towerCapGeo = new THREE.BoxGeometry(4.0, 0.6, 4.0);
+const towerBeaconGeo = new THREE.CylinderGeometry(0.1, 0.35, 5, 8);
+const towerBodyMat = new THREE.MeshBasicMaterial({ color: 0x070716 });
+const towerCapMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, fog: false });
+const towerSpireMat = new THREE.MeshBasicMaterial({ color: 0xff0088, fog: false });
+
+function makeRoadsideStructure(side, z) {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(towerGeo1, towerBodyMat);
+  body.position.y = 13;
+  const cap = new THREE.Mesh(towerCapGeo, towerCapMat);
+  cap.position.y = 26;
+  const beacon = new THREE.Mesh(towerBeaconGeo, towerSpireMat);
+  beacon.position.y = 28.5;
+  g.add(body, cap, beacon);
+  const xDist = side * (14 + Math.random() * 8);
+  g.position.set(xDist, 0, z);
+  g.userData = { type: 'roadsideStructure' };
+  return g;
+}
+
+const archBeamGeo = new THREE.BoxGeometry(12.4, 0.45, 0.7);
+const archPillarGeo = new THREE.BoxGeometry(0.55, 5.6, 0.7);
+const archNeonGeo = new THREE.BoxGeometry(12.2, 0.12, 0.76);
+const archFrameMat = new THREE.MeshBasicMaterial({ color: 0x0b0b1e });
+const archNeonMat = new THREE.MeshBasicMaterial({ color: 0xff00aa, fog: false });
+
+function makeOverheadArch(z) {
+  const g = new THREE.Group();
+  const leftPillar = new THREE.Mesh(archPillarGeo, archFrameMat);
+  leftPillar.position.set(-5.8, 2.8, 0);
+  const rightPillar = new THREE.Mesh(archPillarGeo, archFrameMat);
+  rightPillar.position.set(5.8, 2.8, 0);
+  const topBeam = new THREE.Mesh(archBeamGeo, archFrameMat);
+  topBeam.position.set(0, 5.6, 0);
+  const neonBar = new THREE.Mesh(archNeonGeo, archNeonMat);
+  neonBar.position.set(0, 5.4, 0);
+
+  g.add(leftPillar, rightPillar, topBeam, neonBar);
+  g.position.set(0, 0, z);
+  g.userData = { type: 'overheadArch' };
+  return g;
 }
 
 function buildPatternPlan(freeLane) {
@@ -721,9 +828,12 @@ function applyShipTier() {
 }
 
 function resetGame() {
-  for (const o of [...obstacles, ...orbs, ...pillars, ...streaks]) scene.remove(o);
+  for (const o of [...obstacles, ...orbs, ...pillars, ...streaks, ...roadside, ...arches]) scene.remove(o);
   for (const p of particles) scene.remove(p.pts);
-  obstacles = []; orbs = []; pillars = []; particles = []; streaks = [];
+  obstacles = []; orbs = []; pillars = []; roadside = []; arches = []; particles = []; streaks = [];
+  lastArchDist = 0; currentZoneIndex = 0;
+  BG_BASE.setHex(MILESTONE_ZONES[0].bgHex);
+  if (scene && scene.fog) scene.fog.color.setHex(MILESTONE_ZONES[0].fogHex);
   vy = 0; grounded = true;
   keys.left = keys.right = false;
   speed = 26; maxSpeed = 26; dist = 0; spawnDist = 0; orbCount = 0; elapsed = 0; shakeTime = 0;
@@ -909,6 +1019,12 @@ function animate() {
   const t = clock.elapsedTime;
 
   grid.position.z = (grid.position.z + (state === 'playing' ? speed : 8) * dt) % 4;
+  if (warpStars) {
+    warpStars.position.z = (warpStars.position.z + (state === 'playing' ? speed : 8) * dt * 0.25) % 80;
+  }
+  if (deepStars) {
+    deepStars.material.opacity = 0.68 + Math.sin(t * 1.5) * 0.12;
+  }
 
   morphRoll *= Math.exp(-dt * 3.4);
   if (Math.abs(morphRoll) < 0.004) morphRoll = 0;
@@ -922,6 +1038,7 @@ function animate() {
     ship.rotation.set(0, 0, shipBank);
     ship.position.y = 0.95 + Math.sin(t * 3) * 0.1;
     camera.lookAt(ship.position.x * 0.4, 1, -12);
+    if (cyberSun) cyberSun.position.x = ship.position.x * 2.31;
     updateGroundGlow();
   }
 
@@ -940,6 +1057,28 @@ function animate() {
       const p = makePillar(-150);
       pillars.push(p);
       scene.add(p);
+    }
+    if ((dist % 24) < move) {
+      const side = Math.random() < 0.5 ? -1 : 1;
+      const rs = makeRoadsideStructure(side, -150);
+      roadside.push(rs);
+      scene.add(rs);
+    }
+
+    while (currentZoneIndex + 1 < MILESTONE_ZONES.length && dist >= MILESTONE_ZONES[currentZoneIndex + 1].dist) {
+      currentZoneIndex++;
+      const zInfo = MILESTONE_ZONES[currentZoneIndex];
+      ui.milestoneBanner(zInfo.name, `已行驶 ${Math.floor(dist)} M`, zInfo.color);
+      beep(880, 0.16, 'sine', 0.12);
+      setTimeout(() => beep(1320, 0.22, 'sine', 0.12), 110);
+    }
+
+    const curZone = MILESTONE_ZONES[currentZoneIndex];
+    if (curZone.archFreq > 0 && (dist - lastArchDist >= curZone.archFreq)) {
+      lastArchDist = dist;
+      const arch = makeOverheadArch(-150);
+      arches.push(arch);
+      scene.add(arch);
     }
 
     let dir = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
@@ -1022,6 +1161,14 @@ function animate() {
       pillars[i].position.z += move;
       if (pillars[i].position.z > 12) { scene.remove(pillars[i]); pillars.splice(i, 1); }
     }
+    for (let i = roadside.length - 1; i >= 0; i--) {
+      roadside[i].position.z += move;
+      if (roadside[i].position.z > 15) { scene.remove(roadside[i]); roadside.splice(i, 1); }
+    }
+    for (let i = arches.length - 1; i >= 0; i--) {
+      arches[i].position.z += move;
+      if (arches[i].position.z > 15) { scene.remove(arches[i]); arches.splice(i, 1); }
+    }
 
     streakTimer -= dt;
     if (speed > 40 && streakTimer <= 0) {
@@ -1041,6 +1188,13 @@ function animate() {
       const o = obstacles[i];
       const prevZ = o.position.z;
       o.position.z += move;
+      if (o.userData.scan) {
+        if (o.userData.type === 'wall') {
+          o.userData.scan.position.y = 1.6 + Math.sin(t * 7 + o.userData.phase) * 1.1;
+        } else if (o.userData.type === 'low') {
+          o.userData.scan.scale.x = 0.88 + Math.sin(t * 8 + o.userData.phase) * 0.12;
+        }
+      }
       if (o.position.z > 12) { scene.remove(o); obstacles.splice(i, 1); continue; }
       if (!o.userData.passed && prevZ <= 1.0 && o.position.z >= -1.0) {
         o.userData.passed = true;
@@ -1198,12 +1352,21 @@ function animate() {
 
     camera.position.x = ship.position.x * 0.35;
     camera.lookAt(ship.position.x * 0.5, 1, -12);
+    if (cyberSun) {
+      cyberSun.position.x = ship.position.x * 2.31;
+    }
     camRoll += (-latVel * 0.0016 - camRoll) * Math.min(1, dt * 8);
     camera.rotation.z += camRoll;
 
     fovKick *= Math.exp(-dt * 5);
     camera.fov = 70 + ((speed - 26) / 46) * 12 + fovKick;
     camera.updateProjectionMatrix();
+
+    // 随里程平滑过渡环境基色与远景雾效
+    const targetBgHex = MILESTONE_ZONES[currentZoneIndex].bgHex;
+    tmpColB.setHex(targetBgHex);
+    BG_BASE.lerp(tmpColB, dt * 1.5);
+    if (scene.fog) scene.fog.color.lerp(tmpColB, dt * 1.5);
 
   }
 
@@ -1226,6 +1389,13 @@ function animate() {
   beatGlow *= Math.exp(-dt * 6);
   grid.material.opacity = 0.72 + beatGlow * 0.28;
   if (bloomPass) bloomPass.strength = 1.1 + beatGlow * 0.35;
+  wallCoreMat.opacity = 0.65 + beatGlow * 0.35;
+  lowCoreMat.opacity = 0.65 + beatGlow * 0.35;
+  wallEdgeMat.color.setHex(0xff1155).lerp(WHITE, beatGlow * 0.35);
+  lowEdgeMat.color.setHex(0xffaa00).lerp(WHITE, beatGlow * 0.35);
+  towerCapMat.color.setHex(0x00ffff).lerp(WHITE, beatGlow * 0.35);
+  towerSpireMat.color.setHex(0xff0088).lerp(WHITE, beatGlow * 0.35);
+  archNeonMat.color.setHex(0xff00aa).lerp(WHITE, beatGlow * 0.35);
   if (state === 'over') timeScale += (1 - timeScale) * dt * 2;
 
   for (let i = shockwaves.length - 1; i >= 0; i--) {
@@ -1277,5 +1447,8 @@ window.__neon = {
   makeWall,
   makeLow,
   makeOrb,
+  makeOverheadArch,
+  get currentZoneIndex() { return currentZoneIndex; },
+  MILESTONE_ZONES,
   TIER_COLORS
 };

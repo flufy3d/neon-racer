@@ -186,3 +186,26 @@ export function resetRunSummary() {
   resultEls.screen.classList.remove('resultsActive');
   resultEls.panel.classList.remove('scoreLocked');
 }
+
+export function milestoneBanner(zoneName, distText, color = '#00ffff') {
+  const el = document.createElement('div');
+  el.className = 'milestone-banner';
+  el.innerHTML = `<div style="font-size:12px;letter-spacing:4px;opacity:0.85;margin-bottom:4px;">${distText}</div><div style="font-size:22px;font-weight:900;letter-spacing:5px;text-shadow:0 0 16px ${color};">${zoneName}</div>`;
+  el.style.position = 'fixed';
+  el.style.top = '18%';
+  el.style.left = '50%';
+  el.style.transform = 'translate(-50%, -50%)';
+  el.style.textAlign = 'center';
+  el.style.color = color;
+  el.style.pointerEvents = 'none';
+  el.style.zIndex = '99';
+  el.style.fontFamily = 'monospace, sans-serif';
+  el.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+  el.style.opacity = '1';
+  document.body.appendChild(el);
+  setTimeout(() => {
+    el.style.opacity = '0';
+    el.style.transform = 'translate(-50%, -70%)';
+    setTimeout(() => el.remove(), 600);
+  }, 1600);
+}
