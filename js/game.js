@@ -903,20 +903,6 @@ function isGuidedPattern(plan) {
 }
 
 function spawnPattern() {
-  if (Math.random() < 0.18) {
-    const lane = (Math.random() * 3) | 0;
-    for (let i = 0; i < 5; i++) {
-      const o = makeOrb(LANES[lane], 1.2, -140 - i * 2);
-      orbs.push(o);
-      scene.add(o);
-    }
-    validPrevLanes = new Set([0, 1, 2]);
-    lastPatternDist = dist;
-    return;
-  }
-  let freeLane = (Math.random() * 3) | 0;
-  let plan = buildPatternPlan(freeLane);
-
   const maxV_safe = 5 + speed * 0.27;
   const a = 150;
   const t_acc = maxV_safe / a;
@@ -925,6 +911,37 @@ function spawnPattern() {
   const t_double_min = dx_min_swap <= x_acc ? Math.sqrt(2 * dx_min_swap / a) : (t_acc + (dx_min_swap - x_acc) / maxV_safe);
   const transTime = lastPatternDist === -Infinity ? Infinity : (dist - lastPatternDist) / Math.max(speed, 1);
   const cannotDoubleSwap = transTime < t_double_min;
+
+  if (Math.random() < 0.18) {
+    const lane = (Math.random() * 3) | 0;
+    for (let i = 0; i < 5; i++) {
+      const o = makeOrb(LANES[lane], 1.2, -140 - i * 2);
+      orbs.push(o);
+      scene.add(o);
+    }
+    const nextValid = new Set();
+    for (let cur = 0; cur < 3; cur++) {
+      for (const prev of validPrevLanes) {
+        if (!cannotDoubleSwap || Math.abs(cur - prev) <= 1) {
+          nextValid.add(cur);
+          break;
+        }
+      }
+    }
+    validPrevLanes = nextValid.size > 0 ? nextValid : new Set([0, 1, 2]);
+    lastPatternDist = dist;
+    return;
+  }
+
+  let freeLane;
+  if (cannotDoubleSwap) {
+    // 反向拓扑加权抽样（ch1 + c2）：扣除后置避险守卫向中道注入的额外安全开口偏置（标定值 0.052）
+    const r = Math.random();
+    freeLane = r < 0.052 ? 1 : (r < 0.526 ? 0 : 2);
+  } else {
+    freeLane = (Math.random() * 3) | 0;
+  }
+  let plan = buildPatternPlan(freeLane);
 
   let obsSet = new Set(
     plan.filter(item => item.type === 'wall' || item.type === 'low').map(item => item.lane)
@@ -936,9 +953,37 @@ function spawnPattern() {
     const needFrom2 = validPrevLanes.has(2);
     const canReachFrom2 = !obsSet.has(2) || !obsSet.has(1);
     if ((needFrom0 && !canReachFrom0) || (needFrom2 && !canReachFrom2)) {
-      plan = plan.filter(item => item.lane !== 1 || (item.type !== 'wall' && item.type !== 'low'));
-      plan.push({ lane: 1, type: 'orb' });
-      obsSet.delete(1);
+      let candidateOpenLanes = [];
+      if (needFrom0 && needFrom2) {
+        candidateOpenLanes = [1];
+      } else if (needFrom0) {
+        candidateOpenLanes = [0, 1];
+      } else if (needFrom2) {
+        candidateOpenLanes = [1, 2];
+      } else {
+        candidateOpenLanes = [0, 1, 2];
+      }
+      const chosenOpenLane = candidateOpenLanes[(Math.random() * candidateOpenLanes.length) | 0];
+      const originalObsCount = obsSet.size;
+      if (originalObsCount === 2) {
+        // 保阶重构（h1）：将不可达的 2 障碍波次重写为合法可达车道集的 2 障碍排列，按原生概率采样类型
+        plan = [];
+        obsSet = new Set();
+        for (let l = 0; l < 3; l++) {
+          if (l === chosenOpenLane) {
+            plan.push({ lane: l, type: 'orb' });
+          } else {
+            const type = Math.random() < 0.4 ? 'low' : 'wall';
+            plan.push({ lane: l, type });
+            obsSet.add(l);
+          }
+        }
+      } else {
+        plan = plan.filter(item => item.lane !== chosenOpenLane || (item.type !== 'wall' && item.type !== 'low'));
+        plan.push({ lane: chosenOpenLane, type: 'orb' });
+        obsSet.delete(chosenOpenLane);
+      }
+      freeLane = chosenOpenLane;
     }
   }
 
