@@ -1,4 +1,4 @@
-const CACHE = 'neon-racer-v10';
+const CACHE = 'neon-racer-v11';
 const ASSETS = [
   './',
   './index.html',
@@ -23,7 +23,16 @@ const ASSETS = [
 
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting())
+    caches.open(CACHE).then(c =>
+      Promise.all(
+        ASSETS.map(url =>
+          fetch(new Request(url, { cache: 'reload' })).then(res => {
+            if (!res.ok) throw new Error(`Fetch failed for ${url}: ${res.status}`);
+            return c.put(url, res);
+          })
+        )
+      )
+    ).then(() => self.skipWaiting())
   );
 });
 

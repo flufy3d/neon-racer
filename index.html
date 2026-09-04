@@ -159,10 +159,64 @@
   <p class="sub">按任意键或点击屏幕继续</p>
 </div>
 
+<div id="updateBanner" class="update-banner hidden" role="alert">
+  <span class="update-text">检测到新版本游戏</span>
+  <button id="updateBtn">立即刷新</button>
+</div>
+
 <script type="module" src="js/game.js"></script>
 <script>
 if ('serviceWorker' in navigator) {
-  addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  const hadController = !!navigator.serviceWorker.controller;
+  let refreshing = false;
+  let updatePending = false;
+
+  function reloadPage() {
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
+  }
+
+  function showUpdateBanner() {
+    updatePending = true;
+    const banner = document.getElementById('updateBanner');
+    if (banner) {
+      banner.classList.remove('hidden');
+      const btn = document.getElementById('updateBtn');
+      if (btn) btn.onclick = reloadPage;
+    }
+    const restartBtn = document.getElementById('restartBtn');
+    if (restartBtn) {
+      restartBtn.addEventListener('click', () => {
+        if (updatePending) reloadPage();
+      }, { once: true });
+    }
+  }
+
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController) return;
+    const startScreen = document.getElementById('startScreen');
+    const isAtStart = startScreen && !startScreen.classList.contains('hidden');
+    if (isAtStart) {
+      reloadPage();
+    } else {
+      showUpdateBanner();
+    }
+  });
+
+  let registration = null;
+  addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
+      registration = reg;
+      reg.update();
+    }).catch(() => {});
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && registration) {
+      registration.update();
+    }
+  });
 }
 </script>
 </body>
