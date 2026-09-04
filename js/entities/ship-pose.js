@@ -1,0 +1,162 @@
+import { MAX_TIER, TIER_COLORS } from '../core/constants.js';
+import { run, view } from '../core/state.js';
+import { BG_BASE, WHITE, tmpColA, tmpColB } from '../scene/palette.js';
+
+// 各形态的连续形变参数（下标 = 形态等级，帧间按 shipMorph 插值）
+const MORPH = {
+  noseLen:   [1, 1.05, 1.09, 1.14, 1.20, 1.32],
+  hullBulk:  [1, 1.05, 1.14, 1.20, 1.26, 1.34],
+  wingSpan:  [1, 1.03, 1.07, 1.12, 1.17, 1.24],
+  wingSweep: [0.03, 0.11, 0.17, 0.23, 0.31, 0.42],
+  wingRise:  [0, 0.05, 0.10, 0.14, 0.19, 0.27],
+  tipFin:    [1, 1.15, 1.30, 1.50, 1.85, 2.70],
+  flameLen:  [1, 1.30, 1.50, 1.75, 2.05, 2.50]
+};
+
+function curve(arr, m) {
+  const i = Math.max(0, Math.min(arr.length - 1, Math.floor(m)));
+  const j = Math.min(arr.length - 1, i + 1);
+  return arr[i] + (arr[j] - arr[i]) * Math.max(0, Math.min(1, m - i));
+}
+
+// 模块在 at-1 → at 之间完成展开
+function seg(m, at) { return Math.max(0, Math.min(1, m - at + 1)); }
+
+function tierColorAt(m, out) {
+  const i = Math.max(0, Math.min(MAX_TIER, Math.floor(m)));
+  const j = Math.min(MAX_TIER, i + 1);
+  return out.setHex(TIER_COLORS[i]).lerp(tmpColB.setHex(TIER_COLORS[j]), Math.max(0, Math.min(1, m - i)));
+}
+
+// 按连续形态值 m 摆放机体每个部件 —— 形态切换是真正的机械变形
+export function poseShip(m, t) {
+  const p = view.ship.userData;
+  const col = tierColorAt(m, tmpColA);
+  view.shipGlowMat.color.copy(col);
+  p.bodyMat.emissive.copy(col).multiplyScalar(0.07);
+  p.plateMat.emissive.copy(col).multiplyScalar(0.1);
+  p.trimMat.color.copy(col).lerp(WHITE, 0.18);
+  p.cockpit.material.color.copy(col).lerp(WHITE, 0.45);
+
+  const bulk = curve(MORPH.hullBulk, m);
+  p.fuselage.scale.set(1 + (bulk - 1) * 0.8, bulk, 1 + (bulk - 1) * 0.35);
+  p.noseGroup.scale.set(1 + (bulk - 1) * 0.6, 1 + (bulk - 1) * 0.6, curve(MORPH.noseLen, m));
+
+  const lanceK = seg(m, 5);
+  p.lance.visible = lanceK > 0.01;
+  p.lance.scale.set(0.5 + 0.5 * lanceK, lanceK, 0.5 + 0.5 * lanceK);
+  p.lance.position.z = -0.85 - 0.8 * lanceK;
+
+  const span = curve(MORPH.wingSpan, m), sweep = curve(MORPH.wingSweep, m), rise = curve(MORPH.wingRise, m);
+  const fin = curve(MORPH.tipFin, m);
+  const flameLen = curve(MORPH.flameLen, m) * (0.8 + (run.speed / 72) * 0.45) + Math.sin(t * 24) * 0.07;
+  const podK = seg(m, 3), bladeK = seg(m, 4);
+
+  for (const w of p.wings) {
+    w.g.rotation.y = -w.side * sweep;
+    w.g.rotation.z = w.side * rise;
+    w.g.scale.x = span;
+    w.tip.scale.y = fin;
+    w.tip.position.y = 0.02 + (fin - 1) * 0.055;
+
+    w.pod.visible = podK > 0.01;
+    w.pod.scale.setScalar(0.35 + 0.65 * podK);
+    w.pod.position.set(w.side * (0.38 + 0.2 * podK), -0.12 + 0.12 * podK, 0.2);
+    w.podFlame.material.color.copy(col);
+    w.podFlame.scale.set(1, flameLen * 0.8, 1);
+
+    w.prong.visible = podK > 0.01;
+    w.prong.scale.set(0.4 + 0.6 * podK, 0.4 + 0.6 * podK, podK);
+    w.coil.rotation.z = t * 4;
+
+    w.blade.visible = bladeK > 0.01;
+    w.blade.scale.setScalar(0.3 + 0.7 * bladeK);
+    w.blade.rotation.z = -w.side * 0.95 * bladeK;
+  }
+
+  const canK = seg(m, 1);
+  for (const c of p.canards) {
+    c.g.visible = canK > 0.01;
+    c.g.scale.setScalar(0.25 + 0.75 * canK);
+    c.g.rotation.z = c.side * (-1.15 + 1.4 * canK);
+    c.g.rotation.y = -c.side * (0.5 - 0.32 * canK);
+  }
+  for (const v of p.vents) {
+    v.m.visible = canK > 0.01;
+    v.m.scale.set(1, 0.15 + 0.85 * canK, 1);
+    v.m.rotation.z = v.side * 0.45 * canK;
+    v.m.position.set(v.side * 0.2, 0.1 + 0.09 * canK, 0.68);
+  }
+
+  const plateK = seg(m, 2);
+  const breathe = Math.sin(t * (run.shieldReady ? 3.4 : 1.6)) * (run.shieldReady ? 0.16 : 0.07);
+  for (const pl of p.plates) {
+    pl.g.visible = plateK > 0.01;
+    pl.g.scale.setScalar(0.4 + 0.6 * plateK);
+    pl.g.rotation.z = pl.sx * pl.sy * plateK * (0.5 + breathe);
+    pl.g.rotation.y = -pl.sx * 0.14 * plateK;
+    pl.g.position.set(pl.sx * (0.22 + 0.1 * plateK), pl.sy * (0.13 + 0.16 * plateK), 0.45);
+  }
+
+  const spineK = seg(m, 4);
+  p.spine.visible = spineK > 0.01;
+  p.spine.scale.set(1, spineK, 0.5 + 0.5 * spineK);
+  p.spine.position.y = 0.04 - 0.14 * (1 - spineK);
+
+  p.halo.visible = lanceK > 0.01;
+  p.halo.scale.setScalar(0.3 + 0.7 * lanceK);
+  p.halo.rotation.z = t * 1.4;
+  p.halo.rotation.x = Math.PI / 2 + Math.sin(t * 1.1) * 0.55;
+  p.halo.position.set(0, 0.62 + 0.24 * lanceK + Math.sin(t * 2.2) * 0.03, 0.3);
+  for (const sh of p.shards) {
+    sh.m.visible = lanceK > 0.01;
+    const a = t * 1.7 + sh.i * Math.PI / 2;
+    const r = 0.75 + 0.45 * lanceK;
+    sh.m.position.set(Math.cos(a) * r, 0.3 + Math.sin(t * 2.4 + sh.i) * 0.22, 0.3 + Math.sin(a) * r * 0.7);
+    sh.m.rotation.set(t * 2, t * 2.6, 0);
+    sh.m.scale.setScalar(lanceK);
+  }
+
+  for (const b of p.boosters) {
+    b.g.visible = lanceK > 0.01;
+    b.g.scale.setScalar(0.3 + 0.7 * lanceK);
+    b.g.position.set(b.side * (0.3 + 0.16 * lanceK), 0.18 + 0.18 * lanceK, 0.75);
+    b.g.rotation.z = -b.side * 0.18 * lanceK;
+    b.flame.material.color.copy(col);
+    b.flame.scale.set(1, flameLen * 0.7, 1);
+  }
+
+  for (const f of p.flames) {
+    f.material.color.copy(col);
+    f.scale.set(1 + m * 0.05, flameLen, 1 + m * 0.05);
+  }
+
+  const aura = p.aura;
+  aura.visible = plateK > 0.01;
+  aura.material.color.copy(col);
+  aura.rotation.x = Math.PI / 2;
+  aura.rotation.z = t * 1.2;
+  aura.position.set(0, -0.06, 0.25);
+  aura.scale.setScalar((0.5 + 0.5 * plateK) * (1 + Math.sin(t * 5) * 0.05 + m * 0.02));
+
+  const sb = p.shieldBubble;
+  if (sb.visible) {
+    sb.material.color.copy(col);
+    sb.scale.setScalar(1 + Math.sin(t * 4) * 0.04 + (run.invuln > 0 ? Math.sin(t * 30) * 0.12 : 0));
+    sb.material.opacity = run.invuln > 0 ? 0.35 : 0.16;
+  }
+
+  if (view.grid) {
+    view.grid.material.color.copy(col).multiplyScalar(0.5);
+    view.railMat.color.copy(col).multiplyScalar(0.9);
+    view.scene.background.copy(BG_BASE).lerp(col, 0.05);
+    if (view.groundGlowMat) view.groundGlowMat.color.copy(col);
+  }
+}
+
+export function updateShipMorph(dt, t) {
+  run.shipMorph += (run.tier - run.shipMorph) * Math.min(1, dt * 3.2);
+  if (Math.abs(run.tier - run.shipMorph) < 0.002) run.shipMorph = run.tier;
+  poseShip(run.shipMorph, t);
+}
+

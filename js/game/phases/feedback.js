@@ -1,0 +1,132 @@
+import { beep, playBeat, setEnginePitch, setMusicIntensity } from '../../audio.js';
+import { COMBO_WINDOW, MILESTONE_ZONES } from '../../core/constants.js';
+import { $ } from '../../core/dom.js';
+import { lists, run, view } from '../../core/state.js';
+import { particlePool } from '../../entities/particles.js';
+import { archNeonMat, lowCoreMat, lowEdgeMat, towerCapMat, towerSpireMat, wallCoreMat, wallEdgeMat } from '../../scene/materials.js';
+import { BG_BASE, WHITE, currentLowCoreCol, currentLowEdgeCol, currentWallCoreCol, currentWallEdgeCol, targetLowCoreCol, targetLowEdgeCol, targetWallCoreCol, targetWallEdgeCol, tmpColB } from '../../scene/palette.js';
+import * as ui from '../../ui.js';
+import { showPaused } from '../session.js';
+
+export function updateRunFeedbackAndCamera(dt, t, move) {
+const bpm = 92 + run.speed * 1.15;
+run.beatTimer -= dt;
+if (run.beatTimer <= 0) {
+  const dur = 60 / bpm;
+  run.beatTimer = dur;
+  run.beatGlow = 1;
+  setMusicIntensity(Math.min(1, ((run.speed - 26) / 46) * 0.6 + run.tier * 0.1));
+  playBeat(run.beatCount, dur);
+  run.beatCount++;
+}
+setEnginePitch(46 + run.speed * 1.5 + run.combo * 2);
+
+if (run.speed - run.lastSpeedMark >= 10) {
+  run.lastSpeedMark = run.speed;
+  ui.toast('速度提升!', '#ff8822');
+  run.fovKick += 3;
+  beep(500, 0.35, 'sawtooth', 0.07);
+  setTimeout(() => beep(800, 0.3, 'sawtooth', 0.06), 120);
+}
+
+if (run.combo > 0) {
+  ui.els.vig.style.setProperty('--vc', ui.comboColor(ui.multOf(run.combo)));
+  ui.els.vig.style.opacity = Math.min(0.85, 0.18 + ui.multOf(run.combo) * 0.07) * Math.max(0, run.comboTimer / COMBO_WINDOW);
+} else ui.els.vig.style.opacity = 0;
+
+const jumpLift = Math.max(0, view.ship.position.y - 1.02);
+const targetCamY = 4.6 + jumpLift * 0.40;
+run.camY += (targetCamY - run.camY) * Math.min(1, dt * 12);
+view.camera.position.x = view.ship.position.x * 0.35;
+view.camera.position.y = run.camY;
+view.camera.lookAt(view.ship.position.x * 0.5, 1 + jumpLift * 0.25, -12);
+if (view.cyberSun) {
+  view.cyberSun.position.x = view.ship.position.x * 2.31;
+}
+run.camRoll += (-run.latVel * 0.0016 - run.camRoll) * Math.min(1, dt * 8);
+view.camera.rotation.z += run.camRoll;
+
+run.fovKick *= Math.exp(-dt * 5);
+view.camera.fov = 70 + ((run.speed - 26) / 46) * 12 + run.fovKick;
+view.camera.updateProjectionMatrix();
+
+// 随里程平滑过渡环境基色、远景雾效与障碍物主题配色
+const curZoneCfg = MILESTONE_ZONES[run.currentZoneIndex];
+tmpColB.setHex(curZoneCfg.bgHex);
+BG_BASE.lerp(tmpColB, dt * 1.5);
+if (view.scene.fog) view.scene.fog.color.lerp(tmpColB, dt * 1.5);
+
+targetWallEdgeCol.setHex(curZoneCfg.wallEdgeHex);
+targetLowEdgeCol.setHex(curZoneCfg.lowEdgeHex);
+targetWallCoreCol.setHex(curZoneCfg.wallCoreHex);
+targetLowCoreCol.setHex(curZoneCfg.lowCoreHex);
+currentWallEdgeCol.lerp(targetWallEdgeCol, dt * 2.0);
+currentLowEdgeCol.lerp(targetLowEdgeCol, dt * 2.0);
+currentWallCoreCol.lerp(targetWallCoreCol, dt * 2.0);
+currentLowCoreCol.lerp(targetLowCoreCol, dt * 2.0);
+
+}
+
+export function updateTransientFx(dt, t) {
+const pdt = dt * run.timeScale;
+for (let i = 0; i < particlePool.length; i++) {
+  const p = particlePool[i];
+  if (!p.active) continue;
+  p.life -= pdt;
+  if (p.life <= 0) {
+    p.active = false;
+    p.pts.visible = false;
+    continue;
+  }
+  const arr = p.posArr;
+  const cnt = p.count;
+  for (let j = 0; j < cnt; j++) {
+    const v = p.vel[j];
+    v.y -= 20 * pdt;
+    arr[j * 3] += v.x * pdt;
+    arr[j * 3 + 1] = Math.max(0.05, arr[j * 3 + 1] + v.y * pdt);
+    arr[j * 3 + 2] += v.z * pdt;
+  }
+  p.posAttr.needsUpdate = true;
+  p.mat.opacity = Math.max(0, p.life / p.maxLife);
+}
+
+run.beatGlow *= Math.exp(-dt * 6);
+view.grid.material.opacity = 0.72 + run.beatGlow * 0.28;
+if (view.bloomPass) view.bloomPass.strength = 1.1 + run.beatGlow * 0.35;
+wallCoreMat.opacity = 0.65 + run.beatGlow * 0.35;
+lowCoreMat.opacity = 0.65 + run.beatGlow * 0.35;
+wallCoreMat.color.copy(currentWallCoreCol);
+lowCoreMat.color.copy(currentLowCoreCol);
+wallEdgeMat.color.copy(currentWallEdgeCol).lerp(WHITE, run.beatGlow * 0.35);
+lowEdgeMat.color.copy(currentLowEdgeCol).lerp(WHITE, run.beatGlow * 0.35);
+towerCapMat.color.setHex(0x00ffff).lerp(WHITE, run.beatGlow * 0.35);
+towerSpireMat.color.setHex(0xff0088).lerp(WHITE, run.beatGlow * 0.35);
+archNeonMat.color.setHex(0xff00aa).lerp(WHITE, run.beatGlow * 0.35);
+if (run.state === 'over') run.timeScale += (1 - run.timeScale) * dt * 2;
+
+for (let i = lists.shockwaves.length - 1; i >= 0; i--) {
+  const s = lists.shockwaves[i];
+  s.life -= pdt;
+  const k = 1 - Math.max(0, s.life) / s.maxLife;
+  s.m.scale.setScalar(0.3 + k * 9 * s.power);
+  s.m.material.opacity = 0.9 * (1 - k);
+  if (s.life <= 0) { view.scene.remove(s.m); s.m.material.dispose(); lists.shockwaves.splice(i, 1); }
+}
+
+if (run.shakeTime > 0) {
+  run.shakeTime -= dt;
+  const s = run.shakeTime * 0.5;
+  view.camera.position.x += (Math.random() - 0.5) * s;
+  view.camera.position.y += (Math.random() - 0.5) * s;
+} else if (run.state !== 'playing') {
+  run.camY = 4.6;
+  view.camera.position.y = 4.6;
+  view.camera.position.x *= 0.9;
+}
+
+if (run.paused && !run.showPending) { run.showPending = true; showPaused(); }
+if (!run.paused && run.showPending) { run.showPending = false; $('pauseScreen').classList.add('hidden'); }
+
+}
+
