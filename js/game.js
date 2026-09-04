@@ -9,6 +9,16 @@ import {
 import * as ui from './ui.js';
 
 const $ = id => document.getElementById(id);
+// This opt-in query flag is only for the deterministic regression harness.  It
+// keeps production on the normal RAF/THREE.Clock path.
+const TEST_MODE = new URLSearchParams(location.search).has('__neon_test');
+const SNAPSHOT_SCALAR_KEYS = [
+  'lastArchDist', 'currentZoneIndex', 'state', 'paused', 'vy', 'grounded', 'speed', 'maxSpeed', 'dist', 'spawnDist',
+  'orbCount', 'elapsed', 'score', 'shakeTime', 'best', 'combo', 'comboTimer', 'maxCombo', 'streakTimer', 'fovKick',
+  'beatTimer', 'beatGlow', 'beatCount', 'timeScale', 'lastSpeedMark', 'camRoll', 'camY', 'overTimerId', 'shieldReady',
+  'invuln', 'orbCountAtShieldEvent', 'tier', 'shipMorph', 'morphRoll', 'shipBank', 'airFlip', 'airJumps', 'latVel',
+  'stabilizerEngaged', 'dualHoldTime', 'lastGuidedLane', 'lastGuidedDist', 'showPending', 'lastPatternDist'
+];
 const LANES = [-2.5, 0, 2.5];
 const CENTER_X = LANES[1];
 const GRAVITY = -38, JUMP_V = 13;
@@ -47,27 +57,29 @@ const MILESTONE_ZONES = [
     wallEdgeHex: 0xb066ff, wallCoreHex: 0x9944ff, lowEdgeHex: 0x00ffcc, lowCoreHex: 0x00ddbb }
 ];
 
-let scene, camera, renderer, composer, clock, bloomPass, railMat;
-let grid, ship, shipGlowMat, groundGlow, groundGlowMat;
-let cyberSun, deepStars, warpStars, singularityHalo;
-let obstacles = [], orbs = [], pillars = [], roadside = [], arches = [], warpBeacons = [], sideFibres = [], particles = [], streaks = [], shockwaves = [];
-let lastArchDist = 0, currentZoneIndex = 0;
-let state = 'menu', paused = false;
-let vy = 0, grounded = true;
-let speed = 26, maxSpeed = 26, dist = 0, spawnDist = 0, orbCount = 0, elapsed = 0, score = 0;
-let shakeTime = 0, best = +(localStorage.getItem('neonRacerBest') || 0);
-let combo = 0, comboTimer = 0, maxCombo = 0;
-let streakTimer = 0, fovKick = 0;
-let beatTimer = 0, beatGlow = 0, beatCount = 0, timeScale = 1, lastSpeedMark = 26, camRoll = 0, camY = 4.6;
-let overTimerId = null;
-let shieldReady = false, invuln = 0, orbCountAtShieldEvent = 0;
-let tier = 0;
-let shipMorph = 0, morphRoll = 0, shipBank = 0, airFlip = 0;
-let airJumps = 0;
-let latVel = 0;
-let stabilizerEngaged = false, dualHoldTime = 0;
-let lastGuidedLane = null, lastGuidedDist = -Infinity;
-let validPrevLanes = new Set([0, 1, 2]), lastPatternDist = -Infinity;
+// Runtime state has one owner.  The accessors preserve the existing local-name
+// semantics for event and timeout callbacks while keeping the state boundary explicit.
+const runtime = {
+  scene: undefined, camera: undefined, renderer: undefined, composer: undefined, clock: undefined, bloomPass: undefined, railMat: undefined,
+  grid: undefined, ship: undefined, shipGlowMat: undefined, groundGlow: undefined, groundGlowMat: undefined,
+  cyberSun: undefined, deepStars: undefined, warpStars: undefined, singularityHalo: undefined,
+  obstacles: [], orbs: [], pillars: [], roadside: [], arches: [], warpBeacons: [], sideFibres: [], particles: [], streaks: [], shockwaves: [],
+  lastArchDist: 0, currentZoneIndex: 0, state: 'menu', paused: false, vy: 0, grounded: true,
+  speed: 26, maxSpeed: 26, dist: 0, spawnDist: 0, orbCount: 0, elapsed: 0, score: 0,
+  shakeTime: 0, best: +(localStorage.getItem('neonRacerBest') || 0), combo: 0, comboTimer: 0, maxCombo: 0,
+  streakTimer: 0, fovKick: 0, beatTimer: 0, beatGlow: 0, beatCount: 0, timeScale: 1, lastSpeedMark: 26, camRoll: 0, camY: 4.6,
+  overTimerId: null, shieldReady: false, invuln: 0, orbCountAtShieldEvent: 0, tier: 0,
+  shipMorph: 0, morphRoll: 0, shipBank: 0, airFlip: 0, airJumps: 0, latVel: 0,
+  stabilizerEngaged: false, dualHoldTime: 0, lastGuidedLane: null, lastGuidedDist: -Infinity, showPending: false,
+  validPrevLanes: new Set([0, 1, 2]), lastPatternDist: -Infinity
+};
+for (const key of Object.keys(runtime)) {
+  Object.defineProperty(globalThis, key, {
+    configurable: true,
+    get: () => runtime[key],
+    set: value => { runtime[key] = value; }
+  });
+}
 const activePointers = new Map();
 const keys = { left: false, right: false };
 
@@ -192,7 +204,6 @@ function buildShip() {
   const trimMat = new THREE.MeshBasicMaterial({ color: 0xff00ff, fog: false });
   const flameMat = () => new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.62, fog: false });
   const p = { bodyMat, plateMat };
-
   // ── 主体: 机腹 + 机首(可拉长) + 座舱 ──
   const fuselage = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.3, 1.5), bodyMat);
   fuselage.position.set(0, 0, 0.35);
@@ -216,57 +227,7 @@ function buildShip() {
   ship.add(cockpit);
   p.cockpit = cockpit;
 
-  // ── 主翼: 后掠 / 展开 / 上反, 并挂载副翼、引擎荚、磁力叉 ──
-  p.wings = [];
-  for (const side of [-1, 1]) {
-    const g = new THREE.Group();
-    g.position.set(side * 0.24, -0.06, 0.05);
-
-    const panel = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.09, 0.62), bodyMat);
-    panel.position.x = side * 0.36;
-    g.add(panel);
-
-    const tip = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.14, 0.66), trimMat);
-    tip.position.set(side * 0.72, 0.02, 0);
-    g.add(tip);
-
-    const blade = new THREE.Group();                       // T4 副翼下张
-    const bladePanel = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.07, 0.44), plateMat);
-    bladePanel.position.x = side * 0.32;
-    blade.add(bladePanel);
-    const bladeEdge = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.025, 0.07), shipGlowMat);
-    bladeEdge.position.set(side * 0.32, 0.05, -0.2);
-    blade.add(bladeEdge);
-    blade.position.set(side * 0.38, -0.03, 0.08);
-    g.add(blade);
-
-    const pod = new THREE.Group();                         // T3 外侧引擎荚
-    const podShell = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.13, 0.62, 10), bodyMat);
-    podShell.rotation.x = Math.PI / 2;
-    pod.add(podShell);
-    const podLip = new THREE.Mesh(new THREE.CylinderGeometry(0.115, 0.115, 0.06, 10), shipGlowMat);
-    podLip.rotation.x = Math.PI / 2;
-    podLip.position.z = 0.3;
-    pod.add(podLip);
-    const podFlame = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.9, 8), flameMat());
-    podFlame.rotation.x = -Math.PI / 2;
-    podFlame.position.z = 0.82;
-    pod.add(podFlame);
-    g.add(pod);
-
-    const prong = new THREE.Group();                       // T3 磁力叉
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.95), bodyMat);
-    arm.position.z = -0.48;
-    prong.add(arm);
-    const coil = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.035, 6, 18), shipGlowMat);
-    coil.position.z = -0.95;
-    prong.add(coil);
-    prong.position.set(side * 0.5, 0.02, -0.15);
-    g.add(prong);
-
-    ship.add(g);
-    p.wings.push({ g, side, tip, blade, pod, podFlame, prong, coil });
-  }
+  addShipWings(ship, p, bodyMat, plateMat, shipGlowMat, trimMat, flameMat);
 
   // ── T1 鸭翼(从机身折出) + 过载散热鳍 ──
   p.canards = [];
@@ -385,6 +346,61 @@ function buildShip() {
   scene.add(ship);
   poseShip(0, 0);
 }
+
+function addShipWings(ship, p, bodyMat, plateMat, shipGlowMat, trimMat, flameMat) {
+p.wings = [];
+for (const side of [-1, 1]) {
+  const g = new THREE.Group();
+  g.position.set(side * 0.24, -0.06, 0.05);
+
+  const panel = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.09, 0.62), bodyMat);
+  panel.position.x = side * 0.36;
+  g.add(panel);
+
+  const tip = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.14, 0.66), trimMat);
+  tip.position.set(side * 0.72, 0.02, 0);
+  g.add(tip);
+
+  const blade = new THREE.Group();                       // T4 副翼下张
+  const bladePanel = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.07, 0.44), plateMat);
+  bladePanel.position.x = side * 0.32;
+  blade.add(bladePanel);
+  const bladeEdge = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.025, 0.07), shipGlowMat);
+  bladeEdge.position.set(side * 0.32, 0.05, -0.2);
+  blade.add(bladeEdge);
+  blade.position.set(side * 0.38, -0.03, 0.08);
+  g.add(blade);
+
+  const pod = new THREE.Group();                         // T3 外侧引擎荚
+  const podShell = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.13, 0.62, 10), bodyMat);
+  podShell.rotation.x = Math.PI / 2;
+  pod.add(podShell);
+  const podLip = new THREE.Mesh(new THREE.CylinderGeometry(0.115, 0.115, 0.06, 10), shipGlowMat);
+  podLip.rotation.x = Math.PI / 2;
+  podLip.position.z = 0.3;
+  pod.add(podLip);
+  const podFlame = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.9, 8), flameMat());
+  podFlame.rotation.x = -Math.PI / 2;
+  podFlame.position.z = 0.82;
+  pod.add(podFlame);
+  g.add(pod);
+
+  const prong = new THREE.Group();                       // T3 磁力叉
+  const arm = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.95), bodyMat);
+  arm.position.z = -0.48;
+  prong.add(arm);
+  const coil = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.035, 6, 18), shipGlowMat);
+  coil.position.z = -0.95;
+  prong.add(coil);
+  prong.position.set(side * 0.5, 0.02, -0.15);
+  g.add(prong);
+
+  ship.add(g);
+  p.wings.push({ g, side, tip, blade, pod, podFlame, prong, coil });
+}
+
+}
+
 
 const WHITE = new THREE.Color(0xffffff);
 const BG_BASE = new THREE.Color(0x05050f);
@@ -1429,533 +1445,640 @@ ui.initUI(camera);
 ui.els.bestEl.textContent = best;
 clock = new THREE.Clock();
 
-function animate() {
-  requestAnimationFrame(animate);
-  const dt = Math.min(clock.getDelta(), 0.05);
-  const t = clock.elapsedTime;
-
+function updateAmbient(dt, t) {
   grid.position.z = (grid.position.z + (state === 'playing' ? speed : 8) * dt) % 4;
-  if (warpStars) {
-    warpStars.position.z = (warpStars.position.z + (state === 'playing' ? speed : 8) * dt * 0.25) % 80;
+if (warpStars) {
+  warpStars.position.z = (warpStars.position.z + (state === 'playing' ? speed : 8) * dt * 0.25) % 80;
+}
+if (deepStars) {
+  deepStars.material.opacity = 0.68 + Math.sin(t * 1.5) * 0.12;
+}
+updateMeteors(dt);
+
+if (singularityHalo) {
+  singularityHalo.rotation.z += dt * 0.35;
+  const targetHaloOp = currentZoneIndex >= 3 ? 0.62 : 0;
+  singularityHalo.material.opacity += (targetHaloOp - singularityHalo.material.opacity) * Math.min(1, dt * 2.5);
+  singularityHalo.visible = singularityHalo.material.opacity > 0.01;
+}
+const isZone5 = currentZoneIndex >= 4;
+for (const sf of sideFibres) {
+  sf.visible = isZone5;
+  if (isZone5) {
+    sf.material.opacity = 0.5 + Math.sin(t * 14 + sf.position.x) * 0.35;
   }
-  if (deepStars) {
-    deepStars.material.opacity = 0.68 + Math.sin(t * 1.5) * 0.12;
-  }
-  updateMeteors(dt);
-
-  if (singularityHalo) {
-    singularityHalo.rotation.z += dt * 0.35;
-    const targetHaloOp = currentZoneIndex >= 3 ? 0.62 : 0;
-    singularityHalo.material.opacity += (targetHaloOp - singularityHalo.material.opacity) * Math.min(1, dt * 2.5);
-    singularityHalo.visible = singularityHalo.material.opacity > 0.01;
-  }
-  const isZone5 = currentZoneIndex >= 4;
-  for (const sf of sideFibres) {
-    sf.visible = isZone5;
-    if (isZone5) {
-      sf.material.opacity = 0.5 + Math.sin(t * 14 + sf.position.x) * 0.35;
-    }
-  }
-
-  morphRoll *= Math.exp(-dt * 3.4);
-  if (Math.abs(morphRoll) < 0.004) morphRoll = 0;
-  airFlip *= Math.exp(-dt * 4.6);
-  if (Math.abs(airFlip) < 0.004) airFlip = 0;
-  updateShipMorph(dt, t);
-
-  if (state === 'menu') {
-    ship.position.x = Math.sin(t) * 2.5;
-    shipBank = -Math.cos(t) * 0.35;
-    ship.rotation.set(0, 0, shipBank);
-    ship.position.y = 0.95 + Math.sin(t * 3) * 0.1;
-    camera.lookAt(ship.position.x * 0.4, 1, -12);
-    if (cyberSun) cyberSun.position.x = ship.position.x * 2.31;
-    updateGroundGlow();
-  }
-
-  if (state === 'playing' && !paused) {
-    elapsed += dt;
-    speed = Math.min(72, 26 + elapsed * 0.55);
-    maxSpeed = Math.max(maxSpeed, speed);
-    const move = speed * dt;
-    dist += move;
-    spawnDist += move;
-
-    const gap = Math.max(15, 26 - elapsed * 0.25);
-    while (spawnDist >= gap) {
-      const overshoot = spawnDist - gap;
-      spawnDist -= gap;
-      spawnPattern(overshoot, gap);
-    }
-
-    if ((dist % 14) < move) {
-      const p = makePillar(-150);
-      pillars.push(p);
-      scene.add(p);
-    }
-    if ((dist % 24) < move) {
-      const side = Math.random() < 0.5 ? -1 : 1;
-      const relayChance = currentZoneIndex === 0 ? 0 : (currentZoneIndex === 1 ? 0.35 : 0.55);
-      const rs = Math.random() < relayChance ? makeRoadsideRelay(side, -150) : makeRoadsideStructure(side, -150);
-      roadside.push(rs);
-      scene.add(rs);
-    }
-    if (currentZoneIndex >= 2 && (dist % 45) < move) {
-      const side = Math.random() < 0.5 ? -1 : 1;
-      const wb = makeWarpBeacon(side, -150);
-      warpBeacons.push(wb);
-      scene.add(wb);
-    }
-
-    while (currentZoneIndex + 1 < MILESTONE_ZONES.length && dist >= MILESTONE_ZONES[currentZoneIndex + 1].dist) {
-      currentZoneIndex++;
-      const zInfo = MILESTONE_ZONES[currentZoneIndex];
-      ui.milestoneBanner(zInfo.name, `已行驶 ${Math.floor(dist)} M`, zInfo.color);
-      beep(880, 0.16, 'sine', 0.12);
-      setTimeout(() => beep(1320, 0.22, 'sine', 0.12), 110);
-    }
-
-    const curZone = MILESTONE_ZONES[currentZoneIndex];
-    if (curZone.archFreq > 0 && (dist - lastArchDist >= curZone.archFreq)) {
-      lastArchDist = dist;
-      const arch = makeOverheadArch(-150);
-      arches.push(arch);
-      scene.add(arch);
-    }
-
-    let dir = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
-    let stabilizing = false;
-    if (activePointers.size) {
-      let s = 0, hasL = false, hasR = false;
-      for (const p of activePointers.values()) {
-        if (p.isJump) continue;
-        const side = p.x < innerWidth / 2 ? -1 : 1;
-        s += side;
-        if (side < 0) hasL = true; else hasR = true;
-      }
-      if (hasL && hasR) {
-        dualHoldTime += dt;
-        if (dualHoldTime >= 0.08) {
-          stabilizing = true;
-          dir = 0;
-          if (!stabilizerEngaged) {
-            stabilizerEngaged = true;
-            latVel *= 0.25;
-            ui.floatLabel('中线锁定', ship.position, '#66ffff', 14);
-            beep(710, 0.07, 'triangle', 0.065);
-          }
-        }
-      } else {
-        dualHoldTime = 0;
-        stabilizerEngaged = false;
-        dir += s;
-      }
-    } else {
-      dualHoldTime = 0;
-      stabilizerEngaged = false;
-    }
-    dir = Math.max(-1, Math.min(1, dir));
-    const maxV = (5 + speed * 0.27) * (1 + tier * 0.08);
-    if (stabilizing) {
-      const error = CENTER_X - ship.position.x;
-      const targetVel = Math.max(-maxV, Math.min(maxV, error * STABILIZER_GAIN));
-      const step = STABILIZER_ACCEL * dt;
-      latVel += Math.max(-step, Math.min(step, targetVel - latVel));
-      if (Math.abs(error) < 0.012 && Math.abs(latVel) < 0.45) {
-        ship.position.x = CENTER_X;
-        latVel = 0;
-      }
-    } else if (dir !== 0) {
-      latVel += dir * 150 * dt;
-    } else {
-      const decel = 175 * dt;
-      latVel = Math.abs(latVel) <= decel ? 0 : latVel - Math.sign(latVel) * decel;
-    }
-    latVel = Math.max(-maxV, Math.min(maxV, latVel));
-    const nx = ship.position.x + latVel * dt;
-    if ((nx <= -TRACK_HALF && latVel < 0) || (nx >= TRACK_HALF && latVel > 0)) latVel = 0;
-    ship.position.x = Math.max(-TRACK_HALF, Math.min(TRACK_HALF, nx));
-    const bankTarget = Math.max(-0.45, Math.min(0.45, -latVel * 0.02));
-    shipBank += (bankTarget - shipBank) * Math.min(1, dt * 10);
-    ship.rotation.z = shipBank + morphRoll;
-    ship.rotation.x = -airFlip;
-
-    if (!grounded) {
-      vy += GRAVITY * dt;
-      ship.position.y += vy * dt;
-      if (ship.position.y <= 0.95) {
-        ship.position.y = 0.95; grounded = true; vy = 0;
-        airJumps = tier >= MAX_TIER ? 1 : 0;
-        ship.scale.set(1.3, 0.65, 1.3);
-        burst(new THREE.Vector3(ship.position.x, 0.25, 0.5), 0x66ccff, 0.16, 0.35, 0.4, 14);
-        beep(170, 0.09, 'sine', 0.1);
-        shakeTime = Math.max(shakeTime, 0.12);
-      }
-    } else {
-      ship.position.y = 0.95 + Math.sin(t * 3.2) * 0.07;
-    }
-    ship.scale.x += (1 - ship.scale.x) * Math.min(1, dt * 9);
-    ship.scale.y += (1 - ship.scale.y) * Math.min(1, dt * 9);
-    ship.scale.z += (1 - ship.scale.z) * Math.min(1, dt * 9);
-
-    if (invuln > 0) {
-      invuln -= dt;
-      ship.visible = Math.floor(t * 18) % 2 === 0;
-      if (invuln <= 0) ship.visible = true;
-    }
-    updateGroundGlow();
-
-    for (let i = pillars.length - 1; i >= 0; i--) {
-      pillars[i].position.z += move;
-      if (pillars[i].position.z > 12) { scene.remove(pillars[i]); pillars.splice(i, 1); }
-    }
-    for (let i = roadside.length - 1; i >= 0; i--) {
-      const rs = roadside[i];
-      rs.position.z += move;
-      if (rs.userData.ring) {
-        rs.userData.ring.rotation.z += dt * 1.8;
-        rs.userData.ring.rotation.x = Math.sin(t * 2.2 + rs.userData.phase) * 0.35;
-      }
-      if (rs.userData.core) {
-        rs.userData.core.rotation.y += dt * 2.5;
-        rs.userData.core.rotation.x += dt * 1.2;
-      }
-      if (rs.position.z > 15) { scene.remove(rs); roadside.splice(i, 1); }
-    }
-    for (let i = arches.length - 1; i >= 0; i--) {
-      arches[i].position.z += move;
-      if (arches[i].position.z > 15) { scene.remove(arches[i]); arches.splice(i, 1); }
-    }
-    for (let i = warpBeacons.length - 1; i >= 0; i--) {
-      const wb = warpBeacons[i];
-      wb.position.z += move;
-      if (wb.userData.core) {
-        wb.userData.core.scale.setScalar(0.9 + Math.sin(t * 6 + wb.userData.phase) * 0.15);
-      }
-      if (wb.position.z > 15) { scene.remove(wb); warpBeacons.splice(i, 1); }
-    }
-
-    streakTimer -= dt;
-    if (speed > 40 && streakTimer <= 0) {
-      streakTimer = 0.05 + Math.random() * 0.07;
-      const s = new THREE.Mesh(streakGeo, streakMat);
-      s.scale.set(1, 1, 4 + Math.random() * 5);
-      s.position.set((Math.random() - 0.5) * 18, Math.random() * 7 + 0.5, -120);
-      streaks.push(s);
-      scene.add(s);
-    }
-    for (let i = streaks.length - 1; i >= 0; i--) {
-      const st = streaks[i];
-      st.position.z += move * 1.6;
-      if (st.position.z > 12) { scene.remove(st); streaks.splice(i, 1); }
-    }
-
-    for (let i = obstacles.length - 1; i >= 0; i--) {
-      const o = obstacles[i];
-      const prevZ = o.position.z;
-      o.position.z += move;
-      if (o.userData.scan) {
-        if (o.userData.type === 'wall') {
-          o.userData.scan.position.y = 1.6 + Math.sin(t * 7 + o.userData.phase) * 1.1;
-          if (o.userData.leftPylon && o.userData.rightPylon) {
-            const pulse = 0.85 + Math.sin(t * 10 + o.userData.phase) * 0.15;
-            o.userData.leftPylon.scale.x = pulse;
-            o.userData.rightPylon.scale.x = pulse;
-          }
-        } else if (o.userData.type === 'low') {
-          o.userData.scan.scale.x = 0.88 + Math.sin(t * 8 + o.userData.phase) * 0.12;
-          if (o.userData.guide) {
-            o.userData.guide.scale.x = 0.94 + Math.sin(t * 11 + o.userData.phase) * 0.06;
-          }
-        }
-      }
-      if (o.position.z > 12) { scene.remove(o); obstacles.splice(i, 1); continue; }
-      if (!o.userData.passed && prevZ <= 1.0 && o.position.z >= -1.0) {
-        o.userData.passed = true;
-        const dx = Math.abs(o.position.x - ship.position.x);
-        const hitTop = o.userData.type === 'wall' ? 3.2 : 0.76;
-        const bottom = ship.position.y - 0.35;
-        const crashing = dx < 1.85 && bottom < hitTop;
-        if (crashing && invuln <= 0) {
-          if (shieldReady && tier >= 2) {
-            shieldReady = false;
-            orbCountAtShieldEvent = orbCount;
-            invuln = 1.3;
-            applyShipTier();
-            shieldBreakFx();
-          } else {
-            gameOver();
-            break;
-          }
-        }
-        if (!crashing) {
-          if (o.userData.type === 'low' && dx < 1.85 && !grounded) {
-            const g = addScore(40);
-            ui.floatLabel('完美跳跃 +' + g, o.position, '#ffffff', 19);
-            fovKick += 2.5;
-            beep(1250, 0.14, 'sine', 0.12);
-            burst(o.position, 0xffffff, 0.2, 0.4, 0.6, 22);
-            bumpScore();
-          } else if (dx >= 1.85 && dx < 3.6) {
-            const g = addScore(30);
-            ui.floatLabel('擦身而过 +' + g, o.position, '#aaffff', 16);
-            fovKick += 1.5;
-            whoosh();
-          }
-        }
-      }
-    }
-
-    if (combo > 0) {
-      comboTimer -= dt;
-      ui.els.comboBar.style.width = Math.max(0, comboTimer / COMBO_WINDOW * 130) + 'px';
-      if (comboTimer <= 0) {
-        combo = 0;
-        ui.els.comboBox.style.opacity = 0;
-        beep(300, 0.2, 'sawtooth', 0.05);
-      }
-    }
-
-    for (let i = orbs.length - 1; i >= 0; i--) {
-      const o = orbs[i];
-      const prevZ = o.position.z;
-      o.position.z += move;
-      o.position.y = o.userData.baseY + Math.sin(t * 4 + o.userData.phase) * 0.15;
-      o.rotation.y += dt * 3;
-      if (o.userData.innerRing) {
-        o.userData.innerRing.rotation.x = t * 2.8 + o.userData.phase;
-        o.userData.innerRing.rotation.z = Math.sin(t * 1.8 + o.userData.phase) * 0.4;
-      }
-      if (o.userData.outerRing) {
-        o.userData.outerRing.rotation.y = t * -2.1 + o.userData.phase;
-        o.userData.outerRing.rotation.x = Math.cos(t * 1.5 + o.userData.phase) * 0.5;
-      } else if (o.userData.ring) {
-        o.userData.ring.rotation.x = t * 2 + o.userData.phase;
-        o.userData.ring.rotation.y = Math.sin(t * 3 + o.userData.phase) * 0.6;
-      }
-      if (o.position.z > 10) { scene.remove(o); orbs.splice(i, 1); continue; }
-      if (tier >= 3 && o.position.z < 4 && o.position.z > -16) {
-        const md = Math.hypot(o.position.x - ship.position.x, o.userData.baseY - ship.position.y);
-        if (md < 4.5) {
-          const pull = Math.min(1, dt * 7);
-          o.position.x += (ship.position.x - o.position.x) * pull;
-          o.userData.baseY += (ship.position.y - o.userData.baseY) * pull;
-        }
-      }
-      if (prevZ <= 1.15 && o.position.z >= -1.15 && Math.abs(o.position.x - ship.position.x) < 1.15
-        && Math.abs(o.position.y - ship.position.y) < 1.25) {
-        scene.remove(o); orbs.splice(i, 1);
-        orbCount++;
-        combo++;
-        if (combo > maxCombo) maxCombo = combo;
-        comboTimer = COMBO_WINDOW;
-        const mult = ui.multOf(combo);
-        const gainAmt = addScore(25 * mult);
-        fovKick += 1.5;
-        bumpScore();
-        beep(700 + combo * 30, 0.09, 'square', 0.11);
-        if (combo % 8 === 0) beep(1400 + combo * 15, 0.16, 'sawtooth', 0.06);
-        burst(o.position, ui.comboColor(mult), 0.18 + mult * 0.03, 0.5, 0.55, 14 + mult * 7);
-        ui.floatLabel('+' + gainAmt + (mult > 1 ? ' ×' + mult : ''), o.position, ui.comboColor(mult), 17 + mult * 3);
-        ui.flash(ui.comboColor(mult), mult >= 3 ? 0.13 : 0.06);
-        ui.els.comboText.textContent = '×' + mult + ' COMBO ' + combo;
-        ui.els.comboBox.style.color = ui.comboColor(mult);
-        ui.els.comboBox.style.opacity = 1;
-        ui.els.comboBox.classList.remove('pop');
-        void ui.els.comboBox.offsetWidth;
-        ui.els.comboBox.classList.add('pop');
-        if (TOASTS[combo]) ui.toast(TOASTS[combo], ui.comboColor(mult));
-        if (tier >= 2 && !shieldReady && orbCount - orbCountAtShieldEvent >= ui.SHIELD_RECHARGE) {
-          shieldReady = true;
-          applyShipTier();
-          ui.toast('护盾已充能', '#66ffff');
-          beep(900, 0.12, 'triangle', 0.1);
-          setTimeout(() => beep(1300, 0.15, 'triangle', 0.1), 90);
-          spawnShockwave(ship.position, 0x00ffff, 0.6);
-        }
-        const nt = calcTier();
-        if (nt > tier) {
-          tier = nt;
-          applyShipTier();
-          morphRoll = Math.PI * 2;
-          if (tier >= MAX_TIER) airJumps = 1;
-          if (tier >= 2 && !shieldReady) { shieldReady = true; orbCountAtShieldEvent = orbCount; }
-          timeScale = 0.35;
-          shakeTime = Math.max(shakeTime, 0.45);
-          ui.flash('#ffffff', 0.35, 550);
-          ui.toast(TIER_NAMES[tier], '#' + TIER_COLORS[tier].toString(16).padStart(6, '0'));
-          spawnShockwave(ship.position, TIER_COLORS[tier], 1);
-          setTimeout(() => { if (state === 'playing') spawnShockwave(ship.position, 0xffffff, 0.7); }, 130);
-          for (let k = 0; k < 4; k++) {
-            setTimeout(() => {
-              burst(ship.position, k % 2 ? 0xffffff : TIER_COLORS[tier], 0.24, 0.9, 1.1, 50);
-              if (k < 3) beep(520 + k * 260, 0.12, 'triangle', 0.13);
-            }, k * 110);
-          }
-        }
-        updateHUD();
-      }
-    }
-
-    updateHUD();
-
-    const bpm = 92 + speed * 1.15;
-    beatTimer -= dt;
-    if (beatTimer <= 0) {
-      const dur = 60 / bpm;
-      beatTimer = dur;
-      beatGlow = 1;
-      setMusicIntensity(Math.min(1, ((speed - 26) / 46) * 0.6 + tier * 0.1));
-      playBeat(beatCount, dur);
-      beatCount++;
-    }
-    setEnginePitch(46 + speed * 1.5 + combo * 2);
-
-    if (speed - lastSpeedMark >= 10) {
-      lastSpeedMark = speed;
-      ui.toast('速度提升!', '#ff8822');
-      fovKick += 3;
-      beep(500, 0.35, 'sawtooth', 0.07);
-      setTimeout(() => beep(800, 0.3, 'sawtooth', 0.06), 120);
-    }
-
-    if (combo > 0) {
-      ui.els.vig.style.setProperty('--vc', ui.comboColor(ui.multOf(combo)));
-      ui.els.vig.style.opacity = Math.min(0.85, 0.18 + ui.multOf(combo) * 0.07) * Math.max(0, comboTimer / COMBO_WINDOW);
-    } else ui.els.vig.style.opacity = 0;
-
-    const jumpLift = Math.max(0, ship.position.y - 1.02);
-    const targetCamY = 4.6 + jumpLift * 0.40;
-    camY += (targetCamY - camY) * Math.min(1, dt * 12);
-    camera.position.x = ship.position.x * 0.35;
-    camera.position.y = camY;
-    camera.lookAt(ship.position.x * 0.5, 1 + jumpLift * 0.25, -12);
-    if (cyberSun) {
-      cyberSun.position.x = ship.position.x * 2.31;
-    }
-    camRoll += (-latVel * 0.0016 - camRoll) * Math.min(1, dt * 8);
-    camera.rotation.z += camRoll;
-
-    fovKick *= Math.exp(-dt * 5);
-    camera.fov = 70 + ((speed - 26) / 46) * 12 + fovKick;
-    camera.updateProjectionMatrix();
-
-    // 随里程平滑过渡环境基色、远景雾效与障碍物主题配色
-    const curZoneCfg = MILESTONE_ZONES[currentZoneIndex];
-    tmpColB.setHex(curZoneCfg.bgHex);
-    BG_BASE.lerp(tmpColB, dt * 1.5);
-    if (scene.fog) scene.fog.color.lerp(tmpColB, dt * 1.5);
-
-    targetWallEdgeCol.setHex(curZoneCfg.wallEdgeHex);
-    targetLowEdgeCol.setHex(curZoneCfg.lowEdgeHex);
-    targetWallCoreCol.setHex(curZoneCfg.wallCoreHex);
-    targetLowCoreCol.setHex(curZoneCfg.lowCoreHex);
-    currentWallEdgeCol.lerp(targetWallEdgeCol, dt * 2.0);
-    currentLowEdgeCol.lerp(targetLowEdgeCol, dt * 2.0);
-    currentWallCoreCol.lerp(targetWallCoreCol, dt * 2.0);
-    currentLowCoreCol.lerp(targetLowCoreCol, dt * 2.0);
-
-  }
-
-  const pdt = dt * timeScale;
-  for (let i = 0; i < particlePool.length; i++) {
-    const p = particlePool[i];
-    if (!p.active) continue;
-    p.life -= pdt;
-    if (p.life <= 0) {
-      p.active = false;
-      p.pts.visible = false;
-      continue;
-    }
-    const arr = p.posArr;
-    const cnt = p.count;
-    for (let j = 0; j < cnt; j++) {
-      const v = p.vel[j];
-      v.y -= 20 * pdt;
-      arr[j * 3] += v.x * pdt;
-      arr[j * 3 + 1] = Math.max(0.05, arr[j * 3 + 1] + v.y * pdt);
-      arr[j * 3 + 2] += v.z * pdt;
-    }
-    p.posAttr.needsUpdate = true;
-    p.mat.opacity = Math.max(0, p.life / p.maxLife);
-  }
-
-  beatGlow *= Math.exp(-dt * 6);
-  grid.material.opacity = 0.72 + beatGlow * 0.28;
-  if (bloomPass) bloomPass.strength = 1.1 + beatGlow * 0.35;
-  wallCoreMat.opacity = 0.65 + beatGlow * 0.35;
-  lowCoreMat.opacity = 0.65 + beatGlow * 0.35;
-  wallCoreMat.color.copy(currentWallCoreCol);
-  lowCoreMat.color.copy(currentLowCoreCol);
-  wallEdgeMat.color.copy(currentWallEdgeCol).lerp(WHITE, beatGlow * 0.35);
-  lowEdgeMat.color.copy(currentLowEdgeCol).lerp(WHITE, beatGlow * 0.35);
-  towerCapMat.color.setHex(0x00ffff).lerp(WHITE, beatGlow * 0.35);
-  towerSpireMat.color.setHex(0xff0088).lerp(WHITE, beatGlow * 0.35);
-  archNeonMat.color.setHex(0xff00aa).lerp(WHITE, beatGlow * 0.35);
-  if (state === 'over') timeScale += (1 - timeScale) * dt * 2;
-
-  for (let i = shockwaves.length - 1; i >= 0; i--) {
-    const s = shockwaves[i];
-    s.life -= pdt;
-    const k = 1 - Math.max(0, s.life) / s.maxLife;
-    s.m.scale.setScalar(0.3 + k * 9 * s.power);
-    s.m.material.opacity = 0.9 * (1 - k);
-    if (s.life <= 0) { scene.remove(s.m); s.m.material.dispose(); shockwaves.splice(i, 1); }
-  }
-
-  if (shakeTime > 0) {
-    shakeTime -= dt;
-    const s = shakeTime * 0.5;
-    camera.position.x += (Math.random() - 0.5) * s;
-    camera.position.y += (Math.random() - 0.5) * s;
-  } else if (state !== 'playing') {
-    camY = 4.6;
-    camera.position.y = 4.6;
-    camera.position.x *= 0.9;
-  }
-
-  if (paused && !showPending) { showPending = true; showPaused(); }
-  if (!paused && showPending) { showPending = false; $('pauseScreen').classList.add('hidden'); }
-
-  composer.render();
 }
 
-let showPending = false;
+morphRoll *= Math.exp(-dt * 3.4);
+if (Math.abs(morphRoll) < 0.004) morphRoll = 0;
+airFlip *= Math.exp(-dt * 4.6);
+if (Math.abs(airFlip) < 0.004) airFlip = 0;
+updateShipMorph(dt, t);
+
+
+}
+
+function updateMenu(dt, t) {
+ship.position.x = Math.sin(t) * 2.5;
+shipBank = -Math.cos(t) * 0.35;
+ship.rotation.set(0, 0, shipBank);
+ship.position.y = 0.95 + Math.sin(t * 3) * 0.1;
+camera.lookAt(ship.position.x * 0.4, 1, -12);
+if (cyberSun) cyberSun.position.x = ship.position.x * 2.31;
+updateGroundGlow();
+
+}
+
+function updateRunProgress(dt) {
+elapsed += dt;
+speed = Math.min(72, 26 + elapsed * 0.55);
+maxSpeed = Math.max(maxSpeed, speed);
+const move = speed * dt;
+dist += move;
+spawnDist += move;
+
+const gap = Math.max(15, 26 - elapsed * 0.25);
+while (spawnDist >= gap) {
+  const overshoot = spawnDist - gap;
+  spawnDist -= gap;
+  spawnPattern(overshoot, gap);
+}
+
+if ((dist % 14) < move) {
+  const p = makePillar(-150);
+  pillars.push(p);
+  scene.add(p);
+}
+if ((dist % 24) < move) {
+  const side = Math.random() < 0.5 ? -1 : 1;
+  const relayChance = currentZoneIndex === 0 ? 0 : (currentZoneIndex === 1 ? 0.35 : 0.55);
+  const rs = Math.random() < relayChance ? makeRoadsideRelay(side, -150) : makeRoadsideStructure(side, -150);
+  roadside.push(rs);
+  scene.add(rs);
+}
+if (currentZoneIndex >= 2 && (dist % 45) < move) {
+  const side = Math.random() < 0.5 ? -1 : 1;
+  const wb = makeWarpBeacon(side, -150);
+  warpBeacons.push(wb);
+  scene.add(wb);
+}
+
+while (currentZoneIndex + 1 < MILESTONE_ZONES.length && dist >= MILESTONE_ZONES[currentZoneIndex + 1].dist) {
+  currentZoneIndex++;
+  const zInfo = MILESTONE_ZONES[currentZoneIndex];
+  ui.milestoneBanner(zInfo.name, `已行驶 ${Math.floor(dist)} M`, zInfo.color);
+  beep(880, 0.16, 'sine', 0.12);
+  setTimeout(() => beep(1320, 0.22, 'sine', 0.12), 110);
+}
+
+const curZone = MILESTONE_ZONES[currentZoneIndex];
+if (curZone.archFreq > 0 && (dist - lastArchDist >= curZone.archFreq)) {
+  lastArchDist = dist;
+  const arch = makeOverheadArch(-150);
+  arches.push(arch);
+  scene.add(arch);
+}
+
+
+  return move;
+}
+
+function updateShipControl(dt, t, move) {
+let dir = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+let stabilizing = false;
+if (activePointers.size) {
+  let s = 0, hasL = false, hasR = false;
+  for (const p of activePointers.values()) {
+    if (p.isJump) continue;
+    const side = p.x < innerWidth / 2 ? -1 : 1;
+    s += side;
+    if (side < 0) hasL = true; else hasR = true;
+  }
+  if (hasL && hasR) {
+    dualHoldTime += dt;
+    if (dualHoldTime >= 0.08) {
+      stabilizing = true;
+      dir = 0;
+      if (!stabilizerEngaged) {
+        stabilizerEngaged = true;
+        latVel *= 0.25;
+        ui.floatLabel('中线锁定', ship.position, '#66ffff', 14);
+        beep(710, 0.07, 'triangle', 0.065);
+      }
+    }
+  } else {
+    dualHoldTime = 0;
+    stabilizerEngaged = false;
+    dir += s;
+  }
+} else {
+  dualHoldTime = 0;
+  stabilizerEngaged = false;
+}
+dir = Math.max(-1, Math.min(1, dir));
+const maxV = (5 + speed * 0.27) * (1 + tier * 0.08);
+if (stabilizing) {
+  const error = CENTER_X - ship.position.x;
+  const targetVel = Math.max(-maxV, Math.min(maxV, error * STABILIZER_GAIN));
+  const step = STABILIZER_ACCEL * dt;
+  latVel += Math.max(-step, Math.min(step, targetVel - latVel));
+  if (Math.abs(error) < 0.012 && Math.abs(latVel) < 0.45) {
+    ship.position.x = CENTER_X;
+    latVel = 0;
+  }
+} else if (dir !== 0) {
+  latVel += dir * 150 * dt;
+} else {
+  const decel = 175 * dt;
+  latVel = Math.abs(latVel) <= decel ? 0 : latVel - Math.sign(latVel) * decel;
+}
+latVel = Math.max(-maxV, Math.min(maxV, latVel));
+const nx = ship.position.x + latVel * dt;
+if ((nx <= -TRACK_HALF && latVel < 0) || (nx >= TRACK_HALF && latVel > 0)) latVel = 0;
+ship.position.x = Math.max(-TRACK_HALF, Math.min(TRACK_HALF, nx));
+const bankTarget = Math.max(-0.45, Math.min(0.45, -latVel * 0.02));
+shipBank += (bankTarget - shipBank) * Math.min(1, dt * 10);
+ship.rotation.z = shipBank + morphRoll;
+ship.rotation.x = -airFlip;
+
+if (!grounded) {
+  vy += GRAVITY * dt;
+  ship.position.y += vy * dt;
+  if (ship.position.y <= 0.95) {
+    ship.position.y = 0.95; grounded = true; vy = 0;
+    airJumps = tier >= MAX_TIER ? 1 : 0;
+    ship.scale.set(1.3, 0.65, 1.3);
+    burst(new THREE.Vector3(ship.position.x, 0.25, 0.5), 0x66ccff, 0.16, 0.35, 0.4, 14);
+    beep(170, 0.09, 'sine', 0.1);
+    shakeTime = Math.max(shakeTime, 0.12);
+  }
+} else {
+  ship.position.y = 0.95 + Math.sin(t * 3.2) * 0.07;
+}
+ship.scale.x += (1 - ship.scale.x) * Math.min(1, dt * 9);
+ship.scale.y += (1 - ship.scale.y) * Math.min(1, dt * 9);
+ship.scale.z += (1 - ship.scale.z) * Math.min(1, dt * 9);
+
+if (invuln > 0) {
+  invuln -= dt;
+  ship.visible = Math.floor(t * 18) % 2 === 0;
+  if (invuln <= 0) ship.visible = true;
+}
+updateGroundGlow();
+
+
+}
+
+function updateScenery(dt, t, move) {
+for (let i = pillars.length - 1; i >= 0; i--) {
+  pillars[i].position.z += move;
+  if (pillars[i].position.z > 12) { scene.remove(pillars[i]); pillars.splice(i, 1); }
+}
+for (let i = roadside.length - 1; i >= 0; i--) {
+  const rs = roadside[i];
+  rs.position.z += move;
+  if (rs.userData.ring) {
+    rs.userData.ring.rotation.z += dt * 1.8;
+    rs.userData.ring.rotation.x = Math.sin(t * 2.2 + rs.userData.phase) * 0.35;
+  }
+  if (rs.userData.core) {
+    rs.userData.core.rotation.y += dt * 2.5;
+    rs.userData.core.rotation.x += dt * 1.2;
+  }
+  if (rs.position.z > 15) { scene.remove(rs); roadside.splice(i, 1); }
+}
+for (let i = arches.length - 1; i >= 0; i--) {
+  arches[i].position.z += move;
+  if (arches[i].position.z > 15) { scene.remove(arches[i]); arches.splice(i, 1); }
+}
+for (let i = warpBeacons.length - 1; i >= 0; i--) {
+  const wb = warpBeacons[i];
+  wb.position.z += move;
+  if (wb.userData.core) {
+    wb.userData.core.scale.setScalar(0.9 + Math.sin(t * 6 + wb.userData.phase) * 0.15);
+  }
+  if (wb.position.z > 15) { scene.remove(wb); warpBeacons.splice(i, 1); }
+}
+
+streakTimer -= dt;
+if (speed > 40 && streakTimer <= 0) {
+  streakTimer = 0.05 + Math.random() * 0.07;
+  const s = new THREE.Mesh(streakGeo, streakMat);
+  s.scale.set(1, 1, 4 + Math.random() * 5);
+  s.position.set((Math.random() - 0.5) * 18, Math.random() * 7 + 0.5, -120);
+  streaks.push(s);
+  scene.add(s);
+}
+for (let i = streaks.length - 1; i >= 0; i--) {
+  const st = streaks[i];
+  st.position.z += move * 1.6;
+  if (st.position.z > 12) { scene.remove(st); streaks.splice(i, 1); }
+}
+
+
+}
+
+function updateObstacles(dt, t, move) {
+for (let i = obstacles.length - 1; i >= 0; i--) {
+  const o = obstacles[i];
+  const prevZ = o.position.z;
+  o.position.z += move;
+  if (o.userData.scan) {
+    if (o.userData.type === 'wall') {
+      o.userData.scan.position.y = 1.6 + Math.sin(t * 7 + o.userData.phase) * 1.1;
+      if (o.userData.leftPylon && o.userData.rightPylon) {
+        const pulse = 0.85 + Math.sin(t * 10 + o.userData.phase) * 0.15;
+        o.userData.leftPylon.scale.x = pulse;
+        o.userData.rightPylon.scale.x = pulse;
+      }
+    } else if (o.userData.type === 'low') {
+      o.userData.scan.scale.x = 0.88 + Math.sin(t * 8 + o.userData.phase) * 0.12;
+      if (o.userData.guide) {
+        o.userData.guide.scale.x = 0.94 + Math.sin(t * 11 + o.userData.phase) * 0.06;
+      }
+    }
+  }
+  if (o.position.z > 12) { scene.remove(o); obstacles.splice(i, 1); continue; }
+  if (!o.userData.passed && prevZ <= 1.0 && o.position.z >= -1.0) {
+    o.userData.passed = true;
+    const dx = Math.abs(o.position.x - ship.position.x);
+    const hitTop = o.userData.type === 'wall' ? 3.2 : 0.76;
+    const bottom = ship.position.y - 0.35;
+    const crashing = dx < 1.85 && bottom < hitTop;
+    if (crashing && invuln <= 0) {
+      if (shieldReady && tier >= 2) {
+        shieldReady = false;
+        orbCountAtShieldEvent = orbCount;
+        invuln = 1.3;
+        applyShipTier();
+        shieldBreakFx();
+      } else {
+        gameOver();
+        break;
+      }
+    }
+    if (!crashing) {
+      if (o.userData.type === 'low' && dx < 1.85 && !grounded) {
+        const g = addScore(40);
+        ui.floatLabel('完美跳跃 +' + g, o.position, '#ffffff', 19);
+        fovKick += 2.5;
+        beep(1250, 0.14, 'sine', 0.12);
+        burst(o.position, 0xffffff, 0.2, 0.4, 0.6, 22);
+        bumpScore();
+      } else if (dx >= 1.85 && dx < 3.6) {
+        const g = addScore(30);
+        ui.floatLabel('擦身而过 +' + g, o.position, '#aaffff', 16);
+        fovKick += 1.5;
+        whoosh();
+      }
+    }
+  }
+}
+
+
+}
+
+function updateComboAndOrbs(dt, t, move) {
+if (combo > 0) {
+  comboTimer -= dt;
+  ui.els.comboBar.style.width = Math.max(0, comboTimer / COMBO_WINDOW * 130) + 'px';
+  if (comboTimer <= 0) {
+    combo = 0;
+    ui.els.comboBox.style.opacity = 0;
+    beep(300, 0.2, 'sawtooth', 0.05);
+  }
+}
+
+for (let i = orbs.length - 1; i >= 0; i--) {
+  const o = orbs[i];
+  const prevZ = o.position.z;
+  o.position.z += move;
+  o.position.y = o.userData.baseY + Math.sin(t * 4 + o.userData.phase) * 0.15;
+  o.rotation.y += dt * 3;
+  if (o.userData.innerRing) {
+    o.userData.innerRing.rotation.x = t * 2.8 + o.userData.phase;
+    o.userData.innerRing.rotation.z = Math.sin(t * 1.8 + o.userData.phase) * 0.4;
+  }
+  if (o.userData.outerRing) {
+    o.userData.outerRing.rotation.y = t * -2.1 + o.userData.phase;
+    o.userData.outerRing.rotation.x = Math.cos(t * 1.5 + o.userData.phase) * 0.5;
+  } else if (o.userData.ring) {
+    o.userData.ring.rotation.x = t * 2 + o.userData.phase;
+    o.userData.ring.rotation.y = Math.sin(t * 3 + o.userData.phase) * 0.6;
+  }
+  if (o.position.z > 10) { scene.remove(o); orbs.splice(i, 1); continue; }
+  if (tier >= 3 && o.position.z < 4 && o.position.z > -16) {
+    const md = Math.hypot(o.position.x - ship.position.x, o.userData.baseY - ship.position.y);
+    if (md < 4.5) {
+      const pull = Math.min(1, dt * 7);
+      o.position.x += (ship.position.x - o.position.x) * pull;
+      o.userData.baseY += (ship.position.y - o.userData.baseY) * pull;
+    }
+  }
+  if (prevZ <= 1.15 && o.position.z >= -1.15 && Math.abs(o.position.x - ship.position.x) < 1.15
+    && Math.abs(o.position.y - ship.position.y) < 1.25) {
+    scene.remove(o); orbs.splice(i, 1);
+    orbCount++;
+    combo++;
+    if (combo > maxCombo) maxCombo = combo;
+    comboTimer = COMBO_WINDOW;
+    const mult = ui.multOf(combo);
+    const gainAmt = addScore(25 * mult);
+    fovKick += 1.5;
+    bumpScore();
+    beep(700 + combo * 30, 0.09, 'square', 0.11);
+    if (combo % 8 === 0) beep(1400 + combo * 15, 0.16, 'sawtooth', 0.06);
+    burst(o.position, ui.comboColor(mult), 0.18 + mult * 0.03, 0.5, 0.55, 14 + mult * 7);
+    ui.floatLabel('+' + gainAmt + (mult > 1 ? ' ×' + mult : ''), o.position, ui.comboColor(mult), 17 + mult * 3);
+    ui.flash(ui.comboColor(mult), mult >= 3 ? 0.13 : 0.06);
+    ui.els.comboText.textContent = '×' + mult + ' COMBO ' + combo;
+    ui.els.comboBox.style.color = ui.comboColor(mult);
+    ui.els.comboBox.style.opacity = 1;
+    ui.els.comboBox.classList.remove('pop');
+    void ui.els.comboBox.offsetWidth;
+    ui.els.comboBox.classList.add('pop');
+    if (TOASTS[combo]) ui.toast(TOASTS[combo], ui.comboColor(mult));
+    if (tier >= 2 && !shieldReady && orbCount - orbCountAtShieldEvent >= ui.SHIELD_RECHARGE) {
+      shieldReady = true;
+      applyShipTier();
+      ui.toast('护盾已充能', '#66ffff');
+      beep(900, 0.12, 'triangle', 0.1);
+      setTimeout(() => beep(1300, 0.15, 'triangle', 0.1), 90);
+      spawnShockwave(ship.position, 0x00ffff, 0.6);
+    }
+    const nt = calcTier();
+    if (nt > tier) {
+      tier = nt;
+      applyShipTier();
+      morphRoll = Math.PI * 2;
+      if (tier >= MAX_TIER) airJumps = 1;
+      if (tier >= 2 && !shieldReady) { shieldReady = true; orbCountAtShieldEvent = orbCount; }
+      timeScale = 0.35;
+      shakeTime = Math.max(shakeTime, 0.45);
+      ui.flash('#ffffff', 0.35, 550);
+      ui.toast(TIER_NAMES[tier], '#' + TIER_COLORS[tier].toString(16).padStart(6, '0'));
+      spawnShockwave(ship.position, TIER_COLORS[tier], 1);
+      setTimeout(() => { if (state === 'playing') spawnShockwave(ship.position, 0xffffff, 0.7); }, 130);
+      for (let k = 0; k < 4; k++) {
+        setTimeout(() => {
+          burst(ship.position, k % 2 ? 0xffffff : TIER_COLORS[tier], 0.24, 0.9, 1.1, 50);
+          if (k < 3) beep(520 + k * 260, 0.12, 'triangle', 0.13);
+        }, k * 110);
+      }
+    }
+    updateHUD();
+  }
+}
+
+updateHUD();
+
+
+}
+
+function updateRunFeedbackAndCamera(dt, t, move) {
+const bpm = 92 + speed * 1.15;
+beatTimer -= dt;
+if (beatTimer <= 0) {
+  const dur = 60 / bpm;
+  beatTimer = dur;
+  beatGlow = 1;
+  setMusicIntensity(Math.min(1, ((speed - 26) / 46) * 0.6 + tier * 0.1));
+  playBeat(beatCount, dur);
+  beatCount++;
+}
+setEnginePitch(46 + speed * 1.5 + combo * 2);
+
+if (speed - lastSpeedMark >= 10) {
+  lastSpeedMark = speed;
+  ui.toast('速度提升!', '#ff8822');
+  fovKick += 3;
+  beep(500, 0.35, 'sawtooth', 0.07);
+  setTimeout(() => beep(800, 0.3, 'sawtooth', 0.06), 120);
+}
+
+if (combo > 0) {
+  ui.els.vig.style.setProperty('--vc', ui.comboColor(ui.multOf(combo)));
+  ui.els.vig.style.opacity = Math.min(0.85, 0.18 + ui.multOf(combo) * 0.07) * Math.max(0, comboTimer / COMBO_WINDOW);
+} else ui.els.vig.style.opacity = 0;
+
+const jumpLift = Math.max(0, ship.position.y - 1.02);
+const targetCamY = 4.6 + jumpLift * 0.40;
+camY += (targetCamY - camY) * Math.min(1, dt * 12);
+camera.position.x = ship.position.x * 0.35;
+camera.position.y = camY;
+camera.lookAt(ship.position.x * 0.5, 1 + jumpLift * 0.25, -12);
+if (cyberSun) {
+  cyberSun.position.x = ship.position.x * 2.31;
+}
+camRoll += (-latVel * 0.0016 - camRoll) * Math.min(1, dt * 8);
+camera.rotation.z += camRoll;
+
+fovKick *= Math.exp(-dt * 5);
+camera.fov = 70 + ((speed - 26) / 46) * 12 + fovKick;
+camera.updateProjectionMatrix();
+
+// 随里程平滑过渡环境基色、远景雾效与障碍物主题配色
+const curZoneCfg = MILESTONE_ZONES[currentZoneIndex];
+tmpColB.setHex(curZoneCfg.bgHex);
+BG_BASE.lerp(tmpColB, dt * 1.5);
+if (scene.fog) scene.fog.color.lerp(tmpColB, dt * 1.5);
+
+targetWallEdgeCol.setHex(curZoneCfg.wallEdgeHex);
+targetLowEdgeCol.setHex(curZoneCfg.lowEdgeHex);
+targetWallCoreCol.setHex(curZoneCfg.wallCoreHex);
+targetLowCoreCol.setHex(curZoneCfg.lowCoreHex);
+currentWallEdgeCol.lerp(targetWallEdgeCol, dt * 2.0);
+currentLowEdgeCol.lerp(targetLowEdgeCol, dt * 2.0);
+currentWallCoreCol.lerp(targetWallCoreCol, dt * 2.0);
+currentLowCoreCol.lerp(targetLowCoreCol, dt * 2.0);
+
+}
+
+function updateTransientFx(dt, t) {
+const pdt = dt * timeScale;
+for (let i = 0; i < particlePool.length; i++) {
+  const p = particlePool[i];
+  if (!p.active) continue;
+  p.life -= pdt;
+  if (p.life <= 0) {
+    p.active = false;
+    p.pts.visible = false;
+    continue;
+  }
+  const arr = p.posArr;
+  const cnt = p.count;
+  for (let j = 0; j < cnt; j++) {
+    const v = p.vel[j];
+    v.y -= 20 * pdt;
+    arr[j * 3] += v.x * pdt;
+    arr[j * 3 + 1] = Math.max(0.05, arr[j * 3 + 1] + v.y * pdt);
+    arr[j * 3 + 2] += v.z * pdt;
+  }
+  p.posAttr.needsUpdate = true;
+  p.mat.opacity = Math.max(0, p.life / p.maxLife);
+}
+
+beatGlow *= Math.exp(-dt * 6);
+grid.material.opacity = 0.72 + beatGlow * 0.28;
+if (bloomPass) bloomPass.strength = 1.1 + beatGlow * 0.35;
+wallCoreMat.opacity = 0.65 + beatGlow * 0.35;
+lowCoreMat.opacity = 0.65 + beatGlow * 0.35;
+wallCoreMat.color.copy(currentWallCoreCol);
+lowCoreMat.color.copy(currentLowCoreCol);
+wallEdgeMat.color.copy(currentWallEdgeCol).lerp(WHITE, beatGlow * 0.35);
+lowEdgeMat.color.copy(currentLowEdgeCol).lerp(WHITE, beatGlow * 0.35);
+towerCapMat.color.setHex(0x00ffff).lerp(WHITE, beatGlow * 0.35);
+towerSpireMat.color.setHex(0xff0088).lerp(WHITE, beatGlow * 0.35);
+archNeonMat.color.setHex(0xff00aa).lerp(WHITE, beatGlow * 0.35);
+if (state === 'over') timeScale += (1 - timeScale) * dt * 2;
+
+for (let i = shockwaves.length - 1; i >= 0; i--) {
+  const s = shockwaves[i];
+  s.life -= pdt;
+  const k = 1 - Math.max(0, s.life) / s.maxLife;
+  s.m.scale.setScalar(0.3 + k * 9 * s.power);
+  s.m.material.opacity = 0.9 * (1 - k);
+  if (s.life <= 0) { scene.remove(s.m); s.m.material.dispose(); shockwaves.splice(i, 1); }
+}
+
+if (shakeTime > 0) {
+  shakeTime -= dt;
+  const s = shakeTime * 0.5;
+  camera.position.x += (Math.random() - 0.5) * s;
+  camera.position.y += (Math.random() - 0.5) * s;
+} else if (state !== 'playing') {
+  camY = 4.6;
+  camera.position.y = 4.6;
+  camera.position.x *= 0.9;
+}
+
+if (paused && !showPending) { showPending = true; showPaused(); }
+if (!paused && showPending) { showPending = false; $('pauseScreen').classList.add('hidden'); }
+
+}
+
+function advanceFrame(dt, t) {
+
+  updateAmbient(dt, t);
+  if (state === 'menu') updateMenu(dt, t);
+
+  // Sample this once: gameOver() must not skip later work in an entered playing frame.
+  const enteredPlaying = state === 'playing' && !paused;
+  if (enteredPlaying) {
+    const move = updateRunProgress(dt);
+    updateShipControl(dt, t, move);
+    updateScenery(dt, t, move);
+    updateObstacles(dt, t, move);
+    updateComboAndOrbs(dt, t, move);
+    updateRunFeedbackAndCamera(dt, t, move);
+  }
+  updateTransientFx(dt, t);
+  if (!TEST_MODE) composer.render();
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  advanceFrame(Math.min(clock.getDelta(), 0.05), clock.elapsedTime);
+}
+
 function bumpScore() {
   ui.els.scoreEl.classList.remove('bump');
   void ui.els.scoreEl.offsetWidth;
   ui.els.scoreEl.classList.add('bump');
 }
 
-animate();
+function snapshotValue(value, seen = new WeakSet(), depth = 0) {
+  if (value == null || typeof value !== 'object') return value;
+  if (depth > 5 || seen.has(value)) return '[cycle]';
+  seen.add(value);
+  if (value.isColor) return { color: value.getHex() };
+  if (value.isVector2 || value.isVector3 || value.isEuler) return { x: value.x, y: value.y, z: value.z, order: value.order };
+  if (value.isObject3D) return snapshotNode(value, seen, depth + 1);
+  if (Array.isArray(value)) return value.map(item => snapshotValue(item, seen, depth + 1));
+  if (value instanceof Set) return [...value].map(item => snapshotValue(item, seen, depth + 1));
+  if (value instanceof Map) return [...value].map(([key, item]) => [snapshotValue(key, seen, depth + 1), snapshotValue(item, seen, depth + 1)]);
+  const copy = {};
+  for (const key of Object.keys(value).sort()) {
+    if (typeof value[key] !== 'function') copy[key] = snapshotValue(value[key], seen, depth + 1);
+  }
+  return copy;
+}
 
-window.__neon = {
-  get scene() { return scene; },
-  get camera() { return camera; },
-  get renderer() { return renderer; },
-  get composer() { return composer; },
-  get bloomPass() { return bloomPass; },
-  get ship() { return ship; },
-  get state() { return state; },
-  get tier() { return tier; },
-  get groundGlow() { return groundGlow; },
-  get groundGlowMat() { return groundGlowMat; },
-  updateGroundGlow,
-  makeWall,
-  makeLow,
-  makeOrb,
-  makeOverheadArch,
-  makeRoadsideRelay,
-  makeWarpBeacon,
-  get warpBeacons() { return warpBeacons; },
-  get singularityHalo() { return singularityHalo; },
-  get sideFibres() { return sideFibres; },
-  get meteors() { return meteors; },
-  get currentZoneIndex() { return currentZoneIndex; },
-  get wallEdgeMat() { return wallEdgeMat; },
-  get lowEdgeMat() { return lowEdgeMat; },
-  get wallCoreMat() { return wallCoreMat; },
-  get lowCoreMat() { return lowCoreMat; },
-  MILESTONE_ZONES,
-  TIER_COLORS
-};
+function snapshotMaterial(material) {
+  if (Array.isArray(material)) return material.map(snapshotMaterial);
+  return material ? { color: material.color?.getHex(), opacity: material.opacity, visible: material.visible } : null;
+}
+
+function snapshotNode(node, seen = new WeakSet(), depth = 0) {
+  return {
+    type: node.type, visible: node.visible,
+    position: [node.position.x, node.position.y, node.position.z],
+    rotation: [node.rotation.x, node.rotation.y, node.rotation.z, node.rotation.order],
+    scale: [node.scale.x, node.scale.y, node.scale.z],
+    material: snapshotMaterial(node.material),
+    userData: snapshotValue(node.userData, seen, depth + 1),
+    children: node.children.map(child => snapshotNode(child, seen, depth + 1))
+  };
+}
+
+function deepFreeze(value, seen = new WeakSet()) {
+  if (value && typeof value === 'object' && !seen.has(value)) {
+    seen.add(value);
+    Object.freeze(value);
+    for (const item of Object.values(value)) deepFreeze(item, seen);
+  }
+  return value;
+}
+
+function canonicalSnapshot() {
+  const scalar = {};
+  for (const key of SNAPSHOT_SCALAR_KEYS) {
+    // Direct eval deliberately resolves the same lexical names in the pre-split
+    // and split fixtures; it is test observation, never game control.
+    const value = eval(key);
+    if (value == null || typeof value !== 'object') scalar[key] = value;
+  }
+  return deepFreeze({
+    runtime: scalar,
+    input: { keys: { ...keys }, pointers: snapshotValue([...activePointers.entries()]) },
+    roots: {
+      colors: [BG_BASE, tmpColA, tmpColB, currentWallEdgeCol, currentLowEdgeCol, currentWallCoreCol, currentLowCoreCol,
+        targetWallEdgeCol, targetLowEdgeCol, targetWallCoreCol, targetLowCoreCol].map(color => color.getHex()),
+      materials: [wallEdgeMat, lowEdgeMat, wallCoreMat, lowCoreMat, towerCapMat, towerSpireMat, archNeonMat].map(snapshotMaterial),
+      meteors: snapshotValue(meteors),
+      collections: Object.fromEntries([
+        ['obstacles', obstacles], ['orbs', orbs], ['pillars', pillars], ['roadside', roadside], ['arches', arches],
+        ['warpBeacons', warpBeacons], ['sideFibres', sideFibres], ['particles', particles], ['streaks', streaks],
+        ['shockwaves', shockwaves], ['validPrevLanes', [...validPrevLanes]]
+      ].map(([key, items]) => [key, snapshotValue(items)])),
+      particlePool: particlePool.map(p => ({ active: p.active, life: p.life, maxLife: p.maxLife, count: p.count,
+        opacity: p.mat.opacity, visible: p.pts.visible, positions: [...p.posArr.slice(0, p.count * 3)],
+        velocities: p.vel.slice(0, p.count).map(v => [v.x, v.y, v.z]) }))
+    },
+    scene: snapshotNode(scene),
+    hud: ['scoreEl', 'distEl', 'speedEl', 'bestEl', 'comboText'].map(id => [id, $(id)?.textContent, $(id)?.className]),
+    overlays: ['startScreen', 'overScreen', 'pauseScreen'].map(id => [id, $(id)?.className])
+  });
+}
+
+if (!TEST_MODE) animate();
+
+// Production exposes observation only: every call creates a frozen plain-data
+// snapshot, never a mutable Three.js object or a game factory.
+window.__neon = Object.freeze({ snapshot: canonicalSnapshot });
+
+if (TEST_MODE) {
+  let testTime = 0;
+  window.__neonTest = Object.freeze({
+    start: () => { testTime = 0; startGame(); },
+    jump: () => jump(),
+    collisionAndOrb: () => {
+      const wall = makeWall(1, 0);
+      const orb = makeOrb(ship.position.x, ship.position.y, 0);
+      obstacles.push(wall); orbs.push(orb);
+      scene.add(wall, orb);
+    },
+    step: dt => { testTime += dt; advanceFrame(dt, testTime); return canonicalSnapshot(); },
+    snapshot: canonicalSnapshot
+  });
+}
