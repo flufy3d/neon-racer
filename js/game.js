@@ -58,7 +58,7 @@ let speed = 26, maxSpeed = 26, dist = 0, spawnDist = 0, orbCount = 0, elapsed = 
 let shakeTime = 0, best = +(localStorage.getItem('neonRacerBest') || 0);
 let combo = 0, comboTimer = 0, maxCombo = 0;
 let streakTimer = 0, fovKick = 0;
-let beatTimer = 0, beatGlow = 0, beatCount = 0, timeScale = 1, lastSpeedMark = 26, camRoll = 0;
+let beatTimer = 0, beatGlow = 0, beatCount = 0, timeScale = 1, lastSpeedMark = 26, camRoll = 0, camY = 4.6;
 let overTimerId = null;
 let shieldReady = false, invuln = 0, orbCountAtShieldEvent = 0;
 let tier = 0;
@@ -1155,7 +1155,7 @@ function resetGame() {
   keys.left = keys.right = false;
   speed = 26; maxSpeed = 26; dist = 0; spawnDist = 0; orbCount = 0; elapsed = 0; shakeTime = 0;
   combo = 0; comboTimer = 0; score = 0; streakTimer = 0; fovKick = 0;
-  beatTimer = 0; beatGlow = 0; timeScale = 1; lastSpeedMark = 26; camRoll = 0;
+  beatTimer = 0; beatGlow = 0; timeScale = 1; lastSpeedMark = 26; camRoll = 0; camY = 4.6;
   shieldReady = false; invuln = 0; orbCountAtShieldEvent = 0;
   maxCombo = 0;
   latVel = 0; stabilizerEngaged = false; dualHoldTime = 0; activePointers.clear();
@@ -1820,8 +1820,12 @@ function animate() {
       ui.els.vig.style.opacity = Math.min(0.85, 0.18 + ui.multOf(combo) * 0.07) * Math.max(0, comboTimer / COMBO_WINDOW);
     } else ui.els.vig.style.opacity = 0;
 
+    const jumpLift = Math.max(0, ship.position.y - 1.02);
+    const targetCamY = 4.6 + jumpLift * 0.40;
+    camY += (targetCamY - camY) * Math.min(1, dt * 12);
     camera.position.x = ship.position.x * 0.35;
-    camera.lookAt(ship.position.x * 0.5, 1, -12);
+    camera.position.y = camY;
+    camera.lookAt(ship.position.x * 0.5, 1 + jumpLift * 0.25, -12);
     if (cyberSun) {
       cyberSun.position.x = ship.position.x * 2.31;
     }
@@ -1899,8 +1903,9 @@ function animate() {
     shakeTime -= dt;
     const s = shakeTime * 0.5;
     camera.position.x += (Math.random() - 0.5) * s;
-    camera.position.y = 4.6 + (Math.random() - 0.5) * s;
+    camera.position.y += (Math.random() - 0.5) * s;
   } else if (state !== 'playing') {
+    camY = 4.6;
     camera.position.y = 4.6;
     camera.position.x *= 0.9;
   }
