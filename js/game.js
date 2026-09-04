@@ -9,16 +9,6 @@ import {
 import * as ui from './ui.js';
 
 const $ = id => document.getElementById(id);
-// This opt-in query flag is only for the deterministic regression harness.  It
-// keeps production on the normal RAF/THREE.Clock path.
-const TEST_MODE = new URLSearchParams(location.search).has('__neon_test');
-const SNAPSHOT_SCALAR_KEYS = [
-  'lastArchDist', 'currentZoneIndex', 'state', 'paused', 'vy', 'grounded', 'speed', 'maxSpeed', 'dist', 'spawnDist',
-  'orbCount', 'elapsed', 'score', 'shakeTime', 'best', 'combo', 'comboTimer', 'maxCombo', 'streakTimer', 'fovKick',
-  'beatTimer', 'beatGlow', 'beatCount', 'timeScale', 'lastSpeedMark', 'camRoll', 'camY', 'overTimerId', 'shieldReady',
-  'invuln', 'orbCountAtShieldEvent', 'tier', 'shipMorph', 'morphRoll', 'shipBank', 'airFlip', 'airJumps', 'latVel',
-  'stabilizerEngaged', 'dualHoldTime', 'lastGuidedLane', 'lastGuidedDist', 'showPending', 'lastPatternDist'
-];
 const LANES = [-2.5, 0, 2.5];
 const CENTER_X = LANES[1];
 const GRAVITY = -38, JUMP_V = 13;
@@ -57,29 +47,28 @@ const MILESTONE_ZONES = [
     wallEdgeHex: 0xb066ff, wallCoreHex: 0x9944ff, lowEdgeHex: 0x00ffcc, lowCoreHex: 0x00ddbb }
 ];
 
-// Runtime state has one owner.  The accessors preserve the existing local-name
-// semantics for event and timeout callbacks while keeping the state boundary explicit.
-const runtime = {
-  scene: undefined, camera: undefined, renderer: undefined, composer: undefined, clock: undefined, bloomPass: undefined, railMat: undefined,
-  grid: undefined, ship: undefined, shipGlowMat: undefined, groundGlow: undefined, groundGlowMat: undefined,
-  cyberSun: undefined, deepStars: undefined, warpStars: undefined, singularityHalo: undefined,
-  obstacles: [], orbs: [], pillars: [], roadside: [], arches: [], warpBeacons: [], sideFibres: [], particles: [], streaks: [], shockwaves: [],
-  lastArchDist: 0, currentZoneIndex: 0, state: 'menu', paused: false, vy: 0, grounded: true,
-  speed: 26, maxSpeed: 26, dist: 0, spawnDist: 0, orbCount: 0, elapsed: 0, score: 0,
-  shakeTime: 0, best: +(localStorage.getItem('neonRacerBest') || 0), combo: 0, comboTimer: 0, maxCombo: 0,
-  streakTimer: 0, fovKick: 0, beatTimer: 0, beatGlow: 0, beatCount: 0, timeScale: 1, lastSpeedMark: 26, camRoll: 0, camY: 4.6,
-  overTimerId: null, shieldReady: false, invuln: 0, orbCountAtShieldEvent: 0, tier: 0,
-  shipMorph: 0, morphRoll: 0, shipBank: 0, airFlip: 0, airJumps: 0, latVel: 0,
-  stabilizerEngaged: false, dualHoldTime: 0, lastGuidedLane: null, lastGuidedDist: -Infinity, showPending: false,
-  validPrevLanes: new Set([0, 1, 2]), lastPatternDist: -Infinity
-};
-for (const key of Object.keys(runtime)) {
-  Object.defineProperty(globalThis, key, {
-    configurable: true,
-    get: () => runtime[key],
-    set: value => { runtime[key] = value; }
-  });
-}
+let scene, camera, renderer, composer, clock, bloomPass, railMat;
+let grid, ship, shipGlowMat, groundGlow, groundGlowMat;
+let cyberSun, deepStars, warpStars, singularityHalo;
+let obstacles = [], orbs = [], pillars = [], roadside = [], arches = [], warpBeacons = [], sideFibres = [], particles = [], streaks = [], shockwaves = [];
+let lastArchDist = 0, currentZoneIndex = 0;
+let state = 'menu', paused = false;
+let vy = 0, grounded = true;
+let speed = 26, maxSpeed = 26, dist = 0, spawnDist = 0, orbCount = 0, elapsed = 0, score = 0;
+let shakeTime = 0, best = +(localStorage.getItem('neonRacerBest') || 0);
+let combo = 0, comboTimer = 0, maxCombo = 0;
+let streakTimer = 0, fovKick = 0;
+let beatTimer = 0, beatGlow = 0, beatCount = 0, timeScale = 1, lastSpeedMark = 26, camRoll = 0, camY = 4.6;
+let overTimerId = null;
+let shieldReady = false, invuln = 0, orbCountAtShieldEvent = 0;
+let tier = 0;
+let shipMorph = 0, morphRoll = 0, shipBank = 0, airFlip = 0;
+let airJumps = 0;
+let latVel = 0;
+let stabilizerEngaged = false, dualHoldTime = 0;
+let lastGuidedLane = null, lastGuidedDist = -Infinity;
+let validPrevLanes = new Set([0, 1, 2]), lastPatternDist = -Infinity;
+let showPending = false;
 const activePointers = new Map();
 const keys = { left: false, right: false };
 
@@ -1973,7 +1962,7 @@ function advanceFrame(dt, t) {
     updateRunFeedbackAndCamera(dt, t, move);
   }
   updateTransientFx(dt, t);
-  if (!TEST_MODE) composer.render();
+  composer.render();
 }
 
 function animate() {
@@ -1987,98 +1976,36 @@ function bumpScore() {
   ui.els.scoreEl.classList.add('bump');
 }
 
-function snapshotValue(value, seen = new WeakSet(), depth = 0) {
-  if (value == null || typeof value !== 'object') return value;
-  if (depth > 5 || seen.has(value)) return '[cycle]';
-  seen.add(value);
-  if (value.isColor) return { color: value.getHex() };
-  if (value.isVector2 || value.isVector3 || value.isEuler) return { x: value.x, y: value.y, z: value.z, order: value.order };
-  if (value.isObject3D) return snapshotNode(value, seen, depth + 1);
-  if (Array.isArray(value)) return value.map(item => snapshotValue(item, seen, depth + 1));
-  if (value instanceof Set) return [...value].map(item => snapshotValue(item, seen, depth + 1));
-  if (value instanceof Map) return [...value].map(([key, item]) => [snapshotValue(key, seen, depth + 1), snapshotValue(item, seen, depth + 1)]);
-  const copy = {};
-  for (const key of Object.keys(value).sort()) {
-    if (typeof value[key] !== 'function') copy[key] = snapshotValue(value[key], seen, depth + 1);
-  }
-  return copy;
-}
+animate();
 
-function snapshotMaterial(material) {
-  if (Array.isArray(material)) return material.map(snapshotMaterial);
-  return material ? { color: material.color?.getHex(), opacity: material.opacity, visible: material.visible } : null;
-}
+window.__neon = {
+  get scene() { return scene; },
+  get camera() { return camera; },
+  get renderer() { return renderer; },
+  get composer() { return composer; },
+  get bloomPass() { return bloomPass; },
+  get ship() { return ship; },
+  get state() { return state; },
+  get tier() { return tier; },
+  get groundGlow() { return groundGlow; },
+  get groundGlowMat() { return groundGlowMat; },
+  updateGroundGlow,
+  makeWall,
+  makeLow,
+  makeOrb,
+  makeOverheadArch,
+  makeRoadsideRelay,
+  makeWarpBeacon,
+  get warpBeacons() { return warpBeacons; },
+  get singularityHalo() { return singularityHalo; },
+  get sideFibres() { return sideFibres; },
+  get meteors() { return meteors; },
+  get currentZoneIndex() { return currentZoneIndex; },
+  get wallEdgeMat() { return wallEdgeMat; },
+  get lowEdgeMat() { return lowEdgeMat; },
+  get wallCoreMat() { return wallCoreMat; },
+  get lowCoreMat() { return lowCoreMat; },
+  MILESTONE_ZONES,
+  TIER_COLORS
+};
 
-function snapshotNode(node, seen = new WeakSet(), depth = 0) {
-  return {
-    type: node.type, visible: node.visible,
-    position: [node.position.x, node.position.y, node.position.z],
-    rotation: [node.rotation.x, node.rotation.y, node.rotation.z, node.rotation.order],
-    scale: [node.scale.x, node.scale.y, node.scale.z],
-    material: snapshotMaterial(node.material),
-    userData: snapshotValue(node.userData, seen, depth + 1),
-    children: node.children.map(child => snapshotNode(child, seen, depth + 1))
-  };
-}
-
-function deepFreeze(value, seen = new WeakSet()) {
-  if (value && typeof value === 'object' && !seen.has(value)) {
-    seen.add(value);
-    Object.freeze(value);
-    for (const item of Object.values(value)) deepFreeze(item, seen);
-  }
-  return value;
-}
-
-function canonicalSnapshot() {
-  const scalar = {};
-  for (const key of SNAPSHOT_SCALAR_KEYS) {
-    // Direct eval deliberately resolves the same lexical names in the pre-split
-    // and split fixtures; it is test observation, never game control.
-    const value = eval(key);
-    if (value == null || typeof value !== 'object') scalar[key] = value;
-  }
-  return deepFreeze({
-    runtime: scalar,
-    input: { keys: { ...keys }, pointers: snapshotValue([...activePointers.entries()]) },
-    roots: {
-      colors: [BG_BASE, tmpColA, tmpColB, currentWallEdgeCol, currentLowEdgeCol, currentWallCoreCol, currentLowCoreCol,
-        targetWallEdgeCol, targetLowEdgeCol, targetWallCoreCol, targetLowCoreCol].map(color => color.getHex()),
-      materials: [wallEdgeMat, lowEdgeMat, wallCoreMat, lowCoreMat, towerCapMat, towerSpireMat, archNeonMat].map(snapshotMaterial),
-      meteors: snapshotValue(meteors),
-      collections: Object.fromEntries([
-        ['obstacles', obstacles], ['orbs', orbs], ['pillars', pillars], ['roadside', roadside], ['arches', arches],
-        ['warpBeacons', warpBeacons], ['sideFibres', sideFibres], ['particles', particles], ['streaks', streaks],
-        ['shockwaves', shockwaves], ['validPrevLanes', [...validPrevLanes]]
-      ].map(([key, items]) => [key, snapshotValue(items)])),
-      particlePool: particlePool.map(p => ({ active: p.active, life: p.life, maxLife: p.maxLife, count: p.count,
-        opacity: p.mat.opacity, visible: p.pts.visible, positions: [...p.posArr.slice(0, p.count * 3)],
-        velocities: p.vel.slice(0, p.count).map(v => [v.x, v.y, v.z]) }))
-    },
-    scene: snapshotNode(scene),
-    hud: ['scoreEl', 'distEl', 'speedEl', 'bestEl', 'comboText'].map(id => [id, $(id)?.textContent, $(id)?.className]),
-    overlays: ['startScreen', 'overScreen', 'pauseScreen'].map(id => [id, $(id)?.className])
-  });
-}
-
-if (!TEST_MODE) animate();
-
-// Production exposes observation only: every call creates a frozen plain-data
-// snapshot, never a mutable Three.js object or a game factory.
-window.__neon = Object.freeze({ snapshot: canonicalSnapshot });
-
-if (TEST_MODE) {
-  let testTime = 0;
-  window.__neonTest = Object.freeze({
-    start: () => { testTime = 0; startGame(); },
-    jump: () => jump(),
-    collisionAndOrb: () => {
-      const wall = makeWall(1, 0);
-      const orb = makeOrb(ship.position.x, ship.position.y, 0);
-      obstacles.push(wall); orbs.push(orb);
-      scene.add(wall, orb);
-    },
-    step: dt => { testTime += dt; advanceFrame(dt, testTime); return canonicalSnapshot(); },
-    snapshot: canonicalSnapshot
-  });
-}
