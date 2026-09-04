@@ -526,6 +526,9 @@ kbd.wideKey { min-width: 44px; font-size: 7px; }
   cursor: pointer;
   box-shadow: 0 0 12px rgba(0, 229, 255, 0.25), inset 0 0 10px rgba(0, 229, 255, 0.15);
   transition: all 0.2s;
+  /* 窄屏下 flex 会把按钮压到比文字还窄，中文就逐字竖排了 */
+  white-space: nowrap;
+  flex: none;
 }
 .update-banner button:hover {
   color: #fff;
@@ -546,7 +549,11 @@ kbd.wideKey { min-width: 44px; font-size: 7px; }
     left: 50%;
     transform: translateX(-50%);
     max-width: calc(100% - 24px);
+    /* 窄屏放不下一行，改成上下两行：文字在上、按钮在下 */
+    flex-direction: column;
+    gap: 8px;
   }
+  .update-banner button { width: 100%; padding: 7px 14px; }
 }
 
 
