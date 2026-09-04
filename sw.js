@@ -46,14 +46,47 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-  e.respondWith(
-    caches.match(e.request).then(hit =>
-      hit ||
-      fetch(e.request).then(res => {
-        const copy = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, copy));
-        return res;
-      }).catch(() => caches.match('./index.html'))
-    )
-  );
+
+  const url = new URL(e.request.url);
+  const isNavigate = e.request.mode === 'navigate';
+  const isFirstParty = isNavigate ||
+    url.pathname.endsWith('/index.html') ||
+    url.pathname.endsWith('/') ||
+    url.pathname.includes('/js/') ||
+    url.pathname.endsWith('/style.css');
+
+  if (isFirstParty) {
+    const netReq = isNavigate ? e.request : new Request(e.request.url, { cache: 'no-cache' });
+    e.respondWith(
+      fetch(netReq)
+        .then(res => {
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then(c => c.put(e.request, copy));
+            return res;
+          }
+          return caches.match(e.request).then(cached => cached || res);
+        })
+        .catch(() =>
+          caches.match(e.request).then(cached => {
+            if (cached) return cached;
+            if (isNavigate) return caches.match('./index.html');
+            return undefined;
+          })
+        )
+    );
+  } else {
+    e.respondWith(
+      caches.match(e.request).then(hit =>
+        hit ||
+        fetch(e.request).then(res => {
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then(c => c.put(e.request, copy));
+          }
+          return res;
+        })
+      )
+    );
+  }
 });
