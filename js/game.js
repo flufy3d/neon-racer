@@ -902,20 +902,20 @@ function isGuidedPattern(plan) {
   return plan.filter(item => item.type === 'wall' || item.type === 'low').length === 2;
 }
 
-function spawnPattern() {
+function spawnPattern(overshoot = 0, gap = 15) {
   const maxV_safe = 5 + speed * 0.27;
   const a = 150;
   const t_acc = maxV_safe / a;
   const x_acc = 0.5 * a * t_acc * t_acc;
   const dx_min_swap = 4.35;
   const t_double_min = dx_min_swap <= x_acc ? Math.sqrt(2 * dx_min_swap / a) : (t_acc + (dx_min_swap - x_acc) / maxV_safe);
-  const transTime = lastPatternDist === -Infinity ? Infinity : (dist - lastPatternDist) / Math.max(speed, 1);
+  const transTime = lastPatternDist === -Infinity ? Infinity : gap / Math.max(speed, 1);
   const cannotDoubleSwap = transTime < t_double_min;
 
   if (Math.random() < 0.18) {
     const lane = (Math.random() * 3) | 0;
     for (let i = 0; i < 5; i++) {
-      const o = makeOrb(LANES[lane], 1.2, -140 - i * 2);
+      const o = makeOrb(LANES[lane], 1.2, -140 - i * 2 + overshoot);
       orbs.push(o);
       scene.add(o);
     }
@@ -1002,18 +1002,18 @@ function spawnPattern() {
 
   for (const item of plan) {
     if (item.type === 'wall' || item.type === 'low') {
-      const obj = item.type === 'low' ? makeLow(item.lane, -140) : makeWall(item.lane, -140);
+      const obj = item.type === 'low' ? makeLow(item.lane, -140 + overshoot) : makeWall(item.lane, -140 + overshoot);
       obstacles.push(obj);
       scene.add(obj);
     } else {
-      const o = makeOrb(LANES[item.lane], 1.2, -140);
+      const o = makeOrb(LANES[item.lane], 1.2, -140 + overshoot);
       orbs.push(o);
       scene.add(o);
     }
   }
   if (Math.random() < 0.6) {
     for (let i = 1; i <= 3 + ((Math.random() * 3) | 0); i++) {
-      const o = makeOrb(LANES[freeLane], 1.2, -140 - i * 2);
+      const o = makeOrb(LANES[freeLane], 1.2, -140 - i * 2 + overshoot);
       orbs.push(o);
       scene.add(o);
     }
@@ -1482,7 +1482,11 @@ function animate() {
     spawnDist += move;
 
     const gap = Math.max(15, 26 - elapsed * 0.25);
-    if (spawnDist >= gap) { spawnDist = 0; spawnPattern(); }
+    while (spawnDist >= gap) {
+      const overshoot = spawnDist - gap;
+      spawnDist -= gap;
+      spawnPattern(overshoot, gap);
+    }
 
     if ((dist % 14) < move) {
       const p = makePillar(-150);
