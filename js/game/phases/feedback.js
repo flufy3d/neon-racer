@@ -2,7 +2,7 @@ import { getAudioBeat, playSound, updateAudioState } from '../../audio.js';
 import { COMBO_WINDOW, MILESTONE_ZONES } from '../../core/constants.js';
 import { $ } from '../../core/dom.js';
 import { lists, run, view } from '../../core/state.js';
-import { particlePool } from '../../entities/particles.js';
+import { updateBurstParticles, updateShipTrail, updateShockwaves } from '../../entities/particles.js';
 import { archNeonMat, lowCoreMat, lowEdgeMat, towerCapMat, towerSpireMat, wallCoreMat, wallEdgeMat } from '../../scene/materials.js';
 import { BG_BASE, WHITE, currentLowCoreCol, currentLowEdgeCol, currentWallCoreCol, currentWallEdgeCol, targetLowCoreCol, targetLowEdgeCol, targetWallCoreCol, targetWallEdgeCol, tmpColB } from '../../scene/palette.js';
 import * as ui from '../../ui.js';
@@ -60,27 +60,9 @@ currentLowCoreCol.lerp(targetLowCoreCol, dt * 2.0);
 
 export function updateTransientFx(dt, t) {
 const pdt = dt * run.timeScale;
-for (let i = 0; i < particlePool.length; i++) {
-  const p = particlePool[i];
-  if (!p.active) continue;
-  p.life -= pdt;
-  if (p.life <= 0) {
-    p.active = false;
-    p.pts.visible = false;
-    continue;
-  }
-  const arr = p.posArr;
-  const cnt = p.count;
-  for (let j = 0; j < cnt; j++) {
-    const v = p.vel[j];
-    v.y -= 20 * pdt;
-    arr[j * 3] += v.x * pdt;
-    arr[j * 3 + 1] = Math.max(0.05, arr[j * 3 + 1] + v.y * pdt);
-    arr[j * 3 + 2] += v.z * pdt;
-  }
-  p.posAttr.needsUpdate = true;
-  p.mat.opacity = Math.max(0, p.life / p.maxLife);
-}
+updateBurstParticles(pdt);
+updateShockwaves(pdt);
+updateShipTrail(dt, t);
 
 if (run.state === 'playing' && !run.paused) {
   const beat = getAudioBeat();
@@ -99,15 +81,6 @@ towerCapMat.color.setHex(0x00ffff).lerp(WHITE, run.beatGlow * 0.35);
 towerSpireMat.color.setHex(0xff0088).lerp(WHITE, run.beatGlow * 0.35);
 archNeonMat.color.setHex(0xff00aa).lerp(WHITE, run.beatGlow * 0.35);
 if (run.state === 'over') run.timeScale += (1 - run.timeScale) * dt * 2;
-
-for (let i = lists.shockwaves.length - 1; i >= 0; i--) {
-  const s = lists.shockwaves[i];
-  s.life -= pdt;
-  const k = 1 - Math.max(0, s.life) / s.maxLife;
-  s.m.scale.setScalar(0.3 + k * 9 * s.power);
-  s.m.material.opacity = 0.9 * (1 - k);
-  if (s.life <= 0) { view.scene.remove(s.m); s.m.material.dispose(); lists.shockwaves.splice(i, 1); }
-}
 
 if (run.shakeTime > 0) {
   run.shakeTime -= dt;

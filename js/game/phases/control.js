@@ -1,11 +1,13 @@
 import { playSound } from '../../audio.js';
 import { CENTER_X, GRAVITY, MAX_TIER, STABILIZER_ACCEL, STABILIZER_GAIN, TRACK_HALF } from '../../core/constants.js';
 import { run, view } from '../../core/state.js';
-import { burst } from '../../entities/particles.js';
+import { burst, spawnShockwave } from '../../entities/particles.js';
 import { updateGroundGlow } from '../../scene/ground.js';
 import * as ui from '../../ui.js';
 import { activePointers, keys } from '../input.js';
 import * as THREE from 'three';
+
+const landPos = new THREE.Vector3();
 
 export function updateShipControl(dt, t, move) {
 let dir = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
@@ -71,8 +73,9 @@ if (!run.grounded) {
   if (view.ship.position.y <= 0.95) {
     view.ship.position.y = 0.95; run.grounded = true; run.vy = 0;
     run.airJumps = run.tier >= MAX_TIER ? 1 : 0;
-    view.ship.scale.set(1.3, 0.65, 1.3);
-    burst(new THREE.Vector3(view.ship.position.x, 0.25, 0.5), 0x66ccff, 0.16, 0.35, 0.4, 14);
+    landPos.set(view.ship.position.x, 0.08, 0.5);
+    burst(landPos, 0x66ccff, 0.28, 0.35, 0.65, 24);
+    spawnShockwave(landPos, 0x00ffff, 0.45);
     playSound('land');
     run.shakeTime = Math.max(run.shakeTime, 0.12);
   }

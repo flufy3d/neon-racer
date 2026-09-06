@@ -2,7 +2,7 @@ import { endAudioRun, playSound, startAudioRun } from '../audio.js';
 import { MILESTONE_ZONES, TIER_COLORS } from '../core/constants.js';
 import { $ } from '../core/dom.js';
 import { lists, run, view } from '../core/state.js';
-import { explode, particlePool } from '../entities/particles.js';
+import { explode, resetParticlePools } from '../entities/particles.js';
 import { poseShip } from '../entities/ship-pose.js';
 import { applyShipTier } from '../entities/ship.js';
 import { lowCoreMat, lowEdgeMat, wallCoreMat, wallEdgeMat } from '../scene/materials.js';
@@ -13,10 +13,7 @@ import { activePointers, keys } from './input.js';
 
 function resetGame() {
   for (const o of [...lists.obstacles, ...lists.orbs, ...lists.pillars, ...lists.streaks, ...lists.roadside, ...lists.arches, ...lists.warpBeacons]) view.scene.remove(o);
-  for (const p of particlePool) {
-    p.active = false;
-    p.pts.visible = false;
-  }
+  resetParticlePools();
   lists.obstacles = []; lists.orbs = []; lists.pillars = []; lists.roadside = []; lists.arches = []; lists.warpBeacons = []; lists.particles = []; lists.streaks = [];
   if (view.singularityHalo) {
     view.singularityHalo.material.opacity = 0;
@@ -47,7 +44,6 @@ function resetGame() {
   run.latVel = 0; run.stabilizerEngaged = false; run.dualHoldTime = 0; activePointers.clear();
   run.lastGuidedLane = null; run.lastGuidedDist = -Infinity;
   run.validPrevLanes = new Set([0, 1, 2]); run.lastPatternDist = -Infinity;
-  for (const s of lists.shockwaves) view.scene.remove(s.m);
   lists.shockwaves = [];
   ui.els.vig.style.opacity = 0;
   ui.els.comboBox.style.opacity = 0;

@@ -12,6 +12,8 @@ export const activePointers = new Map();
 
 export const keys = { left: false, right: false };
 
+const airJumpPos = new THREE.Vector3();
+
 function jump() {
   if (run.state !== 'playing' || run.paused) return;
   if (run.grounded) {
@@ -25,10 +27,10 @@ function jump() {
     run.airJumps--;
     run.vy = JUMP_V * 0.88;
     run.airFlip = Math.PI * 2;
-    view.ship.scale.set(1.22, 0.74, 1.22);
-    const at = new THREE.Vector3(view.ship.position.x, view.ship.position.y - 0.35, view.ship.position.z);
-    spawnShockwave(at, TIER_COLORS[MAX_TIER], 0.5);
-    burst(at, TIER_COLORS[MAX_TIER], 0.2, 0.45, 0.8, 28);
+    airJumpPos.set(view.ship.position.x, view.ship.position.y - 0.35, view.ship.position.z);
+    spawnShockwave(airJumpPos, TIER_COLORS[MAX_TIER], 0.85);
+    burst(airJumpPos, 0xffffff, 0.35, 0.45, 1.1, 32);
+    burst(airJumpPos, TIER_COLORS[MAX_TIER], 0.32, 0.65, 1.3, 44);
     ui.floatLabel('量子跃迁', view.ship.position, '#c08cff', 16);
     playSound('airJump');
     updateHUD();

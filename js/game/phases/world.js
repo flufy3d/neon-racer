@@ -102,7 +102,8 @@ for (let i = lists.obstacles.length - 1; i >= 0; i--) {
         ui.floatLabel('完美跳跃 +' + g, o.position, '#ffffff', 19);
         run.fovKick += 2.5;
         playSound('perfectJump');
-        burst(o.position, 0xffffff, 0.2, 0.4, 0.6, 22);
+        burst(o.position, 0xffffff, 0.32, 0.45, 0.9, 28);
+        burst(o.position, 0x00ffff, 0.28, 0.65, 1.1, 32);
         bumpScore();
       } else if (dx >= 1.85 && dx < 3.6) {
         const g = addScore(30);

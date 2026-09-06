@@ -48,7 +48,14 @@ export const streakGeo = new THREE.BoxGeometry(0.05, 0.05, 1);
 
 export const pillarMat = new THREE.MeshBasicMaterial({ color: 0x2244ff });
 
-export const streakMat = new THREE.MeshBasicMaterial({ color: 0x66ddff, transparent: true, opacity: 0.35, fog: false });
+export const streakMat = new THREE.MeshBasicMaterial({
+  color: 0x66eeff,
+  transparent: true,
+  opacity: 0.72,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  fog: false
+});
 
 export const towerGeo1 = new THREE.BoxGeometry(3.6, 26, 3.6);
 
