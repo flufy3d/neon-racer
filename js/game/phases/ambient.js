@@ -1,24 +1,11 @@
 import { lists, run, view } from '../../core/state.js';
 import { updateShipMorph } from '../../entities/ship-pose.js';
 import { updateGroundGlow } from '../../scene/ground.js';
-import { updateMeteors } from '../../scene/sky.js';
+import { updateSky } from '../../scene/sky.js';
 
 export function updateAmbient(dt, t) {
   view.grid.position.z = (view.grid.position.z + (run.state === 'playing' ? run.speed : 8) * dt) % 4;
-if (view.warpStars) {
-  view.warpStars.position.z = (view.warpStars.position.z + (run.state === 'playing' ? run.speed : 8) * dt * 0.25) % 80;
-}
-if (view.deepStars) {
-  view.deepStars.material.opacity = 0.68 + Math.sin(t * 1.5) * 0.12;
-}
-updateMeteors(dt);
-
-if (view.singularityHalo) {
-  view.singularityHalo.rotation.z += dt * 0.35;
-  const targetHaloOp = run.currentZoneIndex >= 3 ? 0.62 : 0;
-  view.singularityHalo.material.opacity += (targetHaloOp - view.singularityHalo.material.opacity) * Math.min(1, dt * 2.5);
-  view.singularityHalo.visible = view.singularityHalo.material.opacity > 0.01;
-}
+updateSky(dt);
 const isZone5 = run.currentZoneIndex >= 4;
 for (const sf of lists.sideFibres) {
   sf.visible = isZone5;

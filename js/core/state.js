@@ -10,8 +10,8 @@
 export const view = {
   scene: undefined, camera: undefined, renderer: undefined, composer: undefined, clock: undefined,
   bloomPass: undefined, railMat: undefined, grid: undefined, ship: undefined, shipGlowMat: undefined,
-  groundGlow: undefined, groundGlowMat: undefined, cyberSun: undefined, deepStars: undefined,
-  warpStars: undefined, singularityHalo: undefined
+  groundGlow: undefined, groundGlowMat: undefined, sky: undefined,
+  cyberSun: undefined, singularityHalo: undefined
 };
 
 export const lists = {

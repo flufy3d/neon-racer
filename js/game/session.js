@@ -7,7 +7,6 @@ import { poseShip } from '../entities/ship-pose.js';
 import { applyShipTier } from '../entities/ship.js';
 import { lowCoreMat, lowEdgeMat, wallCoreMat, wallEdgeMat } from '../scene/materials.js';
 import { BG_BASE, currentLowCoreCol, currentLowEdgeCol, currentWallCoreCol, currentWallEdgeCol } from '../scene/palette.js';
-import { meteors } from '../scene/sky.js';
 import * as ui from '../ui.js';
 import { updateHUD } from './hud.js';
 import { activePointers, keys } from './input.js';
@@ -50,11 +49,6 @@ function resetGame() {
   run.validPrevLanes = new Set([0, 1, 2]); run.lastPatternDist = -Infinity;
   for (const s of lists.shockwaves) view.scene.remove(s.m);
   lists.shockwaves = [];
-  for (const met of meteors) {
-    met.active = false;
-    met.mesh.visible = false;
-    met.timer = 1.2 + Math.random() * 2;
-  }
   ui.els.vig.style.opacity = 0;
   ui.els.comboBox.style.opacity = 0;
   run.tier = 0;

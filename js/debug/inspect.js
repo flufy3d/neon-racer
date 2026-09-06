@@ -3,7 +3,6 @@ import { lists, run, view } from '../core/state.js';
 import { makeLow, makeOrb, makeOverheadArch, makeRoadsideRelay, makeWall, makeWarpBeacon } from '../entities/obstacles.js';
 import { updateGroundGlow } from '../scene/ground.js';
 import { lowCoreMat, lowEdgeMat, wallCoreMat, wallEdgeMat } from '../scene/materials.js';
-import { meteors } from '../scene/sky.js';
 
 window.__neon = {
   get scene() { return view.scene; },
@@ -24,9 +23,10 @@ window.__neon = {
   makeRoadsideRelay,
   makeWarpBeacon,
   get warpBeacons() { return lists.warpBeacons; },
+  get sky() { return view.sky; },
+  get cyberSun() { return view.cyberSun; },
   get singularityHalo() { return view.singularityHalo; },
   get sideFibres() { return lists.sideFibres; },
-  get meteors() { return meteors; },
   get currentZoneIndex() { return run.currentZoneIndex; },
   get wallEdgeMat() { return wallEdgeMat; },
   get lowEdgeMat() { return lowEdgeMat; },

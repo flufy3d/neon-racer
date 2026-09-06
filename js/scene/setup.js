@@ -1,6 +1,6 @@
 import { lists, view } from '../core/state.js';
 import { buildShip } from '../entities/ship.js';
-import { initMeteors, makeCyberSun } from './sky.js';
+import { initSky } from './sky.js';
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -67,27 +67,7 @@ export function initScene() {
     lists.sideFibres.push(sf);
   }
 
-  const starGeo1 = new THREE.BufferGeometry();
-  const pos1 = [];
-  for (let i = 0; i < 1300; i++) {
-    pos1.push((Math.random() - 0.5) * 320, Math.random() * 85 + 4, -Math.random() * 240 - 20);
-  }
-  starGeo1.setAttribute('position', new THREE.Float32BufferAttribute(pos1, 3));
-  view.deepStars = new THREE.Points(starGeo1, new THREE.PointsMaterial({ color: 0x88ccff, size: 0.42, transparent: true, opacity: 0.75 }));
-  view.scene.add(view.deepStars);
-
-  const starGeo2 = new THREE.BufferGeometry();
-  const pos2 = [];
-  for (let i = 0; i < 700; i++) {
-    pos2.push((Math.random() - 0.5) * 160, Math.random() * 65 + 3, -Math.random() * 200 - 10);
-  }
-  starGeo2.setAttribute('position', new THREE.Float32BufferAttribute(pos2, 3));
-  view.warpStars = new THREE.Points(starGeo2, new THREE.PointsMaterial({ color: 0xee77ff, size: 0.65, transparent: true, opacity: 0.6 }));
-  view.scene.add(view.warpStars);
-
-  view.cyberSun = makeCyberSun();
-  view.scene.add(view.cyberSun);
-  initMeteors();
+  initSky();
 
   view.groundGlow = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 2.6), view.groundGlowMat);
   view.groundGlow.name = 'groundGlow';

@@ -1,4 +1,4 @@
-import { view } from '../core/state.js';
+import { run, view } from '../core/state.js';
 import * as THREE from 'three';
 
 export function makeCyberSun() {
@@ -50,63 +50,84 @@ export function makeCyberSun() {
   return plane;
 }
 
-const meteorGeo = new THREE.BoxGeometry(0.18, 0.18, 9.0);
-
-const meteorMat = new THREE.MeshBasicMaterial({ color: 0xaaffff, transparent: true, opacity: 0, fog: false });
-
-export const meteors = [];
-
-export function initMeteors() {
-  for (let i = 0; i < 2; i++) {
-    const m = new THREE.Mesh(meteorGeo, meteorMat.clone());
-    m.visible = false;
-    view.scene.add(m);
-    meteors.push({
-      mesh: m,
-      active: false,
-      timer: 1.2 + i * 2.4,
-      progress: 0,
-      startX: 0, startY: 0, startZ: 0,
-      endX: 0, endY: 0, endZ: 0
-    });
+// A fixed celestial sphere: one small point batch, never translated toward the
+// player. Screen-space sizes are capped, and soft circular masks replace squares.
+export function initSky() {
+  let seed = 7319;
+  const random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
+  const positions = [], sizes = [], phases = [], colors = [];
+  for (let i = 0; i < 850; i++) {
+    const height = 0.10 + random() * 0.88;
+    const angle = random() * Math.PI * 2;
+    const radius = Math.sqrt(1 - height * height);
+    positions.push(Math.cos(angle) * radius, height, Math.sin(angle) * radius);
+    sizes.push(0.9 + Math.pow(random(), 3) * 1.3);
+    phases.push(random() * Math.PI * 2);
+    const tint = random();
+    colors.push(0.40 + tint * 0.16, 0.53 - tint * 0.08, 0.78);
   }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('starSize', new THREE.Float32BufferAttribute(sizes, 1));
+  geometry.setAttribute('phase', new THREE.Float32BufferAttribute(phases, 1));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  const material = new THREE.ShaderMaterial({
+    name: 'DistantNeonStars',
+    vertexColors: true,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    uniforms: {
+      time: { value: 0 },
+      pixelRatio: { value: view.renderer.getPixelRatio() }
+    },
+    vertexShader: `
+      attribute float starSize;
+      attribute float phase;
+      uniform float time;
+      uniform float pixelRatio;
+      varying vec3 starColor;
+      varying float brightness;
+      void main() {
+        starColor = color;
+        brightness = (0.72 + 0.12 * sin(time * 0.45 + phase))
+          * smoothstep(0.10, 0.25, position.y);
+        // Remove camera translation and pin depth to the far plane.
+        vec4 clip = projectionMatrix * vec4(mat3(viewMatrix) * position, 1.0);
+        gl_Position = clip.xyww;
+        gl_PointSize = starSize * pixelRatio;
+      }
+    `,
+    fragmentShader: `
+      varying vec3 starColor;
+      varying float brightness;
+      void main() {
+        vec2 p = gl_PointCoord * 2.0 - 1.0;
+        float mask = 1.0 - smoothstep(0.05, 1.0, dot(p, p));
+        gl_FragColor = vec4(starColor, mask * brightness);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }
+    `
+  });
+  view.sky = new THREE.Points(geometry, material);
+  view.sky.name = 'distantNeonStars';
+  view.sky.frustumCulled = false;
+  view.sky.renderOrder = -1000;
+  view.scene.add(view.sky);
+
+  // Preserve the original striped alien sun and its later-zone halo.
+  view.cyberSun = makeCyberSun();
+  view.scene.add(view.cyberSun);
 }
 
-export function updateMeteors(dt) {
-  for (const met of meteors) {
-    if (!met.active) {
-      met.timer -= dt;
-      if (met.timer <= 0) {
-        met.active = true;
-        met.progress = 0;
-        const side = Math.random() < 0.5 ? -1 : 1;
-        met.startX = side * (32 + Math.random() * 38);
-        met.startY = 22 + Math.random() * 14;
-        met.startZ = -210 - Math.random() * 40;
-        met.endX = met.startX * 0.15;
-        met.endY = 12 + Math.random() * 6;
-        met.endZ = met.startZ + 70 + Math.random() * 30;
-        met.mesh.position.set(met.startX, met.startY, met.startZ);
-        met.mesh.lookAt(met.endX, met.endY, met.endZ);
-        met.mesh.visible = true;
-      }
-    } else {
-      met.progress += dt * 1.8;
-      if (met.progress >= 1) {
-        met.active = false;
-        met.mesh.visible = false;
-        met.timer = 2.0 + Math.random() * 3.5;
-      } else {
-        const k = met.progress;
-        met.mesh.position.set(
-          met.startX + (met.endX - met.startX) * k,
-          met.startY + (met.endY - met.startY) * k,
-          met.startZ + (met.endZ - met.startZ) * k
-        );
-        const alpha = Math.sin(k * Math.PI);
-        met.mesh.material.opacity = alpha * 0.85;
-      }
-    }
-  }
+export function updateSky(dt) {
+  view.sky.material.uniforms.pixelRatio.value = view.renderer.getPixelRatio();
+  if (run.paused) return;
+  view.sky.material.uniforms.time.value += dt;
+  const halo = view.singularityHalo;
+  halo.rotation.z += dt * 0.35;
+  const target = run.currentZoneIndex >= 3 ? 0.62 : 0;
+  halo.material.opacity += (target - halo.material.opacity) * Math.min(1, dt * 2.5);
+  halo.visible = halo.material.opacity > 0.01;
 }
-
