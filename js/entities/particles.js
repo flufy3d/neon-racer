@@ -623,7 +623,7 @@ export function initShipTrailEmitter() {
 
   // 采用专用全白宽能量核尾喷贴图 plumeJetTex，高光密集交融，彻底消除细小点状颗粒感
   const mat = new THREE.PointsMaterial({
-    size: 0.42,
+    size: 0.20,
     map: plumeJetTex,
     vertexColors: true,
     transparent: true,
@@ -678,8 +678,8 @@ export function updateShipTrail(dt, t) {
   // 航速动力学归一化参数：26 (开局低速巡航) -> 72 (极速全加力暴烈状态)
   const spdRatio = Math.max(0, Math.min(1, (run.speed - 26) / 46));
 
-  // 粒子发光体量尺寸：开局 0.42 (饱满厚重) -> 极速 0.58 (狂暴等离子巨浪)，消除单薄稀疏感
-  trailPoints.material.size = 0.42 + spdRatio * 0.16;
+  // 粒子发光体量尺寸：开局 0.18 (锐利纤细) -> 极速 0.24 (收敛凌厉)，保证双发之间保留 0.35+ 单位的清晰黑夜间距，绝不粘合融合
+  trailPoints.material.size = 0.18 + spdRatio * 0.06;
 
   // 接入 run.timeScale 支持子弹时间慢动作流速
   const effDt = dt * (run.timeScale !== undefined ? run.timeScale : 1.0);
@@ -727,17 +727,17 @@ export function updateShipTrail(dt, t) {
     const steer = Math.max(-1, Math.min(1, run.latVel / (10 + run.speed * 0.16)));
     const p = view.ship.userData;
     const thrusters = (p && p.thrusters) || null;
-    const nozzleRadius = 0.076;
+    const nozzleRadius = 0.052;
 
-    // 单发单帧基础发射量：开局 13~15 颗/发 -> 极速 20~24 颗/发，超密流体光刃
-    const baseCount = 13.0 + spdRatio * 10.0;
+    // 单发单帧基础发射量精简 60%：开局 5 颗/发 -> 极速 8 颗/发，避免光晕堆叠过曝融合成坨
+    const baseCount = 5.0 + spdRatio * 3.2;
 
     // 主引擎喷口（左右各一，本体局部坐标系）
     for (let k = 0; k < 2; k++) {
       const isLeft = k === 0;
-      // 变轨机动推力加力：内侧引擎维持 100% 满额基准密度（绝不缩水变稀疏），外侧发动机爆发加力（增加 35% 粒子与初速）
+      // 变轨机动推力加力：内侧引擎维持 100% 满额基准密度，外侧发动机爆发增压
       const steerBoost = isLeft ? Math.max(0, steer * 0.35) : Math.max(0, -steer * 0.35);
-      const spawnCount = Math.round(baseCount * (1.0 + steerBoost));
+      const spawnCount = Math.round(baseCount * (1.0 + steerBoost * 0.35));
       const thrusterObj = thrusters ? thrusters[k] : null;
 
       // 喷管推力矢量偏转角（与 ship-pose.js 中的 thruster.group.rotation.y = -steer * 0.22 严格同步）
@@ -765,14 +765,14 @@ export function updateShipTrail(dt, t) {
         let r, coneSpread, type;
 
         if (isCore) {
-          // 超音速白炽马赫内芯（超细聚焦轴心、极小发散角、高亮白炽光束）
-          r = nozzleRadius * 0.35 * Math.sqrt(Math.random());
-          coneSpread = 0.008 + 0.012 * (r / nozzleRadius);
+          // 超音速白炽马赫内芯（超细聚焦轴心、微米级发散角、高亮白炽光针）
+          r = nozzleRadius * 0.25 * Math.sqrt(Math.random());
+          coneSpread = 0.003 + 0.005 * (r / nozzleRadius);
           type = 1;
         } else {
-          // 气动膨胀烈焰外羽（外环发散、真机金橙烈焰与深红余烬）
-          r = nozzleRadius * (0.35 + 0.65 * Math.sqrt(Math.random()));
-          coneSpread = 0.022 + 0.032 * (r / nozzleRadius);
+          // 气动膨胀烈焰外羽（外环发散、真机金橙烈焰与深红余烬，收缩横向扩散）
+          r = nozzleRadius * (0.25 + 0.55 * Math.sqrt(Math.random()));
+          coneSpread = 0.007 + 0.010 * (r / nozzleRadius);
           type = 0;
         }
 
@@ -824,17 +824,17 @@ export function updateShipTrail(dt, t) {
       auxNozzles.push({ pos: [-0.46, 0.36, 1.30], isLeft: true }, { pos: [0.46, 0.36, 1.30], isLeft: false });
     }
 
-    const auxCount = Math.max(2, Math.round(3.0 + spdRatio * 3.0));
+    const auxCount = Math.max(1, Math.round(1.0 + spdRatio * 1.5));
     for (let k = 0; k < auxNozzles.length; k++) {
       const n = auxNozzles[k];
-      const steerBoost = n.isLeft ? Math.max(0, steer * 0.30) : Math.max(0, -steer * 0.30);
+      const steerBoost = n.isLeft ? Math.max(0, steer * 0.25) : Math.max(0, -steer * 0.25);
       const speedAux = (16.0 + spdRatio * 18.0) * (1.0 + steerBoost * 0.15);
       const frameTravelAux = speedAux * Math.min(effDt, 0.035);
 
       for (let s = 0; s < auxCount; s++) {
         const frac = (s + Math.random()) / auxCount;
         const angle = Math.random() * Math.PI * 2;
-        const r = 0.045 * Math.sqrt(Math.random());
+        const r = 0.025 * Math.sqrt(Math.random());
         _vNozzleLocal.set(
           n.pos[0] + Math.cos(angle) * r,
           n.pos[1] + Math.sin(angle) * r,

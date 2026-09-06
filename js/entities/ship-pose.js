@@ -146,8 +146,8 @@ export function poseShip(m, t) {
       // 高频超音速湍流微颤 (38Hz)，速度越高颤动越剧烈
       const flutter = 1.0 + Math.sin(t * 38 + i * 2.1) * (0.02 + spdRatio * 0.035);
 
-      // 喷管外层焰羽：低速收敛纤细 (0.72x)，高速超音速剧烈膨胀 (1.18x)，外侧爆发时进一步膨胀
-      const nozzleExpand = (0.72 + spdRatio * 0.46) * (1.0 + steerBoost * 0.20);
+      // 喷管外层焰羽：低速纤细收敛 (0.60x)，高速克制扩张 (0.85x)，确保双发独立不粘连
+      const nozzleExpand = (0.60 + spdRatio * 0.25) * (1.0 + steerBoost * 0.15);
       thruster.flame.material.color.setHex(PHYSICAL_PLUME_HEX);
       thruster.flame.scale.set(
         (1 + m * 0.05) * nozzleExpand,
@@ -155,12 +155,12 @@ export function poseShip(m, t) {
         (1 + m * 0.05) * nozzleExpand
       );
 
-      // 内层超高温白炽核心锥：高速时拉长贯穿
+      // 内层超高温白炽核心锥：修长锐利穿透
       thruster.flameCore.material.color.setHex(0xffffff);
       thruster.flameCore.scale.set(
-        (1 + m * 0.03) * (0.70 + spdRatio * 0.40) * (1.0 + steerBoost * 0.15),
+        (1 + m * 0.03) * (0.58 + spdRatio * 0.24) * (1.0 + steerBoost * 0.12),
         curLen * (0.68 + spdRatio * 0.20) * flutter,
-        (1 + m * 0.03) * (0.70 + spdRatio * 0.40) * (1.0 + steerBoost * 0.15)
+        (1 + m * 0.03) * (0.58 + spdRatio * 0.24) * (1.0 + steerBoost * 0.12)
       );
 
       // 推力矢量偏转角（TVC）：喷管朝机动反方向偏转以产生反冲力矩
