@@ -28,13 +28,37 @@ if (run.combo > 0) {
 const jumpLift = Math.max(0, view.ship.position.y - 1.02);
 const targetCamY = 4.6 + jumpLift * 0.40;
 run.camY += (targetCamY - run.camY) * Math.min(1, dt * 12);
-view.camera.position.x = view.ship.position.x * 0.35;
-view.camera.position.y = run.camY;
-view.camera.lookAt(view.ship.position.x * 0.5, 1 + jumpLift * 0.25, -12);
+
+// 黑客帝国弧形环切运镜（Camera Orbit Sweep & Dutch Tilt）
+let targetSweepX = 0, targetSweepY = 0, targetSweepZ = 0, matrixRoll = 0;
+if (run.slowMoTimer > 0 && run.slowMoMaxDuration > 0) {
+  const p = 1 - run.slowMoTimer / run.slowMoMaxDuration;
+  // 正弦加权包络：慢动作中段达到峰值 1.0，头尾平滑过渡为 0
+  const sweepWeight = Math.sin(p * Math.PI);
+  // 向开阔侧优美弧形环切
+  const sweepSide = (view.ship.position.x >= 0 ? -1 : 1);
+  targetSweepX = sweepSide * 2.2 * sweepWeight;
+  targetSweepY = -0.75 * sweepWeight; // 视角略微压低仰角抓拍，力量感拉满
+  targetSweepZ = -1.3 * sweepWeight;  // 镜头向前微距推移 1.3 米，近距离呈现多面体破片悬浮特写
+  matrixRoll = sweepSide * 0.11 * sweepWeight; // 经典好莱坞电影微倾角（Dutch Tilt）
+}
+
+run.camSweepX += (targetSweepX - run.camSweepX) * Math.min(1, dt * 10);
+run.camSweepY += (targetSweepY - run.camSweepY) * Math.min(1, dt * 10);
+run.camSweepZ += (targetSweepZ - run.camSweepZ) * Math.min(1, dt * 10);
+
+view.camera.position.x = view.ship.position.x * 0.35 + run.camSweepX;
+view.camera.position.y = run.camY + run.camSweepY;
+view.camera.position.z = 8.5 + run.camSweepZ;
+
+const lookTargetX = view.ship.position.x * 0.5 - run.camSweepX * 0.28;
+const lookTargetY = 1 + jumpLift * 0.25 - run.camSweepY * 0.25;
+view.camera.lookAt(lookTargetX, lookTargetY, -12);
+
 if (view.cyberSun) {
   view.cyberSun.position.x = view.ship.position.x * 2.31;
 }
-run.camRoll += (-run.latVel * 0.0016 - run.camRoll) * Math.min(1, dt * 8);
+run.camRoll += (-run.latVel * 0.0016 + matrixRoll - run.camRoll) * Math.min(1, dt * 8);
 view.camera.rotation.z += run.camRoll;
 
 run.fovKick *= Math.exp(-dt * 5);

@@ -345,10 +345,12 @@ export function shatterObstacle(obstacle) {
     s.mesh.visible = true;
   }
 
-  // 2. 叠加热烈的高能等离子爆发火花与赛博地面冲击环
+  // 2. 叠加热烈的高能等离子爆发火花与黑客帝国多重空气时空激波环
   burst(pos, themeHex, 0.28, 0.65, 1.4, 38);
   burst(pos, 0xffffff, 0.32, 0.35, 1.1, 22);
-  spawnShockwave(pos, themeHex, 1.8);
+  spawnShockwave(pos, themeHex, 2.0);
+  spawnShockwave({ x: pos.x, y: pos.y + 0.3, z: pos.z - 1.2 }, 0x00ffff, 1.5);
+  spawnShockwave({ x: pos.x, y: pos.y + 0.6, z: pos.z + 1.2 }, 0xffffff, 1.7);
 }
 
 export function updateShards(pdt, move = 0) {

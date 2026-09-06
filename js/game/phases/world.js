@@ -95,8 +95,8 @@ for (let i = lists.obstacles.length - 1; i >= 0; i--) {
           shieldBreakFx();
           playSound('shatter');
           shatterObstacle(o);
-          triggerSlowMo(0.18, 0.45);
-          run.fovKick += 5.5;
+          triggerSlowMo(0.14, 0.65);
+          run.fovKick += 6.5;
           ui.floatLabel('SHATTER! 强行突破', o.position, '#ff0055', 22);
           run.shakeTime = Math.max(run.shakeTime, 0.5);
           view.scene.remove(o);
