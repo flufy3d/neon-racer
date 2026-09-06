@@ -253,8 +253,159 @@ export function updateShockwaves(pdt, move = 0) {
   }
 }
 
-// ── 战斗机超音速马赫尾喷束（内敛紧凑、超细离子流羽、超短寿命连续射流） ──
-const TRAIL_MAX = 120;
+// ── 障碍物多边形爆裂破片池（Zero-GC，三维低面数网格，空中剧烈自旋与跑道后退） ──
+export const shardPool = [];
+const SHARD_POOL_SIZE = 28;
+
+const shardGeoTetra = new THREE.TetrahedronGeometry(0.32);
+const shardGeoBox = new THREE.BoxGeometry(0.22, 0.42, 0.14);
+const shardGeoOcta = new THREE.OctahedronGeometry(0.26);
+
+export function initShardPool() {
+  if (shardPool.length > 0) return;
+  for (let i = 0; i < SHARD_POOL_SIZE; i++) {
+    const geo = i % 3 === 0 ? shardGeoTetra : (i % 3 === 1 ? shardGeoBox : shardGeoOcta);
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0xff1155,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      fog: false
+    });
+    const m = new THREE.Mesh(geo, mat);
+    m.visible = false;
+    view.scene.add(m);
+
+    shardPool.push({
+      mesh: m,
+      mat,
+      active: false,
+      life: 0,
+      maxLife: 1,
+      vel: new THREE.Vector3(),
+      rotVel: new THREE.Vector3(),
+      baseScale: 1,
+      bounces: 0
+    });
+  }
+}
+
+export function shatterObstacle(obstacle) {
+  if (shardPool.length === 0) initShardPool();
+  const pos = obstacle.position;
+  const type = obstacle.userData?.type || 'wall';
+  const isWall = type === 'wall';
+  const centerY = isWall ? 1.6 : 0.42;
+  const spreadY = isWall ? 2.4 : 0.55;
+  const themeHex = isWall ? 0xff1155 : 0xffaa00;
+  const altHex = isWall ? 0xff3388 : 0xffcc22;
+
+  const count = 16;
+  let allocated = 0;
+
+  // 1. 激活三维几何立体破片
+  for (let i = 0; i < SHARD_POOL_SIZE && allocated < count; i++) {
+    const s = shardPool[i];
+    if (s.active) continue;
+
+    s.active = true;
+    allocated++;
+    s.life = 0.75 + Math.random() * 0.45;
+    s.maxLife = s.life;
+    s.bounces = 0;
+    s.baseScale = 0.8 + Math.random() * 0.7;
+
+    // 破片散布在障碍物体积内
+    const px = pos.x + (Math.random() - 0.5) * 2.2;
+    const py = Math.max(0.12, centerY + (Math.random() - 0.5) * spreadY);
+    const pz = pos.z + (Math.random() - 0.5) * 0.4;
+    s.mesh.position.set(px, py, pz);
+
+    // 赋予强大的向外炸飞冲量（左右炸飞 + 被战机撞击向上抛甩 + 前后飞溅）
+    const dx = px - (view.ship ? view.ship.position.x : 0);
+    s.vel.set(
+      dx * 4.8 + (Math.random() - 0.5) * 6.5,
+      (isWall ? 4.5 : 3.0) + Math.random() * 6.5,
+      (Math.random() - 0.5) * 7.0
+    );
+
+    // 剧烈三维自旋翻滚
+    s.rotVel.set(
+      (Math.random() - 0.5) * 18,
+      (Math.random() - 0.5) * 18,
+      (Math.random() - 0.5) * 18
+    );
+
+    // 色彩交替：主色、辅色与部分高能白炽
+    const randCol = Math.random();
+    s.mat.color.setHex(randCol < 0.55 ? themeHex : (randCol < 0.85 ? altHex : 0xffffff));
+    s.mat.opacity = 1.0;
+    s.mesh.scale.setScalar(s.baseScale);
+    s.mesh.visible = true;
+  }
+
+  // 2. 叠加热烈的高能等离子爆发火花与赛博地面冲击环
+  burst(pos, themeHex, 0.28, 0.65, 1.4, 38);
+  burst(pos, 0xffffff, 0.32, 0.35, 1.1, 22);
+  spawnShockwave(pos, themeHex, 1.8);
+}
+
+export function updateShards(pdt, move = 0) {
+  for (let i = 0; i < shardPool.length; i++) {
+    const s = shardPool[i];
+    if (!s.active) continue;
+    s.life -= pdt;
+    if (s.life <= 0) {
+      s.active = false;
+      s.mesh.visible = false;
+      continue;
+    }
+
+    // 物理：空气阻尼、重力、自旋
+    s.vel.x *= Math.exp(-1.6 * pdt);
+    s.vel.z *= Math.exp(-1.6 * pdt);
+    s.vel.y -= 13.5 * pdt;
+
+    s.mesh.position.x += s.vel.x * pdt;
+    s.mesh.position.y += s.vel.y * pdt;
+    // 关键：跑道相对物理位移，破片留在原地并随飞船呼啸向前而迅速向后流逝
+    s.mesh.position.z += (s.vel.z * pdt) + move;
+
+    s.mesh.rotation.x += s.rotVel.x * pdt;
+    s.mesh.rotation.y += s.rotVel.y * pdt;
+    s.mesh.rotation.z += s.rotVel.z * pdt;
+
+    // 地面接触反弹
+    if (s.mesh.position.y <= 0.08) {
+      s.mesh.position.y = 0.08;
+      if (s.bounces < 2) {
+        s.vel.y = -s.vel.y * 0.38;
+        s.vel.x *= 0.65;
+        s.vel.z *= 0.65;
+        s.bounces++;
+      } else {
+        s.vel.y = 0;
+        s.vel.x *= 0.3;
+        s.vel.z *= 0.3;
+      }
+    }
+
+    // 远离视野后方回收
+    if (s.mesh.position.z > 24) {
+      s.active = false;
+      s.mesh.visible = false;
+      continue;
+    }
+
+    const progress = Math.max(0, s.life / s.maxLife);
+    s.mat.opacity = Math.pow(progress, 1.2);
+    s.mesh.scale.setScalar(s.baseScale * (0.25 + 0.75 * progress));
+  }
+}
+
+// ── 战斗机超音速马赫尾喷束（紧凑等离子拉丝、高频推力光刃） ──
+const TRAIL_MAX = 180;
 let trailPoints = null;
 let trailGeo = null;
 let trailPosAttr = null;
@@ -293,9 +444,9 @@ export function initShipTrailEmitter() {
   trailColAttr.setUsage(THREE.DynamicDrawUsage);
   trailGeo.setAttribute('color', trailColAttr);
 
-  // 使用超细战斗机离子流针状贴图，尺寸极小，杜绝离散大圆球
+  // 使用战斗机等离子流针状贴图，适度增大尺寸，呈现清晰光刃推力
   const mat = new THREE.PointsMaterial({
-    size: 0.12,
+    size: 0.24,
     map: jetNeedleTex,
     vertexColors: true,
     transparent: true,
@@ -353,12 +504,11 @@ export function updateShipTrail(dt, t) {
       nozzles.push([-0.46, 0.36, 1.30], [0.46, 0.36, 1.30]);
     }
 
-    // 相对飞船的超音速向后喷射速度（射流紧密相连形成光锥拉丝）
-    const relJetSpeed = run.speed + 38 + Math.random() * 8;
+    // 相对飞船的超音速向后喷射速度（射流相连形成光锥拉丝）
+    const relJetSpeed = run.speed + 46 + Math.random() * 10;
 
     for (let k = 0; k < nozzles.length; k++) {
       const n = nozzles[k];
-      // 极紧凑的喷嘴中心约束（微抖动 < 0.02），绝不散开成大团
       _vNozzleLocal.set(
         n[0] + (Math.random() - 0.5) * 0.02,
         n[1] + (Math.random() - 0.5) * 0.02,
@@ -372,10 +522,10 @@ export function updateShipTrail(dt, t) {
         relJetSpeed
       );
 
-      // 60% 产生喷口炽白马赫核心光，40% 呈现战机主题色
-      const pCol = Math.random() < 0.6 ? _whiteCol : _tmpCol;
-      // 超短寿命（0.05 ~ 0.08 秒），在 1.5 米内迅速溶解成真空，形成内敛光刃尾流
-      const life = 0.05 + Math.random() * 0.035;
+      // 55% 产生喷口炽白马赫核心光，45% 呈现战机主题色
+      const pCol = Math.random() < 0.55 ? _whiteCol : _tmpCol;
+      // 寿命 0.11 ~ 0.16 秒，形成 2.5 ~ 3.5 米清晰的喷流拉羽
+      const life = 0.11 + Math.random() * 0.05;
       spawnTrailParticle(_vNozzleWorld, emitVel, pCol, life);
     }
   }
@@ -396,13 +546,12 @@ export function updateShipTrail(dt, t) {
 
     hasActive = true;
     const v = trailVel[i];
-    v.x *= Math.exp(-6.0 * dt);
+    v.x *= Math.exp(-5.0 * dt);
 
     trailPosArr[i * 3] += v.x * dt;
     trailPosArr[i * 3 + 1] += v.y * dt;
     trailPosArr[i * 3 + 2] += v.z * dt;
 
-    // 超快线性衰减，干净利落
     const alpha = Math.max(0, trailLife[i] / trailMaxLife[i]);
     const base = trailBaseCol[i];
     trailColArr[i * 3] = base.r * alpha;
@@ -429,6 +578,12 @@ export function resetParticlePools() {
     s.m.visible = false;
   }
 
+  for (let i = 0; i < shardPool.length; i++) {
+    const s = shardPool[i];
+    s.active = false;
+    s.mesh.visible = false;
+  }
+
   if (trailPoints) {
     for (let i = 0; i < TRAIL_MAX; i++) {
       trailActive[i] = 0;
@@ -443,21 +598,18 @@ export function resetParticlePools() {
   }
 }
 
-// ── 内敛克制、高级质感的复合爆炸宏 ──
+// ── 复合爆炸宏 ──
 export function explode(pos) {
-  // 紧凑白炽瞬闪
-  burst(pos, 0xffffff, 0.28, 0.35, 1.3, 30);
-  // 核心等离子碎屑扩散
-  burst(pos, 0xff2266, 0.22, 0.75, 1.2, 60);
-  // 单层赛博冲击波
-  spawnShockwave(pos, 0xff0055, 1.6);
+  burst(pos, 0xffffff, 0.32, 0.45, 1.4, 32);
+  burst(pos, 0xff2266, 0.26, 0.85, 1.3, 64);
+  spawnShockwave(pos, 0xff0055, 1.8);
 }
 
 export function shieldBreakFx() {
-  spawnShockwave(view.ship.position, 0x00ffff, 1.2);
-  burst(view.ship.position, 0x00ffff, 0.20, 0.4, 1.0, 35);
-  ui.flash('#00ffff', 0.16, 250);
+  spawnShockwave(view.ship.position, 0x00ffff, 1.4);
+  burst(view.ship.position, 0x00ffff, 0.25, 0.45, 1.2, 40);
+  ui.flash('#00ffff', 0.18, 250);
   ui.toast('护盾破碎!', '#00ffff');
-  run.shakeTime = Math.max(run.shakeTime, 0.35);
+  run.shakeTime = Math.max(run.shakeTime, 0.45);
   playSound('shieldBreak');
 }

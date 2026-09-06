@@ -1,6 +1,6 @@
 import { playSound } from '../../audio.js';
 import { lists, run, view } from '../../core/state.js';
-import { burst, shieldBreakFx } from '../../entities/particles.js';
+import { burst, shatterObstacle, shieldBreakFx } from '../../entities/particles.js';
 import { applyShipTier } from '../../entities/ship.js';
 import { streakGeo, streakMat } from '../../scene/materials.js';
 import * as ui from '../../ui.js';
@@ -84,16 +84,34 @@ for (let i = lists.obstacles.length - 1; i >= 0; i--) {
     const hitTop = o.userData.type === 'wall' ? 3.2 : 0.76;
     const bottom = view.ship.position.y - 0.35;
     const crashing = dx < 1.85 && bottom < hitTop;
-    if (crashing && run.invuln <= 0) {
-      if (run.shieldReady && run.tier >= 2) {
-        run.shieldReady = false;
-        run.orbCountAtShieldEvent = run.orbCount;
-        run.invuln = 1.3;
-        applyShipTier();
-        shieldBreakFx();
+    if (crashing) {
+      if (run.invuln <= 0) {
+        if (run.shieldReady && run.tier >= 2) {
+          run.shieldReady = false;
+          run.orbCountAtShieldEvent = run.orbCount;
+          run.invuln = 1.3;
+          applyShipTier();
+          shieldBreakFx();
+          playSound('shatter');
+          shatterObstacle(o);
+          ui.floatLabel('SHATTER! 强行突破', o.position, '#ff0055', 22);
+          run.shakeTime = Math.max(run.shakeTime, 0.5);
+          view.scene.remove(o);
+          lists.obstacles.splice(i, 1);
+          continue;
+        } else {
+          gameOver();
+          break;
+        }
       } else {
-        gameOver();
-        break;
+        // 无敌冲刺状态迎面撞上障碍物，强行击碎消除，绝不穿模！
+        playSound('shatter');
+        shatterObstacle(o);
+        ui.floatLabel('碾碎!', o.position, '#00ffff', 18);
+        run.shakeTime = Math.max(run.shakeTime, 0.32);
+        view.scene.remove(o);
+        lists.obstacles.splice(i, 1);
+        continue;
       }
     }
     if (!crashing) {

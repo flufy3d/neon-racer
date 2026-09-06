@@ -208,6 +208,12 @@ export function playSound(event, value = 0) {
       voice({ noise: true, filterType: 'bandpass', cutoff: 2700, gain: 0.2, duration: 0.12, pan: -0.2 });
       voice({ time: t + 0.06, noise: true, filterType: 'bandpass', cutoff: 1200, gain: 0.13, duration: 0.38, pan: 0.3 });
       break;
+    case 'shatter':
+      rack?.duck(t, 0.45, 0.4);
+      voice({ frequency: 240, endFrequency: 40, gain: 0.4, duration: 0.5 });
+      voice({ noise: true, cutoff: 5500, endCutoff: 350, gain: 0.32, duration: 0.42 });
+      voice({ noise: true, filterType: 'bandpass', cutoff: 3400, endCutoff: 900, gain: 0.25, duration: 0.28 });
+      break;
     case 'summary': tone('bell', scaleNote(track, clamp(Math.floor(value), 0, 9)), 0, 0.1, 0.055); break;
   }
 }

@@ -2,7 +2,7 @@ import { getAudioBeat, playSound, updateAudioState } from '../../audio.js';
 import { COMBO_WINDOW, MILESTONE_ZONES } from '../../core/constants.js';
 import { $ } from '../../core/dom.js';
 import { lists, run, view } from '../../core/state.js';
-import { updateBurstParticles, updateShipTrail, updateShockwaves } from '../../entities/particles.js';
+import { updateBurstParticles, updateShipTrail, updateShockwaves, updateShards } from '../../entities/particles.js';
 import { archNeonMat, lowCoreMat, lowEdgeMat, towerCapMat, towerSpireMat, wallCoreMat, wallEdgeMat } from '../../scene/materials.js';
 import { BG_BASE, WHITE, currentLowCoreCol, currentLowEdgeCol, currentWallCoreCol, currentWallEdgeCol, targetLowCoreCol, targetLowEdgeCol, targetWallCoreCol, targetWallEdgeCol, tmpColB } from '../../scene/palette.js';
 import * as ui from '../../ui.js';
@@ -63,6 +63,7 @@ const pdt = dt * run.timeScale;
 const move = (run.state === 'playing' && !run.paused) ? (run.speed * dt) : 0;
 updateBurstParticles(pdt, move);
 updateShockwaves(pdt, move);
+updateShards(pdt, move);
 updateShipTrail(dt, t);
 
 if (run.state === 'playing' && !run.paused) {
