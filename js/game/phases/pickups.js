@@ -1,7 +1,7 @@
 import { playSound } from '../../audio.js';
 import { COMBO_WINDOW, MAX_TIER, TIER_COLORS, TIER_NAMES, TOASTS } from '../../core/constants.js';
 import { lists, run, view } from '../../core/state.js';
-import { burst, spawnShockwave } from '../../entities/particles.js';
+import { burst, shatterOrb, spawnShockwave } from '../../entities/particles.js';
 import { applyShipTier } from '../../entities/ship.js';
 import * as ui from '../../ui.js';
 import { addScore, bumpScore, calcTier, updateHUD } from '../hud.js';
@@ -55,10 +55,23 @@ for (let i = lists.orbs.length - 1; i >= 0; i--) {
     run.fovKick += 1.5;
     bumpScore();
     playSound('pickup', run.combo);
-    burst(o.position, ui.comboColor(mult), 0.22 + mult * 0.018, 0.38, 0.75, 14 + Math.min(8, mult * 3));
-    if (mult >= 2) spawnShockwave(o.position, ui.comboColor(mult), 0.7);
-    ui.floatLabel('+' + gainAmt + (mult > 1 ? ' ×' + mult : ''), o.position, ui.comboColor(mult), 17 + mult * 3);
-    ui.flash(ui.comboColor(mult), mult >= 3 ? 0.06 : 0.03);
+    const cbCol = ui.comboColor(mult);
+
+    // 能量球专属 3D 水晶破片碎裂系统（四面体/八面体/微晶片在空中剧烈翻滚炸裂，随战机冲刺向后流逝）
+    shatterOrb(o.position);
+
+    // 三重物理本色火花爆发：
+    // 1. 白炽核心高能裂解（纯白 #ffffff）
+    burst(o.position, 0xffffff, 0.26, 0.35, 0.75, 12);
+    // 2. 内环电离等离子星芒（青蓝 0x00ffff）
+    burst(o.position, 0x00ffff, 0.22, 0.38, 0.85, 14);
+    // 3. 外环聚变能场爆散（琥珀金 0xffd700）
+    burst(o.position, 0xffd700, 0.20, 0.42, 0.95, 10 + Math.min(8, mult * 2));
+
+    // 连击 >= 2 扩散纯净青/金能量光环
+    if (mult >= 2) spawnShockwave(o.position, mult % 2 === 0 ? 0x00ffff : 0xffd700, 0.75);
+    ui.floatLabel('+' + gainAmt + (mult > 1 ? ' ×' + mult : ''), o.position, cbCol, 17 + mult * 3);
+    ui.flash(cbCol, mult >= 3 ? 0.04 : 0.02, 180);
     ui.els.comboText.textContent = '×' + mult + ' COMBO ' + run.combo;
     ui.els.comboBox.style.color = ui.comboColor(mult);
     ui.els.comboBox.style.opacity = 1;

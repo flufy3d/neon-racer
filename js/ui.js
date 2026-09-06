@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-export const COMBO_COLORS = ['#00ffff', '#7fff00', '#ffee00', '#ff8800', '#ff22aa', '#ff2244'];
+export const COMBO_COLORS = ['#00ffff', '#38ffff', '#70ffff', '#ffd700', '#ffea38', '#fff6aa'];
 export const SHIELD_RECHARGE = 30;
 const TIERS_UI = ['初始形态', '引擎过载', '能量护盾', '磁力场', '超载核心', '量子跃迁'];
 export const TIER_THRESHOLDS = [18, 45, 85, 140, 215];

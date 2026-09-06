@@ -8,7 +8,7 @@ export function buildShip() {
   const plateMat = new THREE.MeshStandardMaterial({ color: 0x1c1c3a, metalness: 0.85, roughness: 0.3, emissive: 0x000000 });
   view.shipGlowMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, fog: false });
   const trimMat = new THREE.MeshBasicMaterial({ color: 0xff00ff, fog: false });
-  const flameMat = () => new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.78, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+  const flameMat = () => new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 0.78, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
   const flameCoreMat = () => new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.92, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
   const p = { bodyMat, plateMat };
   // ── 主体: 机腹 + 机首(可拉长) + 座舱 ──
@@ -118,23 +118,67 @@ export function buildShip() {
     p.shards.push({ m: sh, i });
   }
 
-  // ── 主引擎 ──
+  // ── 主引擎与超音速推力矢量喷管（含马赫激波环与白炽高温核） ──
+  p.thrusters = [];
   p.flames = [];
   p.flameCores = [];
+  p.machDiamonds = [];
   for (const x of [-0.3, 0.3]) {
-    const engine = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 10), view.shipGlowMat);
-    engine.position.set(x, 0, 1.02);
-    view.ship.add(engine);
-    const flame = new THREE.Mesh(new THREE.ConeGeometry(0.08, 1.25, 12), flameMat());
+    const group = new THREE.Group();
+    group.position.set(x, 0, 1.02);
+
+    const engine = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.14, 0.28, 12), view.shipGlowMat);
+    engine.rotation.x = Math.PI / 2;
+    group.add(engine);
+
+    // 外层膨胀电离等离子焰羽
+    const flame = new THREE.Mesh(new THREE.ConeGeometry(0.088, 1.35, 14), flameMat());
     flame.rotation.x = -Math.PI / 2;
-    flame.position.set(x, 0, 1.62);
-    view.ship.add(flame);
+    flame.position.set(0, 0, 0.67);
+    group.add(flame);
     p.flames.push(flame);
-    const flameCore = new THREE.Mesh(new THREE.ConeGeometry(0.038, 0.75, 8), flameCoreMat());
+
+    // 内层超高温白炽核心锥
+    const flameCore = new THREE.Mesh(new THREE.ConeGeometry(0.042, 0.82, 10), flameCoreMat());
     flameCore.rotation.x = -Math.PI / 2;
-    flameCore.position.set(x, 0, 1.40);
-    view.ship.add(flameCore);
+    flameCore.position.set(0, 0, 0.41);
+    group.add(flameCore);
     p.flameCores.push(flameCore);
+
+    // 超音速马赫激波环节点 (3 组 Shock Diamonds)
+    const diamonds = [];
+    for (let k = 0; k < 3; k++) {
+      const d = new THREE.Mesh(new THREE.OctahedronGeometry(0.038 - k * 0.006), flameCoreMat());
+      d.rotation.set(Math.PI / 4, 0, Math.PI / 4);
+      d.position.set(0, 0, 0.28 + k * 0.32);
+      group.add(d);
+      diamonds.push(d);
+    }
+    p.machDiamonds.push(diamonds);
+
+    view.ship.add(group);
+    p.thrusters.push({ group, x, flame, flameCore, diamonds });
+  }
+
+  // ── RCS 侧向姿态推进器（左右机翼高压反作用力推进喷口） ──
+  p.rcs = [];
+  for (const side of [-1, 1]) {
+    const rcsGroup = new THREE.Group();
+    rcsGroup.position.set(side * 0.78, 0.02, 0.18);
+
+    const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.05, 0.08, 8), view.shipGlowMat);
+    nozzle.rotation.z = side * (Math.PI / 2);
+    rcsGroup.add(nozzle);
+
+    const plume = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.45, 8), flameCoreMat());
+    plume.rotation.z = side * (-Math.PI / 2);
+    plume.position.set(side * 0.24, 0, 0);
+    plume.scale.set(0.001, 0.001, 0.001);
+    plume.visible = false;
+    rcsGroup.add(plume);
+
+    view.ship.add(rcsGroup);
+    p.rcs.push({ group: rcsGroup, side, plume });
   }
 
   const shieldBubble = new THREE.Mesh(

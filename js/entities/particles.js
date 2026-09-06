@@ -1,7 +1,7 @@
 import { playSound } from '../audio.js';
 import { MAX_PARTICLES_PER_BURST, MAX_TIER, PARTICLE_POOL_SIZE, TIER_COLORS } from '../core/constants.js';
 import { run, view } from '../core/state.js';
-import { jetNeedleTex, neonSparkTex, shockwaveRingTex } from '../scene/textures.js';
+import { jetNeedleTex, neonSparkTex, plumeJetTex, shockwaveRingTex } from '../scene/textures.js';
 import * as ui from '../ui.js';
 import * as THREE from 'three';
 
@@ -406,8 +406,145 @@ export function updateShards(pdt, move = 0) {
   }
 }
 
-// ── 战斗机超音速马赫尾喷束（紧凑等离子拉丝、高频推力光刃） ──
-const TRAIL_MAX = 180;
+// ── 能量球晶体碎裂立体破片池（Zero-GC，能量球专属微型多边形水晶破片） ──
+export const orbShardPool = [];
+const ORB_SHARD_POOL_SIZE = 40;
+
+const orbShardGeoTetra = new THREE.TetrahedronGeometry(0.14);
+const orbShardGeoOcta = new THREE.OctahedronGeometry(0.11);
+const orbShardGeoIcosa = new THREE.IcosahedronGeometry(0.10, 0);
+
+export function initOrbShardPool() {
+  if (orbShardPool.length > 0) return;
+  for (let i = 0; i < ORB_SHARD_POOL_SIZE; i++) {
+    const geo = i % 3 === 0 ? orbShardGeoTetra : (i % 3 === 1 ? orbShardGeoOcta : orbShardGeoIcosa);
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0x00ffff,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      fog: false
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.visible = false;
+    view.scene.add(mesh);
+
+    orbShardPool.push({
+      mesh,
+      mat,
+      active: false,
+      life: 0,
+      maxLife: 1,
+      vel: new THREE.Vector3(),
+      rotVel: new THREE.Vector3(),
+      baseScale: 1
+    });
+  }
+}
+
+export function shatterOrb(pos) {
+  if (orbShardPool.length === 0) initOrbShardPool();
+  const count = 10;
+  // 10 颗立体水晶破片：4 颗青蓝内环碎片 + 4 颗聚变金外环碎片 + 2 颗白炽晶核碎片
+  // 100% 严格忠实于能量球本体三大材质色彩！
+  const colors = [
+    0x00ffff, 0x00ffff, 0x00ffff, 0x00ffff,
+    0xffd700, 0xffd700, 0xffd700, 0xffd700,
+    0xffffff, 0xffffff
+  ];
+
+  for (let i = 0; i < count; i++) {
+    let s = orbShardPool.find(item => !item.active);
+    if (!s) {
+      let minLife = Infinity;
+      for (const item of orbShardPool) {
+        if (item.life < minLife) { minLife = item.life; s = item; }
+      }
+    }
+    if (!s) break;
+
+    s.active = true;
+    s.life = 0.42 + Math.random() * 0.22;
+    s.maxLife = s.life;
+    s.baseScale = 0.85 + Math.random() * 0.55;
+
+    // 随机散布在能量球体积内
+    const px = pos.x + (Math.random() - 0.5) * 0.35;
+    const py = pos.y + (Math.random() - 0.5) * 0.35;
+    const pz = pos.z + (Math.random() - 0.5) * 0.35;
+    s.mesh.position.set(px, py, pz);
+
+    // 强烈的向外爆裂放射速度
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos((Math.random() * 2) - 1);
+    const spd = 5.0 + Math.random() * 6.5;
+
+    s.vel.set(
+      Math.sin(phi) * Math.cos(theta) * spd,
+      Math.sin(phi) * Math.sin(theta) * spd * 0.8 + 1.2,
+      Math.cos(phi) * spd * 0.85
+    );
+
+    // 剧烈三维空间自旋翻滚
+    s.rotVel.set(
+      (Math.random() - 0.5) * 24,
+      (Math.random() - 0.5) * 24,
+      (Math.random() - 0.5) * 24
+    );
+
+    s.mat.color.setHex(colors[i]);
+    s.mat.opacity = 1.0;
+    s.mesh.scale.setScalar(s.baseScale);
+    s.mesh.visible = true;
+  }
+}
+
+export function updateOrbShards(pdt, move = 0) {
+  for (let i = 0; i < orbShardPool.length; i++) {
+    const s = orbShardPool[i];
+    if (!s.active) continue;
+    s.life -= pdt;
+    if (s.life <= 0) {
+      s.active = false;
+      s.mesh.visible = false;
+      continue;
+    }
+
+    s.vel.x *= Math.exp(-2.2 * pdt);
+    s.vel.z *= Math.exp(-2.2 * pdt);
+    s.vel.y -= 11.0 * pdt;
+
+    s.mesh.position.x += s.vel.x * pdt;
+    s.mesh.position.y += s.vel.y * pdt;
+    // 跑道相对物理位移：随战机向前冲刺，碎裂晶片呼啸向后掠过视野！
+    s.mesh.position.z += (s.vel.z * pdt) + move;
+
+    s.mesh.rotation.x += s.rotVel.x * pdt;
+    s.mesh.rotation.y += s.rotVel.y * pdt;
+    s.mesh.rotation.z += s.rotVel.z * pdt;
+
+    if (s.mesh.position.y < 0.06) {
+      s.mesh.position.y = 0.06;
+      s.vel.y = Math.abs(s.vel.y) * 0.35;
+      s.vel.x *= 0.7;
+      s.vel.z *= 0.7;
+    }
+
+    if (s.mesh.position.z > 20) {
+      s.active = false;
+      s.mesh.visible = false;
+      continue;
+    }
+
+    const progress = Math.max(0, s.life / s.maxLife);
+    s.mat.opacity = Math.pow(progress, 1.2);
+    s.mesh.scale.setScalar(s.baseScale * (0.2 + 0.8 * progress));
+  }
+}
+
+// ── 战斗机超音速马赫尾喷束（高密度连续向后排气流柱、高频推力光刃） ──
+const TRAIL_MAX = 1200;
 let trailPoints = null;
 let trailGeo = null;
 let trailPosAttr = null;
@@ -418,13 +555,51 @@ const trailVel = [];
 const trailLife = new Float32Array(TRAIL_MAX);
 const trailMaxLife = new Float32Array(TRAIL_MAX);
 const trailActive = new Uint8Array(TRAIL_MAX);
+const trailType = new Uint8Array(TRAIL_MAX); // 0: 外层烈焰羽流, 1: 超音速马赫内芯
 const trailBaseCol = [];
 let trailCursor = 0;
 
 const _vNozzleLocal = new THREE.Vector3();
 const _vNozzleWorld = new THREE.Vector3();
+const _vDir = new THREE.Vector3();
 const _tmpCol = new THREE.Color();
 const _whiteCol = new THREE.Color(1, 1, 1);
+const _cCoreWhite = new THREE.Color(1.0, 1.0, 1.0);
+const _cMachBlue = new THREE.Color(0.72, 0.90, 1.0);   // 喷口喉部超音速激波冰蓝微光
+const _cSolarGold = new THREE.Color(1.0, 0.84, 0.18);  // 主加力燃烧室耀金爆燃光
+const _cRocketOrange = new THREE.Color(1.0, 0.40, 0.02); // 超音速羽流烈焰高能橙
+const _cDeepEmber = new THREE.Color(0.68, 0.06, 0.01);  // 冷却尾涡深红余烬
+
+function getPlumeColor(progress, type = 0, spdRatio = 1.0) {
+  // progress: 1.0 (刚从喷口射出) -> 0.0 (消散降温)
+  if (type === 1) {
+    // ── 超音速马赫激波内芯（白炽耀光针轴） ──
+    // 高速全加力时极高温白炽核穿透更深（可达生命周期的 40%~60%）
+    const whiteThreshold = 0.36 - spdRatio * 0.12;
+    if (progress > whiteThreshold) {
+      const k = (progress - whiteThreshold) / (1.0 - whiteThreshold);
+      return _tmpCol.copy(_cMachBlue).lerp(_cCoreWhite, k);
+    } else {
+      const k = progress / whiteThreshold;
+      return _tmpCol.copy(_cSolarGold).lerp(_cMachBlue, k);
+    }
+  } else {
+    // ── 气动膨胀烈焰外羽（真机黑体辐射燃烧光谱） ──
+    // 1.00 ~ 0.66: 耀金爆燃光 (#ffd62e)
+    // 0.66 ~ 0.24: 超音速烈焰橙红 (#ff6605)
+    // 0.24 ~ 0.00: 尾端深红冷却余烬 (#ad0f02)
+    if (progress > 0.66) {
+      const k = (progress - 0.66) / 0.34;
+      return _tmpCol.copy(_cSolarGold).lerp(_cCoreWhite, k * 0.40);
+    } else if (progress > 0.24) {
+      const k = (progress - 0.24) / 0.42;
+      return _tmpCol.copy(_cRocketOrange).lerp(_cSolarGold, k);
+    } else {
+      const k = progress / 0.24;
+      return _tmpCol.copy(_cDeepEmber).lerp(_cRocketOrange, k);
+    }
+  }
+}
 
 export function initShipTrailEmitter() {
   if (trailPoints) return;
@@ -435,7 +610,7 @@ export function initShipTrailEmitter() {
   for (let i = 0; i < TRAIL_MAX; i++) {
     trailPosArr[i * 3 + 1] = -999;
     trailVel.push(new THREE.Vector3());
-    trailBaseCol.push(new THREE.Color(0, 1, 1));
+    trailBaseCol.push(new THREE.Color(1, 1, 1));
   }
 
   trailPosAttr = new THREE.BufferAttribute(trailPosArr, 3);
@@ -446,10 +621,10 @@ export function initShipTrailEmitter() {
   trailColAttr.setUsage(THREE.DynamicDrawUsage);
   trailGeo.setAttribute('color', trailColAttr);
 
-  // 使用战斗机等离子流针状贴图，适度增大尺寸，呈现清晰光刃推力
+  // 采用专用全白宽能量核尾喷贴图 plumeJetTex，高光密集交融，彻底消除细小点状颗粒感
   const mat = new THREE.PointsMaterial({
-    size: 0.24,
-    map: jetNeedleTex,
+    size: 0.42,
+    map: plumeJetTex,
     vertexColors: true,
     transparent: true,
     blending: THREE.AdditiveBlending,
@@ -460,10 +635,14 @@ export function initShipTrailEmitter() {
   trailPoints = new THREE.Points(trailGeo, mat);
   trailPoints.frustumCulled = false;
   trailPoints.visible = true;
-  view.scene.add(trailPoints);
+  if (view.ship) {
+    view.ship.add(trailPoints);
+  } else {
+    view.scene.add(trailPoints);
+  }
 }
 
-function spawnTrailParticle(pos, vel, color, life) {
+function spawnTrailParticleWithColor(pos, vel, type, life, maxLife, spdRatio) {
   if (!trailPoints) initShipTrailEmitter();
   const idx = trailCursor;
   trailCursor = (trailCursor + 1) % TRAIL_MAX;
@@ -474,69 +653,43 @@ function spawnTrailParticle(pos, vel, color, life) {
 
   trailVel[idx].copy(vel);
   trailLife[idx] = life;
-  trailMaxLife[idx] = life;
+  trailMaxLife[idx] = maxLife;
   trailActive[idx] = 1;
-  trailBaseCol[idx].copy(color);
+  trailType[idx] = type;
 
-  trailColArr[idx * 3] = color.r;
-  trailColArr[idx * 3 + 1] = color.g;
-  trailColArr[idx * 3 + 2] = color.b;
+  // 诞生瞬间根据精确子步进时间计算黑体辐射光谱，与前一帧存量粒子实现数学级无缝衔接
+  const progress = Math.max(0, life / maxLife);
+  const col = getPlumeColor(progress, type, spdRatio);
+  const alphaBase = 0.90 + spdRatio * 0.10;
+  const fadeZone = 0.22;
+  const alpha = (progress > fadeZone ? 1.0 : (progress / fadeZone)) * alphaBase;
+  trailColArr[idx * 3] = col.r * alpha;
+  trailColArr[idx * 3 + 1] = col.g * alpha;
+  trailColArr[idx * 3 + 2] = col.b * alpha;
 }
 
 export function updateShipTrail(dt, t) {
   if (!trailPoints) initShipTrailEmitter();
-
-  // 1. 发射战斗机超音速紧致等离子射流
-  if (run.state === 'playing' && view.ship && view.ship.visible) {
-    view.ship.updateMatrixWorld();
-    _tmpCol.setHex(TIER_COLORS[Math.min(MAX_TIER, Math.floor(run.tier))]);
-
-    // 主引擎喷口
-    const nozzles = [
-      [-0.3, 0, 1.48],
-      [0.3, 0, 1.48]
-    ];
-
-    // T3 翼下引擎
-    if (run.tier >= 3) {
-      nozzles.push([-0.72, -0.06, 0.85], [0.72, -0.06, 0.85]);
-    }
-    // T5 背部推进器
-    if (run.tier >= 5) {
-      nozzles.push([-0.46, 0.36, 1.30], [0.46, 0.36, 1.30]);
-    }
-
-    // 相对飞船的超音速向后喷射速度（射流相连形成光锥拉丝）
-    const relJetSpeed = run.speed + 46 + Math.random() * 10;
-
-    for (let k = 0; k < nozzles.length; k++) {
-      const n = nozzles[k];
-      _vNozzleLocal.set(
-        n[0] + (Math.random() - 0.5) * 0.02,
-        n[1] + (Math.random() - 0.5) * 0.02,
-        n[2]
-      );
-      _vNozzleWorld.copy(_vNozzleLocal).applyMatrix4(view.ship.matrixWorld);
-
-      const emitVel = new THREE.Vector3(
-        -run.latVel * 0.12,
-        (Math.random() - 0.5) * 0.3,
-        relJetSpeed
-      );
-
-      // 55% 产生喷口炽白马赫核心光，45% 呈现战机主题色
-      const pCol = Math.random() < 0.55 ? _whiteCol : _tmpCol;
-      // 寿命 0.11 ~ 0.16 秒，形成 2.5 ~ 3.5 米清晰的喷流拉羽
-      const life = 0.11 + Math.random() * 0.05;
-      spawnTrailParticle(_vNozzleWorld, emitVel, pCol, life);
-    }
+  // 确保尾喷粒子挂载于战机本体，杜绝机动机身位移脱节
+  if (view.ship && trailPoints.parent !== view.ship) {
+    view.ship.add(trailPoints);
   }
 
-  // 2. 模拟射流后移与能量衰减
+  // 航速动力学归一化参数：26 (开局低速巡航) -> 72 (极速全加力暴烈状态)
+  const spdRatio = Math.max(0, Math.min(1, (run.speed - 26) / 46));
+
+  // 粒子发光体量尺寸：开局 0.42 (饱满厚重) -> 极速 0.58 (狂暴等离子巨浪)，消除单薄稀疏感
+  trailPoints.material.size = 0.42 + spdRatio * 0.16;
+
+  // 接入 run.timeScale 支持子弹时间慢动作流速
+  const effDt = dt * (run.timeScale !== undefined ? run.timeScale : 1.0);
+
+  // ── 阶段 1：先更新上一帧存量粒子的物理位移与热力学衰减 ──
+  // 核心逻辑颠覆：先更新后发射，杜绝同一帧内新粒子被向后推离导致喷口出现空隙断层！
   let hasActive = false;
   for (let i = 0; i < TRAIL_MAX; i++) {
     if (!trailActive[i]) continue;
-    trailLife[i] -= dt;
+    trailLife[i] -= effDt;
     if (trailLife[i] <= 0) {
       trailActive[i] = 0;
       trailPosArr[i * 3 + 1] = -999;
@@ -548,22 +701,359 @@ export function updateShipTrail(dt, t) {
 
     hasActive = true;
     const v = trailVel[i];
-    v.x *= Math.exp(-5.0 * dt);
+    v.x *= Math.exp(-2.0 * effDt);
+    v.y *= Math.exp(-2.0 * effDt);
+    // 保持轻盈向后冲刷惯性，排气顺滑向后流逝
+    v.z *= Math.exp(-1.2 * effDt);
 
-    trailPosArr[i * 3] += v.x * dt;
-    trailPosArr[i * 3 + 1] += v.y * dt;
-    trailPosArr[i * 3 + 2] += v.z * dt;
+    trailPosArr[i * 3] += v.x * effDt;
+    trailPosArr[i * 3 + 1] += v.y * effDt;
+    trailPosArr[i * 3 + 2] += v.z * effDt;
 
-    const alpha = Math.max(0, trailLife[i] / trailMaxLife[i]);
-    const base = trailBaseCol[i];
-    trailColArr[i * 3] = base.r * alpha;
-    trailColArr[i * 3 + 1] = base.g * alpha;
-    trailColArr[i * 3 + 2] = base.b * alpha;
+    const progress = Math.max(0, trailLife[i] / trailMaxLife[i]);
+    const col = getPlumeColor(progress, trailType[i], spdRatio);
+    // 喷口爆发区全饱和，低速柔和羽化，高速烈焰贯穿
+    const alphaBase = 0.90 + spdRatio * 0.10;
+    const fadeZone = 0.22;
+    const alpha = (progress > fadeZone ? 1.0 : (progress / fadeZone)) * alphaBase;
+    trailColArr[i * 3] = col.r * alpha;
+    trailColArr[i * 3 + 1] = col.g * alpha;
+    trailColArr[i * 3 + 2] = col.b * alpha;
+  }
+
+  // ── 阶段 2：在喷口喉部发射当前帧新粒子，紧密无隙填充从喷口到位移前沿的整个空间 ──
+  if (run.state === 'playing' && view.ship && view.ship.visible) {
+    // 左右变轨动力学系数（-1 到 +1）
+    const steer = Math.max(-1, Math.min(1, run.latVel / (10 + run.speed * 0.16)));
+    const p = view.ship.userData;
+    const thrusters = (p && p.thrusters) || null;
+    const nozzleRadius = 0.076;
+
+    // 单发单帧基础发射量：开局 13~15 颗/发 -> 极速 20~24 颗/发，超密流体光刃
+    const baseCount = 13.0 + spdRatio * 10.0;
+
+    // 主引擎喷口（左右各一，本体局部坐标系）
+    for (let k = 0; k < 2; k++) {
+      const isLeft = k === 0;
+      // 变轨机动推力加力：内侧引擎维持 100% 满额基准密度（绝不缩水变稀疏），外侧发动机爆发加力（增加 35% 粒子与初速）
+      const steerBoost = isLeft ? Math.max(0, steer * 0.35) : Math.max(0, -steer * 0.35);
+      const spawnCount = Math.round(baseCount * (1.0 + steerBoost));
+      const thrusterObj = thrusters ? thrusters[k] : null;
+
+      // 喷管推力矢量偏转角（与 ship-pose.js 中的 thruster.group.rotation.y = -steer * 0.22 严格同步）
+      const tvcAngle = thrusterObj && thrusterObj.group ? thrusterObj.group.rotation.y : (-steer * 0.22);
+      const cosTvc = Math.cos(tvcAngle);
+      const sinTvc = Math.sin(tvcAngle);
+
+      // 喷管基准局部坐标 (x: ±0.3, y: 0, z: 1.02)
+      const baseX = thrusterObj ? thrusterObj.x : (isLeft ? -0.3 : 0.3);
+      const baseY = 0;
+      const baseZ = 1.02;
+
+      // 偏转后喷口面局部中心 (圆柱高 0.28，后沿面偏移 0.14)
+      const nozzleCenX = baseX + sinTvc * 0.14;
+      const nozzleCenY = baseY;
+      const nozzleCenZ = baseZ + cosTvc * 0.14;
+
+      // 喷射初速：平稳高速排气（开局 18 m/s -> 极速 38 m/s，外侧爆发可达 45 m/s）
+      const speedBase = (18.0 + spdRatio * 20.0) * (1.0 + steerBoost * 0.20);
+      const frameTravel = speedBase * Math.min(effDt, 0.035);
+
+      for (let s = 0; s < spawnCount; s++) {
+        // 真机双层物理发射结构：中心白炽马赫针 (Core) + 外围膨胀烈焰火炬 (Sheath)
+        const isCore = Math.random() < (0.35 + spdRatio * 0.15);
+        let r, coneSpread, type;
+
+        if (isCore) {
+          // 超音速白炽马赫内芯（超细聚焦轴心、极小发散角、高亮白炽光束）
+          r = nozzleRadius * 0.35 * Math.sqrt(Math.random());
+          coneSpread = 0.008 + 0.012 * (r / nozzleRadius);
+          type = 1;
+        } else {
+          // 气动膨胀烈焰外羽（外环发散、真机金橙烈焰与深红余烬）
+          r = nozzleRadius * (0.35 + 0.65 * Math.sqrt(Math.random()));
+          coneSpread = 0.022 + 0.032 * (r / nozzleRadius);
+          type = 0;
+        }
+
+        // 子帧均匀微插值：从 0 (当前瞬间喷口出口) 连续延伸至 1 (上一帧位移前沿)
+        const frac = (s + Math.random()) / spawnCount;
+        const angle = Math.random() * Math.PI * 2;
+
+        // 喷口圆盘法向微分散
+        const discX = Math.cos(angle) * r;
+        const discY = Math.sin(angle) * r;
+
+        // 旋转对齐到偏转喷管局部坐标轴
+        const spawnX = nozzleCenX + cosTvc * discX;
+        const spawnY = nozzleCenY + discY;
+        const spawnZ = nozzleCenZ - sinTvc * discX;
+
+        // 数学级无隙子帧连续流体插值：严格从喷口喉部 0 距离均匀覆盖到 frameTravel
+        const axialDist = frac * frameTravel;
+        _vNozzleLocal.set(
+          spawnX + sinTvc * axialDist,
+          spawnY,
+          spawnZ + cosTvc * axialDist
+        );
+
+        // 喷射初速：内芯有额外 12% 动能超音速贯穿
+        const coreBoost = isCore ? 1.12 : 1.0;
+        const jetSpeed = (speedBase * coreBoost) + (Math.random() - 0.5) * 2.0;
+
+        _vDir.set(
+          sinTvc * jetSpeed + cosTvc * (discX / nozzleRadius) * jetSpeed * coneSpread,
+          (discY / nozzleRadius) * jetSpeed * coneSpread,
+          cosTvc * jetSpeed - sinTvc * (discX / nozzleRadius) * jetSpeed * coneSpread
+        );
+
+        // 粒子寿命：开局 0.11s (延伸约 2.2m) -> 极速 0.18s (延伸约 6.5m，雄浑长柱)
+        const maxLife = (0.11 + spdRatio * 0.07) * (0.95 + Math.random() * 0.10);
+        const curLife = Math.max(0.01, maxLife - frac * effDt);
+        spawnTrailParticleWithColor(_vNozzleLocal, _vDir, type, curLife, maxLife, spdRatio);
+        hasActive = true;
+      }
+    }
+
+    // 辅助升级引擎（T3 翼下引擎 & T5 背部推进器，均为飞船本体局部坐标）
+    const auxNozzles = [];
+    if (run.tier >= 3) {
+      auxNozzles.push({ pos: [-0.72, -0.06, 0.85], isLeft: true }, { pos: [0.72, -0.06, 0.85], isLeft: false });
+    }
+    if (run.tier >= 5) {
+      auxNozzles.push({ pos: [-0.46, 0.36, 1.30], isLeft: true }, { pos: [0.46, 0.36, 1.30], isLeft: false });
+    }
+
+    const auxCount = Math.max(2, Math.round(3.0 + spdRatio * 3.0));
+    for (let k = 0; k < auxNozzles.length; k++) {
+      const n = auxNozzles[k];
+      const steerBoost = n.isLeft ? Math.max(0, steer * 0.30) : Math.max(0, -steer * 0.30);
+      const speedAux = (16.0 + spdRatio * 18.0) * (1.0 + steerBoost * 0.15);
+      const frameTravelAux = speedAux * Math.min(effDt, 0.035);
+
+      for (let s = 0; s < auxCount; s++) {
+        const frac = (s + Math.random()) / auxCount;
+        const angle = Math.random() * Math.PI * 2;
+        const r = 0.045 * Math.sqrt(Math.random());
+        _vNozzleLocal.set(
+          n.pos[0] + Math.cos(angle) * r,
+          n.pos[1] + Math.sin(angle) * r,
+          n.pos[2] + frac * frameTravelAux
+        );
+        _vDir.set(
+          (Math.random() - 0.5) * 1.0,
+          (Math.random() - 0.5) * 1.0,
+          speedAux
+        );
+        const maxLife = (0.09 + spdRatio * 0.06) * (0.92 + Math.random() * 0.16);
+        const curLife = Math.max(0.01, maxLife - frac * effDt);
+        spawnTrailParticleWithColor(_vNozzleLocal, _vDir, 0, curLife, maxLife, spdRatio);
+        hasActive = true;
+      }
+    }
   }
 
   trailPosAttr.needsUpdate = true;
   trailColAttr.needsUpdate = true;
   trailPoints.visible = hasActive || (run.state === 'playing');
+}
+
+// ── 飞船三维结构残骸池（Zero-GC 预分配，20 块真实部件几何） ──
+export const shipWreckagePool = [];
+const WRECKAGE_COUNT = 20;
+let wreckageInitialized = false;
+
+const carbonArmorMat = new THREE.MeshBasicMaterial({ color: 0x121224 });
+const plateMat = new THREE.MeshBasicMaterial({ color: 0x1b1b36 });
+const cyanGlowMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, fog: false });
+const canopyGlassMat = new THREE.MeshBasicMaterial({
+  color: 0x66ffff,
+  transparent: true,
+  opacity: 0.88,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  fog: false
+});
+const hotCoreMat = new THREE.MeshBasicMaterial({
+  color: 0xffffff,
+  transparent: true,
+  opacity: 0.95,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  fog: false
+});
+const enginePodMat = new THREE.MeshBasicMaterial({ color: 0x222238 });
+
+export function initShipWreckage() {
+  if (wreckageInitialized) return;
+  wreckageInitialized = true;
+
+  const defs = [
+    { geo: new THREE.ConeGeometry(0.36, 1.3, 4), mat: carbonArmorMat, radius: 0.18, offset: [0, 0.05, -0.7], rot: [-Math.PI / 2, 0, 0] },
+    { geo: new THREE.TetrahedronGeometry(0.22), mat: canopyGlassMat, radius: 0.12, offset: [0, 0.28, -0.2], rot: [0.2, 0, 0] },
+    { geo: new THREE.OctahedronGeometry(0.20), mat: canopyGlassMat, radius: 0.12, offset: [0, 0.30, 0.05], rot: [-0.3, 0.4, 0] },
+    { geo: new THREE.BoxGeometry(0.42, 0.24, 0.42), mat: plateMat, radius: 0.16, offset: [0, 0.18, -0.05], rot: [0, 0, 0] },
+    { geo: new THREE.BoxGeometry(0.92, 0.07, 0.68), mat: carbonArmorMat, radius: 0.14, offset: [-0.62, 0.02, 0.22], rot: [0, 0.15, -0.1] },
+    { geo: new THREE.BoxGeometry(0.72, 0.05, 0.44), mat: plateMat, radius: 0.12, offset: [-1.28, 0.06, 0.42], rot: [0, 0.25, -0.2] },
+    { geo: new THREE.BoxGeometry(0.32, 0.18, 0.30), mat: cyanGlowMat, radius: 0.10, offset: [-1.75, 0.16, 0.58], rot: [0, 0, 0.5] },
+    { geo: new THREE.BoxGeometry(0.92, 0.07, 0.68), mat: carbonArmorMat, radius: 0.14, offset: [0.62, 0.02, 0.22], rot: [0, -0.15, 0.1] },
+    { geo: new THREE.BoxGeometry(0.72, 0.05, 0.44), mat: plateMat, radius: 0.12, offset: [1.28, 0.06, 0.42], rot: [0, -0.25, 0.2] },
+    { geo: new THREE.BoxGeometry(0.32, 0.18, 0.30), mat: cyanGlowMat, radius: 0.10, offset: [1.75, 0.16, 0.58], rot: [0, 0, -0.5] },
+    { geo: new THREE.BoxGeometry(0.44, 0.04, 0.24), mat: carbonArmorMat, radius: 0.10, offset: [-0.42, 0.08, -0.46], rot: [0.1, 0.2, 0] },
+    { geo: new THREE.BoxGeometry(0.44, 0.04, 0.24), mat: carbonArmorMat, radius: 0.10, offset: [0.42, 0.08, -0.46], rot: [0.1, -0.2, 0] },
+    { geo: new THREE.BoxGeometry(0.09, 0.56, 0.88), mat: plateMat, radius: 0.18, offset: [0, 0.34, 0.44], rot: [0, 0, 0] },
+    { geo: new THREE.CylinderGeometry(0.12, 0.15, 0.76, 8), mat: enginePodMat, radius: 0.16, offset: [-0.34, 0.02, 0.94], rot: [Math.PI / 2, 0, 0.15] },
+    { geo: new THREE.CylinderGeometry(0.12, 0.15, 0.76, 8), mat: enginePodMat, radius: 0.16, offset: [0.34, 0.02, 0.94], rot: [Math.PI / 2, 0, -0.15] },
+    { geo: new THREE.BoxGeometry(0.50, 0.22, 0.98), mat: carbonArmorMat, radius: 0.18, offset: [0, -0.02, 0.36], rot: [0, 0, 0] },
+    { geo: new THREE.OctahedronGeometry(0.24), mat: hotCoreMat, radius: 0.14, offset: [0, 0.12, 0.48], rot: [0.4, 0.4, 0] },
+    { geo: new THREE.BoxGeometry(0.38, 0.05, 0.56), mat: plateMat, radius: 0.12, offset: [-0.36, 0.14, 0.16], rot: [0, 0, -0.3] },
+    { geo: new THREE.BoxGeometry(0.38, 0.05, 0.56), mat: plateMat, radius: 0.12, offset: [0.36, 0.14, 0.16], rot: [0, 0, 0.3] },
+    { geo: new THREE.BoxGeometry(0.68, 0.16, 0.26), mat: cyanGlowMat, radius: 0.14, offset: [0, -0.06, 1.12], rot: [0, 0, 0] }
+  ];
+
+  for (let i = 0; i < WRECKAGE_COUNT; i++) {
+    const d = defs[i];
+    const mesh = new THREE.Mesh(d.geo, d.mat);
+    mesh.visible = false;
+    view.scene.add(mesh);
+
+    shipWreckagePool.push({
+      mesh,
+      baseRadius: d.radius,
+      defaultOffset: new THREE.Vector3(...d.offset),
+      defaultRot: new THREE.Euler(...d.rot),
+      vel: new THREE.Vector3(),
+      rotVel: new THREE.Vector3(),
+      active: false,
+      bounces: 0,
+      grounded: false
+    });
+  }
+}
+
+export function spawnShipWreckage(ship, speed = 30, latVel = 0) {
+  if (!wreckageInitialized) initShipWreckage();
+  const shipPos = ship.position;
+  const shipRot = ship.rotation;
+  const spdNorm = Math.min(2.2, Math.max(0.8, speed / 28));
+
+  for (let i = 0; i < shipWreckagePool.length; i++) {
+    const part = shipWreckagePool[i];
+    part.active = true;
+    part.bounces = 0;
+    part.grounded = false;
+
+    const worldOffset = part.defaultOffset.clone().applyEuler(shipRot);
+    part.mesh.position.copy(shipPos).add(worldOffset);
+
+    part.mesh.rotation.set(
+      shipRot.x + part.defaultRot.x,
+      shipRot.y + part.defaultRot.y,
+      shipRot.z + part.defaultRot.z
+    );
+
+    const isLeft = part.defaultOffset.x < -0.15;
+    const isRight = part.defaultOffset.x > 0.15;
+    const isFront = part.defaultOffset.z < -0.1;
+    const isRear = part.defaultOffset.z > 0.6;
+    const isCore = i === 1 || i === 2 || i === 16;
+
+    let vx = (Math.random() - 0.5) * 4.5 + latVel * 0.35;
+    if (isLeft) vx -= (6.5 + Math.random() * 8.5) * spdNorm;
+    else if (isRight) vx += (6.5 + Math.random() * 8.5) * spdNorm;
+
+    let vy = (3.5 + Math.random() * 6.5) * spdNorm;
+    if (isFront) vy += 4.5;
+    if (isCore) vy += 5.5;
+
+    let vz = (Math.random() - 0.5) * 5.0;
+    if (isFront) vz += (5.0 + Math.random() * 6.5) * spdNorm;
+    else if (isRear) vz -= (4.5 + Math.random() * 7.5) * spdNorm;
+
+    part.vel.set(vx, vy, vz);
+
+    part.rotVel.set(
+      (Math.random() - 0.5) * 28 * spdNorm,
+      (Math.random() - 0.5) * 26 * spdNorm,
+      (Math.random() - 0.5) * 30 * spdNorm
+    );
+
+    part.mesh.visible = true;
+  }
+}
+
+export function updateShipWreckage(pdt) {
+  if (!wreckageInitialized) return;
+  const floorY = 0.08;
+
+  for (let i = 0; i < shipWreckagePool.length; i++) {
+    const p = shipWreckagePool[i];
+    if (!p.active) continue;
+
+    if (!p.grounded) {
+      p.vel.y -= 13.5 * pdt;
+      const airDrag = Math.exp(-1.35 * pdt);
+      p.vel.x *= airDrag;
+      p.vel.z *= airDrag;
+
+      p.mesh.position.x += p.vel.x * pdt;
+      p.mesh.position.y += p.vel.y * pdt;
+      p.mesh.position.z += p.vel.z * pdt;
+
+      p.mesh.rotation.x += p.rotVel.x * pdt;
+      p.mesh.rotation.y += p.rotVel.y * pdt;
+      p.mesh.rotation.z += p.rotVel.z * pdt;
+
+      const groundContactY = floorY + p.baseRadius * 0.45;
+      if (p.mesh.position.y <= groundContactY) {
+        p.mesh.position.y = groundContactY;
+        if (Math.abs(p.vel.y) > 1.35 && p.bounces < 2) {
+          p.vel.y = -p.vel.y * 0.32;
+          p.vel.x *= 0.62;
+          p.vel.z *= 0.62;
+          p.rotVel.multiplyScalar(0.55);
+          p.bounces++;
+          burst(p.mesh.position, 0xffaa00, 0.16, 0.22, 0.55, 6);
+        } else {
+          p.vel.y = 0;
+          p.grounded = true;
+        }
+      }
+    } else {
+      const groundFriction = Math.exp(-4.6 * pdt);
+      p.vel.x *= groundFriction;
+      p.vel.z *= groundFriction;
+
+      p.mesh.position.x += p.vel.x * pdt;
+      p.mesh.position.z += p.vel.z * pdt;
+
+      p.rotVel.multiplyScalar(Math.exp(-5.8 * pdt));
+      p.mesh.rotation.x += p.rotVel.x * pdt;
+      p.mesh.rotation.y += p.rotVel.y * pdt;
+      p.mesh.rotation.z += p.rotVel.z * pdt;
+
+      const hSpeedSq = p.vel.x * p.vel.x + p.vel.z * p.vel.z;
+      if (hSpeedSq > 1.8 && Math.random() < 0.12) {
+        burst(p.mesh.position, 0xffbb22, 0.14, 0.16, 0.35, 3);
+      } else if (hSpeedSq < 0.03) {
+        p.vel.set(0, 0, 0);
+        p.rotVel.set(0, 0, 0);
+      }
+    }
+  }
+}
+
+export function resetShipWreckage() {
+  if (!wreckageInitialized) return;
+  for (let i = 0; i < shipWreckagePool.length; i++) {
+    const p = shipWreckagePool[i];
+    p.active = false;
+    p.grounded = false;
+    p.bounces = 0;
+    p.vel.set(0, 0, 0);
+    p.rotVel.set(0, 0, 0);
+    p.mesh.visible = false;
+  }
 }
 
 export function resetParticlePools() {
@@ -586,6 +1076,14 @@ export function resetParticlePools() {
     s.mesh.visible = false;
   }
 
+  for (let i = 0; i < orbShardPool.length; i++) {
+    const s = orbShardPool[i];
+    s.active = false;
+    s.mesh.visible = false;
+  }
+
+  resetShipWreckage();
+
   if (trailPoints) {
     for (let i = 0; i < TRAIL_MAX; i++) {
       trailActive[i] = 0;
@@ -600,11 +1098,17 @@ export function resetParticlePools() {
   }
 }
 
-// ── 复合爆炸宏 ──
-export function explode(pos) {
-  burst(pos, 0xffffff, 0.32, 0.45, 1.4, 32);
-  burst(pos, 0xff2266, 0.26, 0.85, 1.3, 64);
-  spawnShockwave(pos, 0xff0055, 1.8);
+// ── 复合爆炸宏（包含机体物理炸裂与等离子过载大爆炸） ──
+export function explode(pos, ship = null, speed = 30, latVel = 0) {
+  if (ship) {
+    spawnShipWreckage(ship, speed, latVel);
+  }
+  // 核心聚变反应堆大爆炸：纯白高光等离子 + 电离青蓝激波 + 烈焰橙红飞溅
+  burst(pos, 0xffffff, 0.35, 0.55, 1.6, 40);
+  burst(pos, 0x00ffff, 0.28, 0.65, 1.4, 48);
+  burst(pos, 0xff5500, 0.26, 0.85, 1.3, 56);
+  spawnShockwave(pos, 0xffffff, 2.2);
+  spawnShockwave({ x: pos.x, y: pos.y + 0.2, z: pos.z - 0.5 }, 0x00ffff, 1.8);
 }
 
 export function shieldBreakFx() {

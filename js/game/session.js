@@ -90,14 +90,16 @@ export function gameOver() {
   run.state = 'over';
   updateFsBtn();
   endAudioRun();
-  explode(view.ship.position);
+  playSound('crash');
+  playSound('shatter');
+  explode(view.ship.position, view.ship, run.speed, run.latVel);
   view.ship.visible = false;
   if (view.groundGlow) view.groundGlow.visible = false;
-  run.shakeTime = 0.9;
-  ui.flash('#ffffff', 0.5, 500);
+  run.shakeTime = 1.1;
+  ui.flash('#ffffff', 0.6, 450);
   ui.els.comboBox.style.opacity = 0;
   ui.els.vig.style.opacity = 0;
-  run.timeScale = 0.25;
+  run.timeScale = 0.22;
   const sc = Math.floor(run.dist) + run.score;
   const isRecord = sc > run.best;
   if (isRecord) {
@@ -115,7 +117,7 @@ export function gameOver() {
       $('overScreen').classList.remove('hidden');
       ui.playRunSummary(index => playSound('summary', index));
     }
-  }, 900);
+  }, 1350);
 }
 
 export function showPaused() {

@@ -2,6 +2,9 @@ import { MAX_TIER, TIER_COLORS } from '../core/constants.js';
 import { run, view } from '../core/state.js';
 import { BG_BASE, WHITE, tmpColA, tmpColB } from '../scene/palette.js';
 
+// 物理热力学战斗机/火箭尾喷基色（烈焰超音速加力橙）
+const PHYSICAL_PLUME_HEX = 0xff6600;
+
 // 各形态的连续形变参数（下标 = 形态等级，帧间按 shipMorph 插值）
 const MORPH = {
   noseLen:   [1, 1.05, 1.09, 1.14, 1.20, 1.32],
@@ -49,7 +52,10 @@ export function poseShip(m, t) {
 
   const span = curve(MORPH.wingSpan, m), sweep = curve(MORPH.wingSweep, m), rise = curve(MORPH.wingRise, m);
   const fin = curve(MORPH.tipFin, m);
-  const flameLen = curve(MORPH.flameLen, m) * (0.8 + (run.speed / 72) * 0.45) + Math.sin(t * 24) * 0.07;
+  const spdRatio = Math.max(0, Math.min(1, (run.speed - 26) / 46));
+  // 速度物理动力学：低速开局时喷焰收缩克制 (0.52x)，极速时全加力狂暴延伸至 1.62x
+  const speedFlameK = 0.52 + spdRatio * 1.10;
+  const flameLen = curve(MORPH.flameLen, m) * speedFlameK + Math.sin(t * 28) * (0.03 + spdRatio * 0.05);
   const podK = seg(m, 3), bladeK = seg(m, 4);
 
   for (const w of p.wings) {
@@ -62,7 +68,7 @@ export function poseShip(m, t) {
     w.pod.visible = podK > 0.01;
     w.pod.scale.setScalar(0.35 + 0.65 * podK);
     w.pod.position.set(w.side * (0.38 + 0.2 * podK), -0.12 + 0.12 * podK, 0.2);
-    w.podFlame.material.color.copy(col);
+    w.podFlame.material.color.setHex(PHYSICAL_PLUME_HEX);
     w.podFlame.scale.set(1, flameLen * 0.8, 1);
 
     w.prong.visible = podK > 0.01;
@@ -122,17 +128,83 @@ export function poseShip(m, t) {
     b.g.scale.setScalar(0.3 + 0.7 * lanceK);
     b.g.position.set(b.side * (0.3 + 0.16 * lanceK), 0.18 + 0.18 * lanceK, 0.75);
     b.g.rotation.z = -b.side * 0.18 * lanceK;
-    b.flame.material.color.copy(col);
+    b.flame.material.color.setHex(PHYSICAL_PLUME_HEX);
     b.flame.scale.set(1, flameLen * 0.7, 1);
   }
 
-  for (const f of p.flames) {
-    f.material.color.copy(col);
-    f.scale.set(1 + m * 0.05, flameLen, 1 + m * 0.05);
+  // ── 左右变轨动力推进物理学模拟（差动推力、矢量偏转、马赫环与 RCS 侧推） ──
+  const steer = Math.max(-1, Math.min(1, run.latVel / (10 + run.speed * 0.16)));
+
+  if (p.thrusters) {
+    for (let i = 0; i < p.thrusters.length; i++) {
+      const thruster = p.thrusters[i];
+      // 变轨机动推力加力：内侧发动机维持 100% 满额基准推力（绝不缩短、不缩水、不稀疏），外侧发动机爆发增压加力（喷流拉长 35%）
+      const isLeft = thruster.x < 0;
+      const steerBoost = isLeft ? Math.max(0, steer * 0.35) : Math.max(0, -steer * 0.35);
+      const curLen = flameLen * (1.0 + steerBoost);
+
+      // 高频超音速湍流微颤 (38Hz)，速度越高颤动越剧烈
+      const flutter = 1.0 + Math.sin(t * 38 + i * 2.1) * (0.02 + spdRatio * 0.035);
+
+      // 喷管外层焰羽：低速收敛纤细 (0.72x)，高速超音速剧烈膨胀 (1.18x)，外侧爆发时进一步膨胀
+      const nozzleExpand = (0.72 + spdRatio * 0.46) * (1.0 + steerBoost * 0.20);
+      thruster.flame.material.color.setHex(PHYSICAL_PLUME_HEX);
+      thruster.flame.scale.set(
+        (1 + m * 0.05) * nozzleExpand,
+        curLen * flutter,
+        (1 + m * 0.05) * nozzleExpand
+      );
+
+      // 内层超高温白炽核心锥：高速时拉长贯穿
+      thruster.flameCore.material.color.setHex(0xffffff);
+      thruster.flameCore.scale.set(
+        (1 + m * 0.03) * (0.70 + spdRatio * 0.40) * (1.0 + steerBoost * 0.15),
+        curLen * (0.68 + spdRatio * 0.20) * flutter,
+        (1 + m * 0.03) * (0.70 + spdRatio * 0.40) * (1.0 + steerBoost * 0.15)
+      );
+
+      // 推力矢量偏转角（TVC）：喷管朝机动反方向偏转以产生反冲力矩
+      thruster.group.rotation.y = -steer * 0.22;
+
+      // 3 组超音速马赫激波环 (Shock Diamonds)：低速收敛在喷口，高速大幅沿轴线拉伸并剧烈高频脉动
+      if (thruster.diamonds) {
+        for (let k = 0; k < thruster.diamonds.length; k++) {
+          const d = thruster.diamonds[k];
+          d.position.z = (0.18 + k * (0.22 + spdRatio * 0.16)) * Math.max(0.45, curLen);
+          const pulse = 1.0 + Math.sin(t * (28 + spdRatio * 18) + k * 1.8 + i * 3.1) * (0.12 + spdRatio * 0.16);
+          const diamondScale = (0.40 + spdRatio * 0.70) * (1.0 - k * 0.14) * pulse * (1.0 + steerBoost * 0.25);
+          d.scale.setScalar(diamondScale);
+          d.visible = curLen > 0.25;
+        }
+      }
+    }
+  } else {
+    for (const f of p.flames) {
+      f.material.color.setHex(PHYSICAL_PLUME_HEX);
+      f.scale.set(1 + m * 0.05, flameLen, 1 + m * 0.05);
+    }
+    if (p.flameCores) {
+      for (const fc of p.flameCores) {
+        fc.material.color.setHex(0xffffff);
+        fc.scale.set(1 + m * 0.03, flameLen * 0.85, 1 + m * 0.03);
+      }
+    }
   }
-  if (p.flameCores) {
-    for (const fc of p.flameCores) {
-      fc.scale.set(1 + m * 0.03, flameLen * 0.85, 1 + m * 0.03);
+
+  // RCS 侧向姿态推进器喷焰控制
+  if (p.rcs) {
+    for (const r of p.rcs) {
+      // 左侧 RCS (side = -1) 在向右变轨 (steer > 0) 时喷射；右侧 RCS (side = 1) 在向左变轨 (steer < 0) 时喷射
+      const activeSteer = r.side < 0 ? Math.max(0, steer) : Math.max(0, -steer);
+      if (activeSteer > 0.06) {
+        const rcsFlicker = 0.85 + Math.sin(t * 45 + r.side) * 0.15;
+        const rcsScale = activeSteer * rcsFlicker;
+        r.plume.scale.set(rcsScale * 1.1, rcsScale * 1.5, rcsScale * 1.1);
+        r.plume.visible = true;
+      } else {
+        r.plume.visible = false;
+        r.plume.scale.set(0.001, 0.001, 0.001);
+      }
     }
   }
 

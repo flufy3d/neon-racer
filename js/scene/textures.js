@@ -145,9 +145,33 @@ export function makeShockwaveRingTexture() {
   return tex;
 }
 
+export function makePlumeJetTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  // 专为喷气尾焰/火箭排气定制的全白高密度能量核径向渐变贴图
+  // 中心 0~42% 保持超高密实体光核，42%~70% 充沛体积发光层，70%~100% 平滑无缝羽化
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 31);
+  grad.addColorStop(0.0, 'rgba(255,255,255,1.0)');
+  grad.addColorStop(0.24, 'rgba(255,255,255,0.98)');
+  grad.addColorStop(0.44, 'rgba(255,255,255,0.85)');
+  grad.addColorStop(0.68, 'rgba(255,255,255,0.44)');
+  grad.addColorStop(0.88, 'rgba(255,255,255,0.12)');
+  grad.addColorStop(1.0, 'rgba(255,255,255,0.0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.generateMipmaps = false;
+  tex.minFilter = THREE.LinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  return tex;
+}
+
 export const neonSparkTex = makeNeonSparkTexture();
 export const neonStarTex = makeNeonStarTexture();
 export const jetNeedleTex = makeJetNeedleTexture();
 export const shockwaveRingTex = makeShockwaveRingTexture();
+export const plumeJetTex = makePlumeJetTexture();
 
 
