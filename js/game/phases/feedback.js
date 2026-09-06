@@ -1,4 +1,4 @@
-import { beep, playBeat, setEnginePitch, setMusicIntensity } from '../../audio.js';
+import { getAudioBeat, playSound, updateAudioState } from '../../audio.js';
 import { COMBO_WINDOW, MILESTONE_ZONES } from '../../core/constants.js';
 import { $ } from '../../core/dom.js';
 import { lists, run, view } from '../../core/state.js';
@@ -9,24 +9,15 @@ import * as ui from '../../ui.js';
 import { showPaused } from '../session.js';
 
 export function updateRunFeedbackAndCamera(dt, t, move) {
-const bpm = 92 + run.speed * 1.15;
-run.beatTimer -= dt;
-if (run.beatTimer <= 0) {
-  const dur = 60 / bpm;
-  run.beatTimer = dur;
-  run.beatGlow = 1;
-  setMusicIntensity(Math.min(1, ((run.speed - 26) / 46) * 0.6 + run.tier * 0.1));
-  playBeat(run.beatCount, dur);
-  run.beatCount++;
-}
-setEnginePitch(46 + run.speed * 1.5 + run.combo * 2);
+// Collision handling may already have ended this run earlier in the frame.
+// The audio session rejects updates/events after that transition.
+updateAudioState({ speed: run.speed, tier: run.tier, combo: run.combo, zone: run.currentZoneIndex });
 
 if (run.speed - run.lastSpeedMark >= 10) {
   run.lastSpeedMark = run.speed;
   ui.toast('速度提升!', '#ff8822');
   run.fovKick += 3;
-  beep(500, 0.35, 'sawtooth', 0.07);
-  setTimeout(() => beep(800, 0.3, 'sawtooth', 0.06), 120);
+  playSound('speed');
 }
 
 if (run.combo > 0) {
@@ -91,7 +82,11 @@ for (let i = 0; i < particlePool.length; i++) {
   p.mat.opacity = Math.max(0, p.life / p.maxLife);
 }
 
-run.beatGlow *= Math.exp(-dt * 6);
+if (run.state === 'playing' && !run.paused) {
+  const beat = getAudioBeat();
+  run.beatGlow = beat.glow;
+  run.beatCount = beat.count;
+} else run.beatGlow *= Math.exp(-dt * 6);
 view.grid.material.opacity = 0.72 + run.beatGlow * 0.28;
 if (view.bloomPass) view.bloomPass.strength = 1.1 + run.beatGlow * 0.35;
 wallCoreMat.opacity = 0.65 + run.beatGlow * 0.35;

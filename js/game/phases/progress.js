@@ -1,4 +1,4 @@
-import { beep } from '../../audio.js';
+import { playSound } from '../../audio.js';
 import { MILESTONE_ZONES } from '../../core/constants.js';
 import { lists, run, view } from '../../core/state.js';
 import { makeOverheadArch, makePillar, makeRoadsideRelay, makeRoadsideStructure, makeWarpBeacon } from '../../entities/obstacles.js';
@@ -43,8 +43,7 @@ while (run.currentZoneIndex + 1 < MILESTONE_ZONES.length && run.dist >= MILESTON
   run.currentZoneIndex++;
   const zInfo = MILESTONE_ZONES[run.currentZoneIndex];
   ui.milestoneBanner(zInfo.name, `已行驶 ${Math.floor(run.dist)} M`, zInfo.color);
-  beep(880, 0.16, 'sine', 0.12);
-  setTimeout(() => beep(1320, 0.22, 'sine', 0.12), 110);
+  playSound('zone');
 }
 
 const curZone = MILESTONE_ZONES[run.currentZoneIndex];

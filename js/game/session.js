@@ -1,4 +1,4 @@
-import { beep, crashSound, ensureAudio, startEngine, stopEngine } from '../audio.js';
+import { endAudioRun, playSound, startAudioRun } from '../audio.js';
 import { MILESTONE_ZONES, TIER_COLORS } from '../core/constants.js';
 import { $ } from '../core/dom.js';
 import { lists, run, view } from '../core/state.js';
@@ -41,7 +41,7 @@ function resetGame() {
   keys.left = keys.right = false;
   run.speed = 26; run.maxSpeed = 26; run.dist = 0; run.spawnDist = 0; run.orbCount = 0; run.elapsed = 0; run.shakeTime = 0;
   run.combo = 0; run.comboTimer = 0; run.score = 0; run.streakTimer = 0; run.fovKick = 0;
-  run.beatTimer = 0; run.beatGlow = 0; run.timeScale = 1; run.lastSpeedMark = 26; run.camRoll = 0; run.camY = 4.6;
+  run.beatGlow = 0; run.timeScale = 1; run.lastSpeedMark = 26; run.camRoll = 0; run.camY = 4.6;
   run.shieldReady = false; run.invuln = 0; run.orbCountAtShieldEvent = 0;
   run.maxCombo = 0;
   run.latVel = 0; run.stabilizerEngaged = false; run.dualHoldTime = 0; activePointers.clear();
@@ -75,22 +75,23 @@ export function updateFsBtn() {
 }
 
 export function startGame() {
-  ensureAudio();
   if (run.overTimerId) { clearTimeout(run.overTimerId); run.overTimerId = null; }
   ui.resetRunSummary();
   resetGame();
   run.beatCount = 0;
-  startEngine();
+  startAudioRun();
   run.state = 'playing'; run.paused = false;
+  run.showPending = false;
   updateFsBtn();
   $('startScreen').classList.add('hidden');
   $('overScreen').classList.add('hidden');
+  $('pauseScreen').classList.add('hidden');
 }
 
 export function gameOver() {
   run.state = 'over';
   updateFsBtn();
-  crashSound();
+  endAudioRun();
   explode(view.ship.position);
   view.ship.visible = false;
   if (view.groundGlow) view.groundGlow.visible = false;
@@ -98,7 +99,6 @@ export function gameOver() {
   ui.flash('#ffffff', 0.5, 500);
   ui.els.comboBox.style.opacity = 0;
   ui.els.vig.style.opacity = 0;
-  stopEngine();
   run.timeScale = 0.25;
   const sc = Math.floor(run.dist) + run.score;
   const isRecord = sc > run.best;
@@ -115,7 +115,7 @@ export function gameOver() {
   run.overTimerId = setTimeout(() => {
     if (run.state === 'over') {
       $('overScreen').classList.remove('hidden');
-      ui.playRunSummary(index => beep(420 + index * 105, 0.055, 'square', 0.045));
+      ui.playRunSummary(index => playSound('summary', index));
     }
   }, 900);
 }

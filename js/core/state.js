@@ -25,7 +25,7 @@ export const run = {
   speed: 26, maxSpeed: 26, dist: 0, spawnDist: 0, orbCount: 0, elapsed: 0, score: 0,
   shakeTime: 0, best: +(localStorage.getItem('neonRacerBest') || 0),
   combo: 0, comboTimer: 0, maxCombo: 0, streakTimer: 0, fovKick: 0,
-  beatTimer: 0, beatGlow: 0, beatCount: 0, timeScale: 1, lastSpeedMark: 26, camRoll: 0, camY: 4.6,
+  beatGlow: 0, beatCount: 0, timeScale: 1, lastSpeedMark: 26, camRoll: 0, camY: 4.6,
   overTimerId: null, shieldReady: false, invuln: 0, orbCountAtShieldEvent: 0, tier: 0,
   shipMorph: 0, morphRoll: 0, shipBank: 0, airFlip: 0, airJumps: 0, latVel: 0,
   stabilizerEngaged: false, dualHoldTime: 0, lastGuidedLane: null, lastGuidedDist: -Infinity,

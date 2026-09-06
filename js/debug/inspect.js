@@ -1,10 +1,12 @@
 import { MILESTONE_ZONES, TIER_COLORS } from '../core/constants.js';
+import { getAudioSnapshot } from '../audio.js';
 import { lists, run, view } from '../core/state.js';
 import { makeLow, makeOrb, makeOverheadArch, makeRoadsideRelay, makeWall, makeWarpBeacon } from '../entities/obstacles.js';
 import { updateGroundGlow } from '../scene/ground.js';
 import { lowCoreMat, lowEdgeMat, wallCoreMat, wallEdgeMat } from '../scene/materials.js';
 
 window.__neon = {
+  get audio() { return getAudioSnapshot(); },
   get scene() { return view.scene; },
   get camera() { return view.camera; },
   get renderer() { return view.renderer; },

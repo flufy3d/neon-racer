@@ -1,4 +1,4 @@
-import { beep } from '../audio.js';
+import { pauseAudioRun, playSound, resumeAudioRun } from '../audio.js';
 import { JUMP_V, MAX_TIER, SWIPE_AIRJUMP, SWIPE_JUMP, TIER_COLORS } from '../core/constants.js';
 import { $ } from '../core/dom.js';
 import { run, view } from '../core/state.js';
@@ -19,8 +19,7 @@ function jump() {
     run.grounded = false;
     run.airJumps = run.tier >= MAX_TIER ? 1 : 0;
     view.ship.scale.set(0.8, 1.35, 0.8);
-    beep(500, 0.15, 'sine', 0.1);
-    setTimeout(() => beep(750, 0.12, 'sine', 0.08), 70);
+    playSound('jump');
   } else if (run.airJumps > 0) {
     // T5 量子跃迁: 空中二段跳
     run.airJumps--;
@@ -31,8 +30,7 @@ function jump() {
     spawnShockwave(at, TIER_COLORS[MAX_TIER], 0.5);
     burst(at, TIER_COLORS[MAX_TIER], 0.2, 0.45, 0.8, 28);
     ui.floatLabel('量子跃迁', view.ship.position, '#c08cff', 16);
-    beep(760, 0.12, 'triangle', 0.11);
-    setTimeout(() => beep(1180, 0.14, 'triangle', 0.09), 60);
+    playSound('airJump');
     updateHUD();
   }
 }
@@ -73,6 +71,7 @@ addEventListener('pointerdown', e => {
   if (e.target.closest('button')) return;
   if (run.paused && run.state === 'playing') {
     run.paused = false;
+    resumeAudioRun();
     $('pauseScreen').classList.add('hidden');
     updateFsBtn();
   }
@@ -157,6 +156,7 @@ $('restartBtn').onclick = startGame;
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && run.state === 'playing') {
     run.paused = true;
+    pauseAudioRun();
     updateFsBtn();
     clearInputState();
   }
@@ -165,15 +165,27 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('blur', () => {
   if (run.state === 'playing') {
     run.paused = true;
+    pauseAudioRun();
     updateFsBtn();
     clearInputState();
   }
 });
 
-window.addEventListener('pagehide', clearInputState);
+window.addEventListener('pagehide', () => {
+  clearInputState();
+  if (run.state === 'playing') {
+    run.paused = true;
+    pauseAudioRun();
+  }
+});
 
 addEventListener('keydown', () => {
-  if (run.paused && run.state === 'playing') { run.paused = false; $('pauseScreen').classList.add('hidden'); updateFsBtn(); }
+  if (run.paused && run.state === 'playing') {
+    run.paused = false;
+    resumeAudioRun();
+    $('pauseScreen').classList.add('hidden');
+    updateFsBtn();
+  }
 });
 
 $('fsBtn').onclick = e => {

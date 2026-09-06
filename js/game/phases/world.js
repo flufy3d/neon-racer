@@ -1,4 +1,4 @@
-import { beep, whoosh } from '../../audio.js';
+import { playSound } from '../../audio.js';
 import { lists, run, view } from '../../core/state.js';
 import { burst, shieldBreakFx } from '../../entities/particles.js';
 import { applyShipTier } from '../../entities/ship.js';
@@ -101,14 +101,14 @@ for (let i = lists.obstacles.length - 1; i >= 0; i--) {
         const g = addScore(40);
         ui.floatLabel('完美跳跃 +' + g, o.position, '#ffffff', 19);
         run.fovKick += 2.5;
-        beep(1250, 0.14, 'sine', 0.12);
+        playSound('perfectJump');
         burst(o.position, 0xffffff, 0.2, 0.4, 0.6, 22);
         bumpScore();
       } else if (dx >= 1.85 && dx < 3.6) {
         const g = addScore(30);
         ui.floatLabel('擦身而过 +' + g, o.position, '#aaffff', 16);
         run.fovKick += 1.5;
-        whoosh();
+        playSound('nearMiss', o.position.x - view.ship.position.x);
       }
     }
   }

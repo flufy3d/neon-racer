@@ -1,4 +1,4 @@
-import { beep } from '../audio.js';
+import { playSound } from '../audio.js';
 import { MAX_PARTICLES_PER_BURST, PARTICLE_POOL_SIZE } from '../core/constants.js';
 import { lists, run, view } from '../core/state.js';
 import * as ui from '../ui.js';
@@ -100,7 +100,6 @@ export function shieldBreakFx() {
   ui.flash('#00ffff', 0.3, 400);
   ui.toast('护盾破碎!', '#00ffff');
   run.shakeTime = Math.max(run.shakeTime, 0.4);
-  beep(800, 0.2, 'sawtooth', 0.12);
-  setTimeout(() => beep(400, 0.25, 'sawtooth', 0.1), 100);
+  playSound('shieldBreak');
 }
 

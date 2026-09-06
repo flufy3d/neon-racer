@@ -1,4 +1,4 @@
-import { beep } from '../../audio.js';
+import { playSound } from '../../audio.js';
 import { CENTER_X, GRAVITY, MAX_TIER, STABILIZER_ACCEL, STABILIZER_GAIN, TRACK_HALF } from '../../core/constants.js';
 import { run, view } from '../../core/state.js';
 import { burst } from '../../entities/particles.js';
@@ -27,7 +27,7 @@ if (activePointers.size) {
         run.stabilizerEngaged = true;
         run.latVel *= 0.25;
         ui.floatLabel('中线锁定', view.ship.position, '#66ffff', 14);
-        beep(710, 0.07, 'triangle', 0.065);
+        playSound('lock');
       }
     }
   } else {
@@ -73,7 +73,7 @@ if (!run.grounded) {
     run.airJumps = run.tier >= MAX_TIER ? 1 : 0;
     view.ship.scale.set(1.3, 0.65, 1.3);
     burst(new THREE.Vector3(view.ship.position.x, 0.25, 0.5), 0x66ccff, 0.16, 0.35, 0.4, 14);
-    beep(170, 0.09, 'sine', 0.1);
+    playSound('land');
     run.shakeTime = Math.max(run.shakeTime, 0.12);
   }
 } else {
