@@ -84,12 +84,18 @@ export function startAudioRun() {
   tick(); timer = setInterval(tick, 25);
 }
 
-export function updateAudioState(state) {
+export function updateAudioState(speedVal, tierVal, comboVal, zoneVal) {
   if (status !== 'playing') return;
-  speed = clamp(state.speed, 26, 72);
-  const newTier = clamp(state.tier, 0, 5), newZone = clamp(state.zone, 0, 4);
+  let s, t, c, z;
+  if (typeof speedVal === 'object' && speedVal !== null) {
+    s = speedVal.speed; t = speedVal.tier; c = speedVal.combo; z = speedVal.zone;
+  } else {
+    s = speedVal; t = tierVal; c = comboVal; z = zoneVal;
+  }
+  speed = clamp(s, 26, 72);
+  const newTier = clamp(t, 0, 5), newZone = clamp(z, 0, 4);
   if (newTier !== tier || newZone !== zone) pendingFill = true;
-  tier = newTier; zone = newZone; combo = clamp(state.combo, 0, 1000);
+  tier = newTier; zone = newZone; combo = clamp(c, 0, 1000);
   rack?.updateEngine(speed, combo);
 }
 

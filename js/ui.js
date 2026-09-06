@@ -59,30 +59,111 @@ export function toast(text, color = '#ffd700') {
   els.toastEl.classList.add('show');
 }
 
+let lastScore = -1;
+let lastSpeed = -1;
+let lastDist = -1;
+let lastOrbCount = -1;
+let lastMaxCombo = -1;
+let lastTier = -1;
+let lastTierColorHex = '';
+let lastTierProgress = '';
+let lastTierBarWidth = '';
+let lastTierNextText = '';
+let lastTierAb = -1;
+let lastShieldReadyAb = null;
+let lastAirJumpReadyAb = null;
+let lastShieldText = null;
+let lastJumpText = null;
+
+export function resetHUDCache() {
+  lastScore = -1;
+  lastSpeed = -1;
+  lastDist = -1;
+  lastOrbCount = -1;
+  lastMaxCombo = -1;
+  lastTier = -1;
+  lastTierColorHex = '';
+  lastTierProgress = '';
+  lastTierBarWidth = '';
+  lastTierNextText = '';
+  lastTierAb = -1;
+  lastShieldReadyAb = null;
+  lastAirJumpReadyAb = null;
+  lastShieldText = null;
+  lastJumpText = null;
+}
+
 export function updateHUD(s) {
-  els.scoreEl.textContent = 'SCORE ' + (Math.floor(s.dist) + s.bonus);
-  els.speedEl.textContent = Math.round(s.speed * 3.6);
-  els.distStat.textContent = Math.floor(s.dist) + ' m';
-  els.orbStat.textContent = '◆ ' + s.orbCount;
-  els.maxComboEl.textContent = '×' + multOf(Math.max(s.maxCombo, 1)) + ' · ' + s.maxCombo + ' 连';
-  els.tierNameEl.textContent = 'TIER ' + s.tier + ' · ' + TIERS_UI[s.tier];
-  els.tierNameEl.style.color = '#' + s.tierColorHex;
+  const scoreVal = Math.floor(s.dist) + s.bonus;
+  if (scoreVal !== lastScore) {
+    lastScore = scoreVal;
+    els.scoreEl.textContent = 'SCORE ' + scoreVal;
+  }
+  const speedVal = Math.round(s.speed * 3.6);
+  if (speedVal !== lastSpeed) {
+    lastSpeed = speedVal;
+    els.speedEl.textContent = speedVal;
+  }
+  const distVal = Math.floor(s.dist);
+  if (distVal !== lastDist) {
+    lastDist = distVal;
+    els.distStat.textContent = distVal + ' m';
+  }
+  if (s.orbCount !== lastOrbCount) {
+    lastOrbCount = s.orbCount;
+    els.orbStat.textContent = '◆ ' + s.orbCount;
+  }
+  if (s.maxCombo !== lastMaxCombo) {
+    lastMaxCombo = s.maxCombo;
+    els.maxComboEl.textContent = '×' + multOf(Math.max(s.maxCombo, 1)) + ' · ' + s.maxCombo + ' 连';
+  }
+  if (s.tier !== lastTier || s.tierColorHex !== lastTierColorHex) {
+    lastTier = s.tier;
+    lastTierColorHex = s.tierColorHex;
+    els.tierNameEl.textContent = 'TIER ' + s.tier + ' · ' + TIERS_UI[s.tier];
+    els.tierNameEl.style.color = '#' + s.tierColorHex;
+  }
   if (s.tier >= MAX_TIER) {
-    els.tierBar.style.width = '100%';
-    els.tierNext.textContent = '已达最高形态';
+    if (lastTierProgress !== 'max') {
+      lastTierProgress = 'max';
+      els.tierBar.style.width = '100%';
+      els.tierNext.textContent = '已达最高形态';
+    }
   } else {
     const lo = s.tier === 0 ? 0 : TIER_THRESHOLDS[s.tier - 1];
     const hi = TIER_THRESHOLDS[s.tier];
-    els.tierBar.style.width = Math.min(100, (s.orbCount - lo) / (hi - lo) * 100) + '%';
-    els.tierNext.textContent = `下一形态 ${hi} 球`;
+    const w = Math.min(100, (s.orbCount - lo) / (hi - lo) * 100) + '%';
+    const nextText = `下一形态 ${hi} 球`;
+    if (w !== lastTierBarWidth) {
+      lastTierBarWidth = w;
+      els.tierBar.style.width = w;
+    }
+    if (nextText !== lastTierNextText) {
+      lastTierNextText = nextText;
+      els.tierNext.textContent = nextText;
+    }
+    lastTierProgress = '';
   }
-  els.abEls.forEach((el, i) => {
-    const active = s.tier >= i + 1;
-    el.classList.toggle('locked', !active);
-    el.classList.toggle('ready', active && (i === 1 ? s.shieldReady : i === 4 ? s.airJumpReady : true));
-  });
-  els.shieldState.textContent = s.tier < 2 ? '' : s.shieldReady ? '[就绪]' : `[充能 ${s.charge}/${SHIELD_RECHARGE}]`;
-  els.jumpState.textContent = s.tier < MAX_TIER ? '' : s.airJumpReady ? '[就绪]' : '[已用]';
+  if (s.tier !== lastTierAb || s.shieldReady !== lastShieldReadyAb || s.airJumpReady !== lastAirJumpReadyAb) {
+    lastTierAb = s.tier;
+    lastShieldReadyAb = s.shieldReady;
+    lastAirJumpReadyAb = s.airJumpReady;
+    els.abEls.forEach((el, i) => {
+      const active = s.tier >= i + 1;
+      el.classList.toggle('locked', !active);
+      el.classList.toggle('ready', active && (i === 1 ? s.shieldReady : i === 4 ? s.airJumpReady : true));
+    });
+  }
+  const shieldText = s.tier < 2 ? '' : s.shieldReady ? '[就绪]' : `[充能 ${s.charge}/${SHIELD_RECHARGE}]`;
+  if (shieldText !== lastShieldText) {
+    lastShieldText = shieldText;
+    els.shieldState.textContent = shieldText;
+  }
+  const jumpText = s.tier < MAX_TIER ? '' : s.airJumpReady ? '[就绪]' : '[已用]';
+  if (jumpText !== lastJumpText) {
+    lastJumpText = jumpText;
+    els.jumpState.textContent = jumpText;
+  }
 }
 
 const resultEls = {

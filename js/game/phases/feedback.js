@@ -8,10 +8,18 @@ import { BG_BASE, WHITE, currentLowCoreCol, currentLowEdgeCol, currentWallCoreCo
 import * as ui from '../../ui.js';
 import { showPaused } from '../session.js';
 
+let _lastVigColor = '';
+let _lastVigOpacity = -1;
+
+export function resetFeedbackCache() {
+  _lastVigColor = '';
+  _lastVigOpacity = -1;
+}
+
 export function updateRunFeedbackAndCamera(dt, t, move) {
 // Collision handling may already have ended this run earlier in the frame.
 // The audio session rejects updates/events after that transition.
-updateAudioState({ speed: run.speed, tier: run.tier, combo: run.combo, zone: run.currentZoneIndex });
+updateAudioState(run.speed, run.tier, run.combo, run.currentZoneIndex);
 
 if (run.speed - run.lastSpeedMark >= 10) {
   run.lastSpeedMark = run.speed;
@@ -21,9 +29,20 @@ if (run.speed - run.lastSpeedMark >= 10) {
 }
 
 if (run.combo > 0) {
-  ui.els.vig.style.setProperty('--vc', ui.comboColor(ui.multOf(run.combo)));
-  ui.els.vig.style.opacity = Math.min(0.85, 0.18 + ui.multOf(run.combo) * 0.07) * Math.max(0, run.comboTimer / COMBO_WINDOW);
-} else ui.els.vig.style.opacity = 0;
+  const vCol = ui.comboColor(ui.multOf(run.combo));
+  if (vCol !== _lastVigColor) {
+    _lastVigColor = vCol;
+    ui.els.vig.style.setProperty('--vc', vCol);
+  }
+  const op = Math.min(0.85, 0.18 + ui.multOf(run.combo) * 0.07) * Math.max(0, run.comboTimer / COMBO_WINDOW);
+  ui.els.vig.style.opacity = op;
+  _lastVigOpacity = op;
+} else {
+  if (_lastVigOpacity !== 0) {
+    _lastVigOpacity = 0;
+    ui.els.vig.style.opacity = 0;
+  }
+}
 
 const jumpLift = Math.max(0, view.ship.position.y - 1.02);
 const targetCamY = 4.6 + jumpLift * 0.40;

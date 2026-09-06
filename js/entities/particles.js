@@ -668,6 +668,18 @@ function spawnTrailParticleWithColor(pos, vel, type, life, maxLife, spdRatio) {
   trailColArr[idx * 3 + 2] = col.b * alpha;
 }
 
+const AUX_NOZZLES_T3 = Object.freeze([
+  { pos: [-0.72, -0.06, 0.85], isLeft: true },
+  { pos: [0.72, -0.06, 0.85], isLeft: false }
+]);
+const AUX_NOZZLES_T5 = Object.freeze([
+  { pos: [-0.72, -0.06, 0.85], isLeft: true },
+  { pos: [0.72, -0.06, 0.85], isLeft: false },
+  { pos: [-0.46, 0.36, 1.30], isLeft: true },
+  { pos: [0.46, 0.36, 1.30], isLeft: false }
+]);
+const EMPTY_AUX_NOZZLES = Object.freeze([]);
+
 export function updateShipTrail(dt, t) {
   if (!trailPoints) initShipTrailEmitter();
   // 确保尾喷粒子挂载于战机本体，杜绝机动机身位移脱节
@@ -683,6 +695,7 @@ export function updateShipTrail(dt, t) {
 
   // 接入 run.timeScale 支持子弹时间慢动作流速
   const effDt = dt * (run.timeScale !== undefined ? run.timeScale : 1.0);
+  const dragFactor = Math.exp(-2.0 * effDt);
 
   // ── 阶段 1：先更新上一帧存量粒子的物理位移与热力学衰减 ──
   // 核心逻辑颠覆：先更新后发射，杜绝同一帧内新粒子被向后推离导致喷口出现空隙断层！
@@ -701,10 +714,10 @@ export function updateShipTrail(dt, t) {
 
     hasActive = true;
     const v = trailVel[i];
-    v.x *= Math.exp(-2.0 * effDt);
-    v.y *= Math.exp(-2.0 * effDt);
+    v.x *= dragFactor;
+    v.y *= dragFactor;
     // 阻尼适度加大，使尾流在短距离内快速降速并羽化消散，形成短粗有力轮廓
-    v.z *= Math.exp(-2.0 * effDt);
+    v.z *= dragFactor;
 
     trailPosArr[i * 3] += v.x * effDt;
     trailPosArr[i * 3 + 1] += v.y * effDt;
@@ -816,13 +829,7 @@ export function updateShipTrail(dt, t) {
     }
 
     // 辅助升级引擎（T3 翼下引擎 & T5 背部推进器，均为飞船本体局部坐标）
-    const auxNozzles = [];
-    if (run.tier >= 3) {
-      auxNozzles.push({ pos: [-0.72, -0.06, 0.85], isLeft: true }, { pos: [0.72, -0.06, 0.85], isLeft: false });
-    }
-    if (run.tier >= 5) {
-      auxNozzles.push({ pos: [-0.46, 0.36, 1.30], isLeft: true }, { pos: [0.46, 0.36, 1.30], isLeft: false });
-    }
+    const auxNozzles = run.tier >= 5 ? AUX_NOZZLES_T5 : (run.tier >= 3 ? AUX_NOZZLES_T3 : EMPTY_AUX_NOZZLES);
 
     const auxCount = Math.max(1, Math.round(1.0 + spdRatio * 1.5));
     for (let k = 0; k < auxNozzles.length; k++) {

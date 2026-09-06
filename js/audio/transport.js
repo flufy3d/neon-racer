@@ -8,11 +8,13 @@ export class MusicTransport {
     this.step = 0;
     this.nextTime = 0;
     this.pending = [];
+    this.pendingIndex = 0;
     this.beatTime = -Infinity;
     this.beatCount = 0;
     this.active = false;
     this.remaining = 0.03;
     this.lastTime = null;
+    this._visualResult = { count: 0, glow: 0 };
   }
 
   start(now) {
@@ -24,12 +26,16 @@ export class MusicTransport {
   setSpeed(speed) { this.targetBpm = bpmForSpeed(speed); }
 
   consume(now) {
-    while (this.pending.length && this.pending[0].time <= now) {
-      const event = this.pending.shift();
+    while (this.pendingIndex < this.pending.length && this.pending[this.pendingIndex].time <= now) {
+      const event = this.pending[this.pendingIndex++];
       if (event.step % 4 === 0) {
         this.beatTime = event.time;
         this.beatCount = Math.floor(event.step / 4) + 1;
       }
+    }
+    if (this.pendingIndex > 32) {
+      this.pending.splice(0, this.pendingIndex);
+      this.pendingIndex = 0;
     }
   }
 
@@ -58,16 +64,19 @@ export class MusicTransport {
   pause(now) {
     if (!this.active) return;
     this.consume(now);
-    const first = this.pending[0];
+    const first = this.pending[this.pendingIndex];
     this.remaining = Math.max(0.005, (first ? first.time : this.nextTime) - now);
     if (first) this.step = first.step;
     this.pending = [];
+    this.pendingIndex = 0;
     this.active = false;
     this.beatTime = -Infinity;
   }
 
   visual(now) {
     this.consume(now);
-    return { count: this.beatCount, glow: this.active ? Math.exp(-Math.max(0, now - this.beatTime) * 6) : 0 };
+    this._visualResult.count = this.beatCount;
+    this._visualResult.glow = this.active ? Math.exp(-Math.max(0, now - this.beatTime) * 6) : 0;
+    return this._visualResult;
   }
 }

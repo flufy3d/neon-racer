@@ -14,13 +14,32 @@ export function calcTier() {
   return t;
 }
 
+const TIER_COLOR_HEXES = TIER_COLORS.map(c => c.toString(16).padStart(6, '0'));
+const hudState = {
+  dist: 0,
+  bonus: 0,
+  speed: 0,
+  orbCount: 0,
+  maxCombo: 0,
+  tier: 0,
+  airJumpReady: false,
+  shieldReady: false,
+  charge: 0,
+  tierColorHex: ''
+};
+
 export function updateHUD() {
-  ui.updateHUD({
-    dist: run.dist, bonus: run.score, speed: run.speed, orbCount: run.orbCount, maxCombo: run.maxCombo, tier: run.tier,
-    airJumpReady: run.tier >= MAX_TIER && (run.grounded || run.airJumps > 0),
-    shieldReady: run.shieldReady, charge: run.orbCount - run.orbCountAtShieldEvent,
-    tierColorHex: TIER_COLORS[run.tier].toString(16).padStart(6, '0')
-  });
+  hudState.dist = run.dist;
+  hudState.bonus = run.score;
+  hudState.speed = run.speed;
+  hudState.orbCount = run.orbCount;
+  hudState.maxCombo = run.maxCombo;
+  hudState.tier = run.tier;
+  hudState.airJumpReady = run.tier >= MAX_TIER && (run.grounded || run.airJumps > 0);
+  hudState.shieldReady = run.shieldReady;
+  hudState.charge = run.orbCount - run.orbCountAtShieldEvent;
+  hudState.tierColorHex = TIER_COLOR_HEXES[run.tier] || 'ffffff';
+  ui.updateHUD(hudState);
 }
 
 export function bumpScore() {
@@ -28,4 +47,3 @@ export function bumpScore() {
   void ui.els.scoreEl.offsetWidth;
   ui.els.scoreEl.classList.add('bump');
 }
-

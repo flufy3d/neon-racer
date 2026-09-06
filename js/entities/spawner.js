@@ -1,6 +1,6 @@
 import { LANES } from '../core/constants.js';
 import { lists, run, view } from '../core/state.js';
-import { makeLow, makeOrb, makeWall } from './obstacles.js';
+import { makeOrb, spawnPooledObstacle, spawnPooledOrb } from './obstacles.js';
 
 function buildPatternPlan(freeLane) {
   const plan = [];
@@ -32,9 +32,8 @@ export function spawnPattern(overshoot = 0, gap = 15) {
   if (Math.random() < 0.18) {
     const lane = (Math.random() * 3) | 0;
     for (let i = 0; i < 5; i++) {
-      const o = makeOrb(LANES[lane], 1.2, -140 - i * 2 + overshoot);
+      const o = spawnPooledOrb(view.scene, LANES[lane], 1.2, -140 - i * 2 + overshoot);
       lists.orbs.push(o);
-      view.scene.add(o);
     }
     const nextValid = new Set();
     for (let cur = 0; cur < 3; cur++) {
@@ -119,20 +118,17 @@ export function spawnPattern(overshoot = 0, gap = 15) {
 
   for (const item of plan) {
     if (item.type === 'wall' || item.type === 'low') {
-      const obj = item.type === 'low' ? makeLow(item.lane, -140 + overshoot) : makeWall(item.lane, -140 + overshoot);
+      const obj = spawnPooledObstacle(view.scene, item.type, item.lane, -140 + overshoot);
       lists.obstacles.push(obj);
-      view.scene.add(obj);
     } else {
-      const o = makeOrb(LANES[item.lane], 1.2, -140 + overshoot);
+      const o = spawnPooledOrb(view.scene, LANES[item.lane], 1.2, -140 + overshoot);
       lists.orbs.push(o);
-      view.scene.add(o);
     }
   }
   if (Math.random() < 0.6) {
     for (let i = 1; i <= 3 + ((Math.random() * 3) | 0); i++) {
-      const o = makeOrb(LANES[freeLane], 1.2, -140 - i * 2 + overshoot);
+      const o = spawnPooledOrb(view.scene, LANES[freeLane], 1.2, -140 - i * 2 + overshoot);
       lists.orbs.push(o);
-      view.scene.add(o);
     }
   }
 }

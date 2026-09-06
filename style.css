@@ -32,7 +32,7 @@ canvas { display: block; }
   font-size: clamp(30px, 5vw, 52px); letter-spacing: 3px; opacity: 0; transition: opacity .3s; }
 #comboBox.pop { animation: pop .22s ease-out; }
 @keyframes pop { 0% { transform: scale(1.55); } 100% { transform: scale(1); } }
-#comboBar { height: 4px; width: 130px; margin: 6px auto 0; border-radius: 2px; background: currentColor; box-shadow: 0 0 10px currentColor; }
+#comboBar { height: 4px; width: 130px; margin: 6px auto 0; border-radius: 2px; background: currentColor; box-shadow: 0 0 10px currentColor; transform-origin: center; will-change: transform; }
 #toast { position: absolute; top: 30%; width: 100%; text-align: center; font-size: clamp(24px, 4vw, 40px);
   font-weight: bold; letter-spacing: 8px; opacity: 0; }
 #toast.show { animation: toastAnim 1.5s ease-out forwards; }

@@ -8,11 +8,18 @@ import { applyShipTier } from '../entities/ship.js';
 import { lowCoreMat, lowEdgeMat, wallCoreMat, wallEdgeMat } from '../scene/materials.js';
 import { BG_BASE, currentLowCoreCol, currentLowEdgeCol, currentWallCoreCol, currentWallEdgeCol } from '../scene/palette.js';
 import * as ui from '../ui.js';
+import { resetObstaclePool, resetOrbPool } from '../entities/obstacles.js';
+import { resetPillars, resetStreaks } from './phases/world.js';
+import { resetFeedbackCache } from './phases/feedback.js';
 import { updateHUD } from './hud.js';
 import { activePointers, keys } from './input.js';
 
 function resetGame() {
-  for (const o of [...lists.obstacles, ...lists.orbs, ...lists.pillars, ...lists.streaks, ...lists.roadside, ...lists.arches, ...lists.warpBeacons]) view.scene.remove(o);
+  resetOrbPool();
+  resetObstaclePool();
+  resetStreaks();
+  resetPillars();
+  for (const o of [...lists.roadside, ...lists.arches, ...lists.warpBeacons]) view.scene.remove(o);
   resetParticlePools();
   lists.obstacles = []; lists.orbs = []; lists.pillars = []; lists.roadside = []; lists.arches = []; lists.warpBeacons = []; lists.particles = []; lists.streaks = [];
   if (view.singularityHalo) {
@@ -47,8 +54,10 @@ function resetGame() {
   run.lastGuidedLane = null; run.lastGuidedDist = -Infinity;
   run.validPrevLanes = new Set([0, 1, 2]); run.lastPatternDist = -Infinity;
   lists.shockwaves = [];
+  resetFeedbackCache();
   ui.els.vig.style.opacity = 0;
   ui.els.comboBox.style.opacity = 0;
+  ui.els.comboBar.style.transform = 'scaleX(1)';
   run.tier = 0;
   run.airJumps = 0; run.airFlip = 0; run.morphRoll = 0; run.shipBank = 0; run.shipMorph = 0;
   applyShipTier();
@@ -64,6 +73,7 @@ function resetGame() {
     view.groundGlow.scale.set(1, 1, 1);
     if (view.groundGlowMat) view.groundGlowMat.opacity = 0.45;
   }
+  ui.resetHUDCache();
   updateHUD();
 }
 

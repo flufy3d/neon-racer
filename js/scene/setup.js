@@ -1,5 +1,7 @@
 import { lists, view } from '../core/state.js';
+import { initObstaclePool, initOrbPool } from '../entities/obstacles.js';
 import { buildShip } from '../entities/ship.js';
+import { initPillarInstancedMesh, initStreakInstancedMesh } from '../game/phases/world.js';
 import { initSky } from './sky.js';
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -76,6 +78,10 @@ export function initScene() {
   view.scene.add(view.groundGlow);
 
   buildShip();
+  initOrbPool(view.scene);
+  initObstaclePool(view.scene);
+  initStreakInstancedMesh(view.scene);
+  initPillarInstancedMesh(view.scene);
 }
 
 function onResize() {

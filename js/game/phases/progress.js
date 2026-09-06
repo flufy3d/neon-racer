@@ -1,7 +1,8 @@
 import { playSound } from '../../audio.js';
 import { MILESTONE_ZONES } from '../../core/constants.js';
 import { lists, run, view } from '../../core/state.js';
-import { makeOverheadArch, makePillar, makeRoadsideRelay, makeRoadsideStructure, makeWarpBeacon } from '../../entities/obstacles.js';
+import { makeOverheadArch, makeRoadsideRelay, makeRoadsideStructure, makeWarpBeacon } from '../../entities/obstacles.js';
+import { spawnPillarInstance } from './world.js';
 import { spawnPattern } from '../../entities/spawner.js';
 import * as ui from '../../ui.js';
 
@@ -21,9 +22,7 @@ while (run.spawnDist >= gap) {
 }
 
 if ((run.dist % 14) < move) {
-  const p = makePillar(-150);
-  lists.pillars.push(p);
-  view.scene.add(p);
+  spawnPillarInstance(-150);
 }
 if ((run.dist % 24) < move) {
   const side = Math.random() < 0.5 ? -1 : 1;

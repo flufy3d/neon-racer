@@ -61,6 +61,130 @@ export function makeOrb(x, y, z) {
   return g;
 }
 
+export const ORB_POOL_CAPACITY = 72;
+export const orbPool = [];
+
+export function initOrbPool(scene) {
+  if (orbPool.length > 0) return;
+  for (let i = 0; i < ORB_POOL_CAPACITY; i++) {
+    const orb = makeOrb(0, -999, 0);
+    orb.visible = false;
+    orb.userData.active = false;
+    orbPool.push(orb);
+    if (scene) scene.add(orb);
+  }
+}
+
+export function spawnPooledOrb(scene, x, y, z) {
+  if (orbPool.length === 0 && scene) initOrbPool(scene);
+  let orb = orbPool.find(o => !o.userData.active);
+  if (!orb) {
+    orb = makeOrb(0, -999, 0);
+    orbPool.push(orb);
+    if (scene) scene.add(orb);
+  }
+  orb.position.set(x, y, z);
+  orb.rotation.set(0, 0, 0);
+  orb.userData.baseY = y;
+  orb.userData.phase = Math.random() * Math.PI * 2;
+  orb.userData.active = true;
+  orb.visible = true;
+  if (orb.userData.innerRing) {
+    orb.userData.innerRing.rotation.set(Math.PI / 2, 0, 0);
+  }
+  if (orb.userData.outerRing) {
+    orb.userData.outerRing.rotation.set(0, Math.PI / 4, 0);
+  }
+  return orb;
+}
+
+export function releasePooledOrb(orb) {
+  orb.visible = false;
+  orb.userData.active = false;
+  orb.position.set(0, -999, 0);
+}
+
+export function resetOrbPool() {
+  for (const orb of orbPool) {
+    orb.visible = false;
+    orb.userData.active = false;
+    orb.position.set(0, -999, 0);
+  }
+}
+
+export const OBSTACLE_POOL_CAPACITY = 24;
+export const wallPool = [];
+export const lowPool = [];
+
+export function initObstaclePool(scene) {
+  if (wallPool.length === 0) {
+    for (let i = 0; i < OBSTACLE_POOL_CAPACITY; i++) {
+      const w = makeWall(0, -999);
+      w.visible = false;
+      w.userData.active = false;
+      w.userData.passed = false;
+      wallPool.push(w);
+      if (scene) scene.add(w);
+    }
+  }
+  if (lowPool.length === 0) {
+    for (let i = 0; i < OBSTACLE_POOL_CAPACITY; i++) {
+      const l = makeLow(0, -999);
+      l.visible = false;
+      l.userData.active = false;
+      l.userData.passed = false;
+      lowPool.push(l);
+      if (scene) scene.add(l);
+    }
+  }
+}
+
+export function spawnPooledObstacle(scene, type, lane, z) {
+  const pool = type === 'wall' ? wallPool : lowPool;
+  if (pool.length === 0 && scene) initObstaclePool(scene);
+  let obj = pool.find(o => !o.userData.active);
+  if (!obj) {
+    obj = type === 'wall' ? makeWall(lane, z) : makeLow(lane, z);
+    pool.push(obj);
+    if (scene) scene.add(obj);
+  }
+  obj.position.set(LANES[lane], 0, z);
+  obj.rotation.set(0, 0, 0);
+  obj.scale.set(1, 1, 1);
+  obj.userData.lane = lane;
+  obj.userData.active = true;
+  obj.userData.passed = false;
+  obj.userData.phase = Math.random() * Math.PI * 2;
+
+  if (type === 'wall') {
+    if (obj.userData.scan) obj.userData.scan.position.y = 1.6;
+    if (obj.userData.leftPylon) obj.userData.leftPylon.scale.set(1, 1, 1);
+    if (obj.userData.rightPylon) obj.userData.rightPylon.scale.set(1, 1, 1);
+  } else if (type === 'low') {
+    if (obj.userData.scan) obj.userData.scan.scale.set(1, 1, 1);
+    if (obj.userData.guide) obj.userData.guide.scale.set(1, 1, 1);
+  }
+
+  obj.visible = true;
+  return obj;
+}
+
+export function releasePooledObstacle(obj) {
+  obj.visible = false;
+  obj.userData.active = false;
+  obj.userData.passed = false;
+  obj.position.set(0, -999, 0);
+}
+
+export function resetObstaclePool() {
+  for (const w of wallPool) {
+    releasePooledObstacle(w);
+  }
+  for (const l of lowPool) {
+    releasePooledObstacle(l);
+  }
+}
+
 export function makePillar(z) {
   const p = new THREE.Mesh(pillarGeo, pillarMat);
   p.position.set(Math.random() < 0.5 ? -7.5 : 7.5, 2.5, z);
