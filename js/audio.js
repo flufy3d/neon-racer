@@ -209,10 +209,21 @@ export function playSound(event, value = 0) {
       voice({ time: t + 0.06, noise: true, filterType: 'bandpass', cutoff: 1200, gain: 0.13, duration: 0.38, pan: 0.3 });
       break;
     case 'shatter':
-      rack?.duck(t, 0.45, 0.4);
-      voice({ frequency: 240, endFrequency: 40, gain: 0.4, duration: 0.5 });
-      voice({ noise: true, cutoff: 5500, endCutoff: 350, gain: 0.32, duration: 0.42 });
-      voice({ noise: true, filterType: 'bandpass', cutoff: 3400, endCutoff: 900, gain: 0.25, duration: 0.28 });
+      // 1. 深度环境闪避（Duck）：将背景音乐深沉压低至 18%，持续 0.58 秒，营造子弹时间抽空真空感
+      rack?.duck(t, 0.18, 0.58);
+
+      // 2. 慢动作时间拉伸低频俯冲（Time-Stretched Sub-bass Pitch Drop）：从 380Hz 缓慢下潜至 32Hz，持续 0.55 秒
+      voice({ frequency: 380, endFrequency: 32, type: 'triangle', gain: 0.55, duration: 0.55 });
+      voice({ frequency: 180, endFrequency: 28, type: 'sawtooth', gain: 0.35, duration: 0.45, cutoff: 400 });
+
+      // 3. 漫长碎裂噪声包络（Time-Stretched Shard Fracture）：带通从 5500Hz 慢速扫至 220Hz，完美覆盖慢镜头
+      voice({ noise: true, filterType: 'bandpass', cutoff: 5500, endCutoff: 220, gain: 0.42, duration: 0.52 });
+      voice({ noise: true, cutoff: 4800, endCutoff: 160, gain: 0.35, duration: 0.48 });
+
+      // 4. 碎片凌空碰撞次级晶体回响（Delayed Shard Echoes）：随慢镜头碎片散开，在左声道与右声道分别发出二次脆响
+      voice({ time: t + 0.09, frequency: 1200, endFrequency: 320, type: 'sine', gain: 0.18, duration: 0.16, pan: -0.45 });
+      voice({ time: t + 0.18, frequency: 950, endFrequency: 240, type: 'triangle', gain: 0.15, duration: 0.20, pan: 0.45 });
+      voice({ time: t + 0.12, noise: true, filterType: 'bandpass', cutoff: 2800, endCutoff: 600, gain: 0.14, duration: 0.15, pan: 0.3 });
       break;
     case 'summary': tone('bell', scaleNote(track, clamp(Math.floor(value), 0, 9)), 0, 0.1, 0.055); break;
   }

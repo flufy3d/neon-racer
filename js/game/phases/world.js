@@ -5,6 +5,7 @@ import { applyShipTier } from '../../entities/ship.js';
 import { streakGeo, streakMat } from '../../scene/materials.js';
 import * as ui from '../../ui.js';
 import { addScore, bumpScore } from '../hud.js';
+import { triggerSlowMo } from '../loop.js';
 import { gameOver } from '../session.js';
 import * as THREE from 'three';
 
@@ -94,6 +95,8 @@ for (let i = lists.obstacles.length - 1; i >= 0; i--) {
           shieldBreakFx();
           playSound('shatter');
           shatterObstacle(o);
+          triggerSlowMo(0.18, 0.45);
+          run.fovKick += 5.5;
           ui.floatLabel('SHATTER! 强行突破', o.position, '#ff0055', 22);
           run.shakeTime = Math.max(run.shakeTime, 0.5);
           view.scene.remove(o);
@@ -107,6 +110,8 @@ for (let i = lists.obstacles.length - 1; i >= 0; i--) {
         // 无敌冲刺状态迎面撞上障碍物，强行击碎消除，绝不穿模！
         playSound('shatter');
         shatterObstacle(o);
+        triggerSlowMo(0.28, 0.22);
+        run.fovKick += 2.0;
         ui.floatLabel('碾碎!', o.position, '#00ffff', 18);
         run.shakeTime = Math.max(run.shakeTime, 0.32);
         view.scene.remove(o);

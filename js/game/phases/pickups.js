@@ -5,6 +5,7 @@ import { burst, spawnShockwave } from '../../entities/particles.js';
 import { applyShipTier } from '../../entities/ship.js';
 import * as ui from '../../ui.js';
 import { addScore, bumpScore, calcTier, updateHUD } from '../hud.js';
+import { triggerSlowMo } from '../loop.js';
 
 export function updateComboAndOrbs(dt, t, move) {
 if (run.combo > 0) {
@@ -80,7 +81,7 @@ for (let i = lists.orbs.length - 1; i >= 0; i--) {
       run.morphRoll = Math.PI * 2;
       if (run.tier >= MAX_TIER) run.airJumps = 1;
       if (run.tier >= 2 && !run.shieldReady) { run.shieldReady = true; run.orbCountAtShieldEvent = run.orbCount; }
-      run.timeScale = 0.35;
+      triggerSlowMo(0.35, 0.45);
       run.shakeTime = Math.max(run.shakeTime, 0.4);
       ui.flash('#ffffff', 0.16, 320);
       ui.toast(TIER_NAMES[run.tier], '#' + TIER_COLORS[run.tier].toString(16).padStart(6, '0'));

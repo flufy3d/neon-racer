@@ -38,7 +38,7 @@ function resetGame() {
   keys.left = keys.right = false;
   run.speed = 26; run.maxSpeed = 26; run.dist = 0; run.spawnDist = 0; run.orbCount = 0; run.elapsed = 0; run.shakeTime = 0;
   run.combo = 0; run.comboTimer = 0; run.score = 0; run.streakTimer = 0; run.fovKick = 0;
-  run.beatGlow = 0; run.timeScale = 1; run.lastSpeedMark = 26; run.camRoll = 0; run.camY = 4.6;
+  run.beatGlow = 0; run.timeScale = 1; run.slowMoTimer = 0; run.lastSpeedMark = 26; run.camRoll = 0; run.camY = 4.6;
   run.shieldReady = false; run.invuln = 0; run.orbCountAtShieldEvent = 0;
   run.maxCombo = 0;
   run.latVel = 0; run.stabilizerEngaged = false; run.dualHoldTime = 0; activePointers.clear();

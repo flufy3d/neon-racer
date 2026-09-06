@@ -60,7 +60,7 @@ currentLowCoreCol.lerp(targetLowCoreCol, dt * 2.0);
 
 export function updateTransientFx(dt, t) {
 const pdt = dt * run.timeScale;
-const move = (run.state === 'playing' && !run.paused) ? (run.speed * dt) : 0;
+const move = (run.state === 'playing' && !run.paused) ? (run.speed * pdt) : 0;
 updateBurstParticles(pdt, move);
 updateShockwaves(pdt, move);
 updateShards(pdt, move);
