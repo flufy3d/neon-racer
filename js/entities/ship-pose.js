@@ -53,9 +53,9 @@ export function poseShip(m, t) {
   const span = curve(MORPH.wingSpan, m), sweep = curve(MORPH.wingSweep, m), rise = curve(MORPH.wingRise, m);
   const fin = curve(MORPH.tipFin, m);
   const spdRatio = Math.max(0, Math.min(1, (run.speed - 26) / 46));
-  // 速度物理动力学：低速开局时喷焰收缩克制 (0.52x)，极速时全加力狂暴延伸至 1.62x
-  const speedFlameK = 0.52 + spdRatio * 1.10;
-  const flameLen = curve(MORPH.flameLen, m) * speedFlameK + Math.sin(t * 28) * (0.03 + spdRatio * 0.05);
+  // 速度物理动力学：短粗紧凑喷流，开局收敛 (0.55x)，极速克制延伸至 1.05x，杜绝细长面条感
+  const speedFlameK = 0.55 + spdRatio * 0.50;
+  const flameLen = curve(MORPH.flameLen, m) * speedFlameK + Math.sin(t * 28) * (0.02 + spdRatio * 0.03);
   const podK = seg(m, 3), bladeK = seg(m, 4);
 
   for (const w of p.wings) {
@@ -146,8 +146,8 @@ export function poseShip(m, t) {
       // 高频超音速湍流微颤 (38Hz)，速度越高颤动越剧烈
       const flutter = 1.0 + Math.sin(t * 38 + i * 2.1) * (0.02 + spdRatio * 0.035);
 
-      // 喷管外层焰羽：低速纤细收敛 (0.60x)，高速克制扩张 (0.85x)，确保双发独立不粘连
-      const nozzleExpand = (0.60 + spdRatio * 0.25) * (1.0 + steerBoost * 0.15);
+      // 喷管外层焰羽：短粗饱满基底 (0.82x ~ 1.08x)，粗实有力，同时保持双发清晰间隙
+      const nozzleExpand = (0.82 + spdRatio * 0.26) * (1.0 + steerBoost * 0.15);
       thruster.flame.material.color.setHex(PHYSICAL_PLUME_HEX);
       thruster.flame.scale.set(
         (1 + m * 0.05) * nozzleExpand,
@@ -155,26 +155,26 @@ export function poseShip(m, t) {
         (1 + m * 0.05) * nozzleExpand
       );
 
-      // 内层超高温白炽核心锥：修长锐利穿透
+      // 内层超高温白炽核心锥：短粗致密白炽火核
       thruster.flameCore.material.color.setHex(0xffffff);
       thruster.flameCore.scale.set(
-        (1 + m * 0.03) * (0.58 + spdRatio * 0.24) * (1.0 + steerBoost * 0.12),
-        curLen * (0.68 + spdRatio * 0.20) * flutter,
-        (1 + m * 0.03) * (0.58 + spdRatio * 0.24) * (1.0 + steerBoost * 0.12)
+        (1 + m * 0.03) * (0.78 + spdRatio * 0.24) * (1.0 + steerBoost * 0.12),
+        curLen * (0.62 + spdRatio * 0.15) * flutter,
+        (1 + m * 0.03) * (0.78 + spdRatio * 0.24) * (1.0 + steerBoost * 0.12)
       );
 
       // 推力矢量偏转角（TVC）：喷管朝机动反方向偏转以产生反冲力矩
       thruster.group.rotation.y = -steer * 0.22;
 
-      // 3 组超音速马赫激波环 (Shock Diamonds)：低速收敛在喷口，高速大幅沿轴线拉伸并剧烈高频脉动
+      // 3 组超音速马赫激波环 (Shock Diamonds)：短距离紧密汇聚在短粗焰锥中
       if (thruster.diamonds) {
         for (let k = 0; k < thruster.diamonds.length; k++) {
           const d = thruster.diamonds[k];
-          d.position.z = (0.18 + k * (0.22 + spdRatio * 0.16)) * Math.max(0.45, curLen);
+          d.position.z = (0.15 + k * (0.16 + spdRatio * 0.08)) * Math.max(0.40, curLen);
           const pulse = 1.0 + Math.sin(t * (28 + spdRatio * 18) + k * 1.8 + i * 3.1) * (0.12 + spdRatio * 0.16);
-          const diamondScale = (0.40 + spdRatio * 0.70) * (1.0 - k * 0.14) * pulse * (1.0 + steerBoost * 0.25);
+          const diamondScale = (0.50 + spdRatio * 0.40) * (1.0 - k * 0.14) * pulse * (1.0 + steerBoost * 0.25);
           d.scale.setScalar(diamondScale);
-          d.visible = curLen > 0.25;
+          d.visible = curLen > 0.22;
         }
       }
     }

@@ -623,7 +623,7 @@ export function initShipTrailEmitter() {
 
   // 采用专用全白宽能量核尾喷贴图 plumeJetTex，高光密集交融，彻底消除细小点状颗粒感
   const mat = new THREE.PointsMaterial({
-    size: 0.20,
+    size: 0.28,
     map: plumeJetTex,
     vertexColors: true,
     transparent: true,
@@ -660,8 +660,8 @@ function spawnTrailParticleWithColor(pos, vel, type, life, maxLife, spdRatio) {
   // 诞生瞬间根据精确子步进时间计算黑体辐射光谱，与前一帧存量粒子实现数学级无缝衔接
   const progress = Math.max(0, life / maxLife);
   const col = getPlumeColor(progress, type, spdRatio);
-  const alphaBase = 0.90 + spdRatio * 0.10;
-  const fadeZone = 0.22;
+  const alphaBase = 0.92 + spdRatio * 0.08;
+  const fadeZone = 0.28;
   const alpha = (progress > fadeZone ? 1.0 : (progress / fadeZone)) * alphaBase;
   trailColArr[idx * 3] = col.r * alpha;
   trailColArr[idx * 3 + 1] = col.g * alpha;
@@ -678,8 +678,8 @@ export function updateShipTrail(dt, t) {
   // 航速动力学归一化参数：26 (开局低速巡航) -> 72 (极速全加力暴烈状态)
   const spdRatio = Math.max(0, Math.min(1, (run.speed - 26) / 46));
 
-  // 粒子发光体量尺寸：开局 0.18 (锐利纤细) -> 极速 0.24 (收敛凌厉)，保证双发之间保留 0.35+ 单位的清晰黑夜间距，绝不粘合融合
-  trailPoints.material.size = 0.18 + spdRatio * 0.06;
+  // 粒子发光体量尺寸：开局 0.28 (短粗饱满) -> 极速 0.34 (雄浑火炬)，双发之间保持 0.30 单位清晰间距
+  trailPoints.material.size = 0.28 + spdRatio * 0.06;
 
   // 接入 run.timeScale 支持子弹时间慢动作流速
   const effDt = dt * (run.timeScale !== undefined ? run.timeScale : 1.0);
@@ -703,8 +703,8 @@ export function updateShipTrail(dt, t) {
     const v = trailVel[i];
     v.x *= Math.exp(-2.0 * effDt);
     v.y *= Math.exp(-2.0 * effDt);
-    // 保持轻盈向后冲刷惯性，排气顺滑向后流逝
-    v.z *= Math.exp(-1.2 * effDt);
+    // 阻尼适度加大，使尾流在短距离内快速降速并羽化消散，形成短粗有力轮廓
+    v.z *= Math.exp(-2.0 * effDt);
 
     trailPosArr[i * 3] += v.x * effDt;
     trailPosArr[i * 3 + 1] += v.y * effDt;
@@ -713,8 +713,8 @@ export function updateShipTrail(dt, t) {
     const progress = Math.max(0, trailLife[i] / trailMaxLife[i]);
     const col = getPlumeColor(progress, trailType[i], spdRatio);
     // 喷口爆发区全饱和，低速柔和羽化，高速烈焰贯穿
-    const alphaBase = 0.90 + spdRatio * 0.10;
-    const fadeZone = 0.22;
+    const alphaBase = 0.92 + spdRatio * 0.08;
+    const fadeZone = 0.28;
     const alpha = (progress > fadeZone ? 1.0 : (progress / fadeZone)) * alphaBase;
     trailColArr[i * 3] = col.r * alpha;
     trailColArr[i * 3 + 1] = col.g * alpha;
@@ -727,10 +727,10 @@ export function updateShipTrail(dt, t) {
     const steer = Math.max(-1, Math.min(1, run.latVel / (10 + run.speed * 0.16)));
     const p = view.ship.userData;
     const thrusters = (p && p.thrusters) || null;
-    const nozzleRadius = 0.052;
+    const nozzleRadius = 0.062;
 
-    // 单发单帧基础发射量精简 60%：开局 5 颗/发 -> 极速 8 颗/发，避免光晕堆叠过曝融合成坨
-    const baseCount = 5.0 + spdRatio * 3.2;
+    // 单发单帧基础发射量：开局 6 颗/发 -> 极速 9 颗/发，形成短粗致密火炬
+    const baseCount = 6.0 + spdRatio * 3.0;
 
     // 主引擎喷口（左右各一，本体局部坐标系）
     for (let k = 0; k < 2; k++) {
@@ -755,8 +755,8 @@ export function updateShipTrail(dt, t) {
       const nozzleCenY = baseY;
       const nozzleCenZ = baseZ + cosTvc * 0.14;
 
-      // 喷射初速：平稳高速排气（开局 18 m/s -> 极速 38 m/s，外侧爆发可达 45 m/s）
-      const speedBase = (18.0 + spdRatio * 20.0) * (1.0 + steerBoost * 0.20);
+      // 喷射初速收敛：短促高能排气（开局 16 m/s -> 极速 26 m/s，外侧爆发达 30 m/s）
+      const speedBase = (16.0 + spdRatio * 10.0) * (1.0 + steerBoost * 0.18);
       const frameTravel = speedBase * Math.min(effDt, 0.035);
 
       for (let s = 0; s < spawnCount; s++) {
@@ -765,14 +765,14 @@ export function updateShipTrail(dt, t) {
         let r, coneSpread, type;
 
         if (isCore) {
-          // 超音速白炽马赫内芯（超细聚焦轴心、微米级发散角、高亮白炽光针）
-          r = nozzleRadius * 0.25 * Math.sqrt(Math.random());
-          coneSpread = 0.003 + 0.005 * (r / nozzleRadius);
+          // 超音速白炽马赫内芯（轴向聚焦、短粗高亮白炽光核）
+          r = nozzleRadius * 0.30 * Math.sqrt(Math.random());
+          coneSpread = 0.005 + 0.008 * (r / nozzleRadius);
           type = 1;
         } else {
-          // 气动膨胀烈焰外羽（外环发散、真机金橙烈焰与深红余烬，收缩横向扩散）
-          r = nozzleRadius * (0.25 + 0.55 * Math.sqrt(Math.random()));
-          coneSpread = 0.007 + 0.010 * (r / nozzleRadius);
+          // 气动膨胀烈焰外羽（自然张开成短粗锥形火炬）
+          r = nozzleRadius * (0.30 + 0.60 * Math.sqrt(Math.random()));
+          coneSpread = 0.012 + 0.018 * (r / nozzleRadius);
           type = 0;
         }
 
@@ -799,7 +799,7 @@ export function updateShipTrail(dt, t) {
 
         // 喷射初速：内芯有额外 12% 动能超音速贯穿
         const coreBoost = isCore ? 1.12 : 1.0;
-        const jetSpeed = (speedBase * coreBoost) + (Math.random() - 0.5) * 2.0;
+        const jetSpeed = (speedBase * coreBoost) + (Math.random() - 0.5) * 1.5;
 
         _vDir.set(
           sinTvc * jetSpeed + cosTvc * (discX / nozzleRadius) * jetSpeed * coneSpread,
@@ -807,8 +807,8 @@ export function updateShipTrail(dt, t) {
           cosTvc * jetSpeed - sinTvc * (discX / nozzleRadius) * jetSpeed * coneSpread
         );
 
-        // 粒子寿命：开局 0.11s (延伸约 2.2m) -> 极速 0.18s (延伸约 6.5m，雄浑长柱)
-        const maxLife = (0.11 + spdRatio * 0.07) * (0.95 + Math.random() * 0.10);
+        // 粒子寿命大幅压缩：开局 0.062s (延伸约 1.0m) -> 极速 0.090s (延伸约 2.3m)，实现短粗精悍
+        const maxLife = (0.062 + spdRatio * 0.028) * (0.94 + Math.random() * 0.12);
         const curLife = Math.max(0.01, maxLife - frac * effDt);
         spawnTrailParticleWithColor(_vNozzleLocal, _vDir, type, curLife, maxLife, spdRatio);
         hasActive = true;
@@ -828,13 +828,13 @@ export function updateShipTrail(dt, t) {
     for (let k = 0; k < auxNozzles.length; k++) {
       const n = auxNozzles[k];
       const steerBoost = n.isLeft ? Math.max(0, steer * 0.25) : Math.max(0, -steer * 0.25);
-      const speedAux = (16.0 + spdRatio * 18.0) * (1.0 + steerBoost * 0.15);
+      const speedAux = (14.0 + spdRatio * 10.0) * (1.0 + steerBoost * 0.15);
       const frameTravelAux = speedAux * Math.min(effDt, 0.035);
 
       for (let s = 0; s < auxCount; s++) {
         const frac = (s + Math.random()) / auxCount;
         const angle = Math.random() * Math.PI * 2;
-        const r = 0.025 * Math.sqrt(Math.random());
+        const r = 0.030 * Math.sqrt(Math.random());
         _vNozzleLocal.set(
           n.pos[0] + Math.cos(angle) * r,
           n.pos[1] + Math.sin(angle) * r,
@@ -845,7 +845,7 @@ export function updateShipTrail(dt, t) {
           (Math.random() - 0.5) * 1.0,
           speedAux
         );
-        const maxLife = (0.09 + spdRatio * 0.06) * (0.92 + Math.random() * 0.16);
+        const maxLife = (0.055 + spdRatio * 0.025) * (0.92 + Math.random() * 0.16);
         const curLife = Math.max(0.01, maxLife - frac * effDt);
         spawnTrailParticleWithColor(_vNozzleLocal, _vDir, 0, curLife, maxLife, spdRatio);
         hasActive = true;
