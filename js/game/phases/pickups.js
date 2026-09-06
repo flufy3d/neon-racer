@@ -55,11 +55,9 @@ for (let i = lists.orbs.length - 1; i >= 0; i--) {
     run.fovKick += 1.5;
     bumpScore();
     playSound('pickup', run.combo);
-    burst(o.position, 0xffffff, 0.26, 0.32, 0.75, 10 + mult * 3);
-    burst(o.position, ui.comboColor(mult), 0.32 + mult * 0.04, 0.65, 0.75, 16 + mult * 7);
-    if (mult >= 3) spawnShockwave(o.position, ui.comboColor(mult), 0.35 + mult * 0.08);
+    burst(o.position, ui.comboColor(mult), 0.15 + mult * 0.012, 0.28, 0.45, 8 + Math.min(6, mult * 2));
     ui.floatLabel('+' + gainAmt + (mult > 1 ? ' ×' + mult : ''), o.position, ui.comboColor(mult), 17 + mult * 3);
-    ui.flash(ui.comboColor(mult), mult >= 3 ? 0.13 : 0.06);
+    ui.flash(ui.comboColor(mult), mult >= 3 ? 0.06 : 0.03);
     ui.els.comboText.textContent = '×' + mult + ' COMBO ' + run.combo;
     ui.els.comboBox.style.color = ui.comboColor(mult);
     ui.els.comboBox.style.opacity = 1;
@@ -82,16 +80,15 @@ for (let i = lists.orbs.length - 1; i >= 0; i--) {
       if (run.tier >= MAX_TIER) run.airJumps = 1;
       if (run.tier >= 2 && !run.shieldReady) { run.shieldReady = true; run.orbCountAtShieldEvent = run.orbCount; }
       run.timeScale = 0.35;
-      run.shakeTime = Math.max(run.shakeTime, 0.45);
-      ui.flash('#ffffff', 0.35, 550);
+      run.shakeTime = Math.max(run.shakeTime, 0.35);
+      ui.flash('#ffffff', 0.16, 320);
       ui.toast(TIER_NAMES[run.tier], '#' + TIER_COLORS[run.tier].toString(16).padStart(6, '0'));
       playSound('evolve');
-      spawnShockwave(view.ship.position, TIER_COLORS[run.tier], 1.6);
-      setTimeout(() => { if (run.state === 'playing') spawnShockwave(view.ship.position, 0xffffff, 1.0); }, 120);
-      for (let k = 0; k < 4; k++) {
+      spawnShockwave(view.ship.position, TIER_COLORS[run.tier], 1.1);
+      for (let k = 0; k < 2; k++) {
         setTimeout(() => {
-          burst(view.ship.position, k % 2 ? 0xffffff : TIER_COLORS[run.tier], 0.38, 0.95, 1.3, 60);
-        }, k * 110);
+          burst(view.ship.position, k === 0 ? 0xffffff : TIER_COLORS[run.tier], 0.22, 0.5, 0.9, 24);
+        }, k * 100);
       }
     }
     updateHUD();

@@ -130,6 +130,11 @@ export function poseShip(m, t) {
     f.material.color.copy(col);
     f.scale.set(1 + m * 0.05, flameLen, 1 + m * 0.05);
   }
+  if (p.flameCores) {
+    for (const fc of p.flameCores) {
+      fc.scale.set(1 + m * 0.03, flameLen * 0.85, 1 + m * 0.03);
+    }
+  }
 
   const aura = p.aura;
   aura.visible = plateK > 0.01;

@@ -43,14 +43,33 @@ export function makeNeonSparkTexture() {
   const c = document.createElement('canvas');
   c.width = c.height = 64;
   const g = c.getContext('2d');
-  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 30);
   grad.addColorStop(0.0, 'rgba(255,255,255,1.0)');
-  grad.addColorStop(0.18, 'rgba(255,255,255,0.92)');
-  grad.addColorStop(0.45, 'rgba(225,245,255,0.55)');
-  grad.addColorStop(0.72, 'rgba(160,220,255,0.18)');
+  grad.addColorStop(0.12, 'rgba(255,255,255,0.85)');
+  grad.addColorStop(0.28, 'rgba(210,240,255,0.35)');
+  grad.addColorStop(0.55, 'rgba(140,200,255,0.06)');
   grad.addColorStop(1.0, 'rgba(0,0,0,0)');
   g.fillStyle = grad;
   g.fillRect(0, 0, 64, 64);
+  const tex = new THREE.CanvasTexture(c);
+  tex.generateMipmaps = false;
+  tex.minFilter = THREE.LinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  return tex;
+}
+
+export function makeJetNeedleTexture() {
+  const c = document.createElement('canvas');
+  c.width = 32;
+  c.height = 64;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(16, 32, 0, 16, 32, 28);
+  grad.addColorStop(0.0, 'rgba(255,255,255,1.0)');
+  grad.addColorStop(0.18, 'rgba(220,250,255,0.75)');
+  grad.addColorStop(0.45, 'rgba(120,210,255,0.2)');
+  grad.addColorStop(1.0, 'rgba(0,0,0,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 32, 64);
   const tex = new THREE.CanvasTexture(c);
   tex.generateMipmaps = false;
   tex.minFilter = THREE.LinearFilter;
@@ -128,6 +147,7 @@ export function makeShockwaveRingTexture() {
 
 export const neonSparkTex = makeNeonSparkTexture();
 export const neonStarTex = makeNeonStarTexture();
+export const jetNeedleTex = makeJetNeedleTexture();
 export const shockwaveRingTex = makeShockwaveRingTexture();
 
 

@@ -8,7 +8,8 @@ export function buildShip() {
   const plateMat = new THREE.MeshStandardMaterial({ color: 0x1c1c3a, metalness: 0.85, roughness: 0.3, emissive: 0x000000 });
   view.shipGlowMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, fog: false });
   const trimMat = new THREE.MeshBasicMaterial({ color: 0xff00ff, fog: false });
-  const flameMat = () => new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.62, fog: false });
+  const flameMat = () => new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.78, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+  const flameCoreMat = () => new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.92, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
   const p = { bodyMat, plateMat };
   // ── 主体: 机腹 + 机首(可拉长) + 座舱 ──
   const fuselage = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.3, 1.5), bodyMat);
@@ -119,15 +120,21 @@ export function buildShip() {
 
   // ── 主引擎 ──
   p.flames = [];
+  p.flameCores = [];
   for (const x of [-0.3, 0.3]) {
     const engine = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 10), view.shipGlowMat);
     engine.position.set(x, 0, 1.02);
     view.ship.add(engine);
-    const flame = new THREE.Mesh(new THREE.ConeGeometry(0.12, 1.1, 8), flameMat());
+    const flame = new THREE.Mesh(new THREE.ConeGeometry(0.08, 1.25, 12), flameMat());
     flame.rotation.x = -Math.PI / 2;
     flame.position.set(x, 0, 1.62);
     view.ship.add(flame);
     p.flames.push(flame);
+    const flameCore = new THREE.Mesh(new THREE.ConeGeometry(0.038, 0.75, 8), flameCoreMat());
+    flameCore.rotation.x = -Math.PI / 2;
+    flameCore.position.set(x, 0, 1.40);
+    view.ship.add(flameCore);
+    p.flameCores.push(flameCore);
   }
 
   const shieldBubble = new THREE.Mesh(
