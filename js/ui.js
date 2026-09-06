@@ -188,20 +188,11 @@ export function resetRunSummary() {
 }
 
 export function milestoneBanner(zoneName, distText, color = '#00ffff') {
+  document.querySelectorAll('.milestone-banner').forEach(e => e.remove());
   const el = document.createElement('div');
   el.className = 'milestone-banner';
-  el.innerHTML = `<div style="font-size:12px;letter-spacing:4px;opacity:0.85;margin-bottom:4px;">${distText}</div><div style="font-size:22px;font-weight:900;letter-spacing:5px;text-shadow:0 0 16px ${color};">${zoneName}</div>`;
-  el.style.position = 'fixed';
-  el.style.top = '18%';
-  el.style.left = '50%';
-  el.style.transform = 'translate(-50%, -50%)';
-  el.style.textAlign = 'center';
-  el.style.color = color;
-  el.style.pointerEvents = 'none';
-  el.style.zIndex = '99';
-  el.style.fontFamily = 'monospace, sans-serif';
-  el.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
-  el.style.opacity = '1';
+  el.style.setProperty('--zone-col', color);
+  el.innerHTML = `<div class="milestone-dist">${distText}</div><div class="milestone-zone">${zoneName}</div>`;
   document.body.appendChild(el);
   setTimeout(() => {
     el.style.opacity = '0';
@@ -211,26 +202,18 @@ export function milestoneBanner(zoneName, distText, color = '#00ffff') {
 }
 
 export function evolutionBanner(tier, title, color = '#00ffff') {
+  document.querySelectorAll('.evolution-banner').forEach(e => e.remove());
   const el = document.createElement('div');
   el.className = 'evolution-banner';
+  el.style.setProperty('--tier-col', color);
   el.innerHTML = `
-    <div style="font-size:11px;font-weight:700;letter-spacing:6px;opacity:0.9;margin-bottom:6px;text-transform:uppercase;color:#ffffff;text-shadow:0 0 10px ${color};">
+    <div class="evolution-tag">
       ◆ QUANTUM UPGRADE // 形态升阶 ◆
     </div>
-    <div style="font-size:24px;font-weight:900;letter-spacing:4px;color:${color};text-shadow:0 0 20px ${color}, 0 0 45px ${color};">
+    <div class="evolution-title">
       ${title}
     </div>
   `;
-  el.style.position = 'fixed';
-  el.style.top = '22%';
-  el.style.left = '50%';
-  el.style.transform = 'translate(-50%, -50%) scale(0.85)';
-  el.style.textAlign = 'center';
-  el.style.pointerEvents = 'none';
-  el.style.zIndex = '99';
-  el.style.fontFamily = '"Orbitron", monospace, sans-serif';
-  el.style.transition = 'opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)';
-  el.style.opacity = '0';
   document.body.appendChild(el);
 
   requestAnimationFrame(() => {
@@ -247,3 +230,4 @@ export function evolutionBanner(tier, title, color = '#00ffff') {
     setTimeout(() => el.remove(), 500);
   }, 1600);
 }
+
