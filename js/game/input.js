@@ -80,9 +80,9 @@ addEventListener('pointerdown', e => {
     x: e.clientX,
     startX: e.clientX,
     baseY: e.clientY,
+    startTime: performance.now(),
     isJump: false,
-    jumpTriggered: false,
-    origShipX: view.ship ? view.ship.position.x : 0
+    jumpTriggered: false
   });
 });
 
@@ -92,11 +92,9 @@ addEventListener('pointermove', e => {
   p.x = e.clientX;
   const dy = p.baseY - e.clientY;
   const dx = Math.abs(e.clientX - p.startX);
-  if (dy > 12 && dy > dx * 0.8) {
-    if (!p.isJump && !hasOtherActiveSteering(e.pointerId) && p.origShipX !== undefined) {
-      view.ship.position.x = p.origShipX;
-      run.latVel = 0;
-    }
+  const now = performance.now();
+  const isInitialFlick = (now - p.startTime) < 100;
+  if (isInitialFlick && dy > 12 && dy > dx * 1.0) {
     p.isJump = true;
   }
   const need = run.grounded ? SWIPE_JUMP : SWIPE_AIRJUMP;
@@ -105,23 +103,16 @@ addEventListener('pointermove', e => {
   } else if (dx > dy * 1.2) {
     if (!p.jumpTriggered && dx >= 16) {
       p.isJump = false;
-      p.origShipX = view.ship ? view.ship.position.x : 0;
-    } else {
-      p.origShipX = undefined;
     }
     p.baseY = e.clientY;
     p.startX = e.clientX;
   } else if (dy >= need && dy > dx * 1.1 && (run.grounded || run.airJumps > 0)) {
-    if (!p.isJump && !hasOtherActiveSteering(e.pointerId) && p.origShipX !== undefined) {
-      view.ship.position.x = p.origShipX;
-    }
     p.isJump = true;
     p.jumpTriggered = true;
     if (!hasOtherActiveSteering(e.pointerId)) run.latVel = 0;
     jump();
     p.baseY = e.clientY;
     p.startX = e.clientX;
-    p.origShipX = undefined;
   }
 });
 
@@ -132,13 +123,9 @@ const releasePointer = e => {
     const dx = Math.abs(e.clientX - p.startX);
     const need = run.grounded ? SWIPE_JUMP : SWIPE_AIRJUMP;
     if (dy >= need && dy > dx * 1.1 && (run.grounded || run.airJumps > 0)) {
-      if (!p.isJump && !hasOtherActiveSteering(e.pointerId) && p.origShipX !== undefined) {
-        view.ship.position.x = p.origShipX;
-      }
       p.isJump = true;
       p.jumpTriggered = true;
       jump();
-      p.origShipX = undefined;
     }
     if (p.isJump && !hasOtherActiveSteering(e.pointerId)) run.latVel = 0;
     activePointers.delete(e.pointerId);
