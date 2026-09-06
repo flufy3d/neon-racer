@@ -5,7 +5,6 @@ import { burst, spawnShockwave } from '../../entities/particles.js';
 import { applyShipTier } from '../../entities/ship.js';
 import * as ui from '../../ui.js';
 import { addScore, bumpScore, calcTier, updateHUD } from '../hud.js';
-import { triggerSlowMo } from '../loop.js';
 
 export function updateComboAndOrbs(dt, t, move) {
 if (run.combo > 0) {
@@ -81,15 +80,25 @@ for (let i = lists.orbs.length - 1; i >= 0; i--) {
       run.morphRoll = Math.PI * 2;
       if (run.tier >= MAX_TIER) run.airJumps = 1;
       if (run.tier >= 2 && !run.shieldReady) { run.shieldReady = true; run.orbCountAtShieldEvent = run.orbCount; }
-      triggerSlowMo(0.35, 0.45);
-      run.shakeTime = Math.max(run.shakeTime, 0.4);
-      ui.flash('#ffffff', 0.16, 320);
-      ui.toast(TIER_NAMES[run.tier], '#' + TIER_COLORS[run.tier].toString(16).padStart(6, '0'));
+
+      // 彻底消除慢动作停顿阻滞，保持 100% 极速冲刺心流！
+      // 瞬时超曲速推背感广角爆发（Hyper-Warp Impulse）
+      run.fovKick += 8.5;
+      run.shakeTime = Math.max(run.shakeTime, 0.28);
+
+      const colHex = '#' + TIER_COLORS[run.tier].toString(16).padStart(6, '0');
+      ui.flash(colHex, 0.12, 280);
+      ui.evolutionBanner(run.tier, TIER_NAMES[run.tier], colHex);
       playSound('evolve');
-      spawnShockwave(view.ship.position, TIER_COLORS[run.tier], 1.4);
+
+      // 双重正交量子激波脉冲环（机身扫描 + 尾部推进）
+      spawnShockwave(view.ship.position, TIER_COLORS[run.tier], 1.8);
+      spawnShockwave({ x: view.ship.position.x, y: view.ship.position.y + 0.3, z: view.ship.position.z - 0.8 }, 0xffffff, 1.4);
+
+      // 双波超新星晶体星芒爆发
       for (let k = 0; k < 2; k++) {
         setTimeout(() => {
-          burst(view.ship.position, k === 0 ? 0xffffff : TIER_COLORS[run.tier], 0.28, 0.55, 1.1, 32);
+          burst(view.ship.position, k === 0 ? 0xffffff : TIER_COLORS[run.tier], 0.30, 0.6, 1.2, 36);
         }, k * 90);
       }
     }

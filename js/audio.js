@@ -190,10 +190,15 @@ export function playSound(event, value = 0) {
       break;
     case 'evolve':
       pendingFill = true;
-      rack.duck(t, 0.48, 0.7);
-      chime([0, 2, 4, 7], 0.085, track.lead, 0.11);
-      voice({ noise: true, filterType: 'bandpass', cutoff: 300, endCutoff: 4000, attack: 0.17, gain: 0.1, duration: 0.48 });
-      tone('taiko', 45, 0, 0.3, 0.12);
+      rack.duck(t, 0.55, 0.45);
+      // 上升大调科幻五度琶音号角（Ascending Sci-Fi Power Chord）
+      chime([0, 4, 7, 11, 14], 0.055, 'bell', 0.14);
+      // 激光能量共振扫频 (Resonant Laser Sweep)
+      voice({ frequency: 220, endFrequency: 2400, type: 'triangle', gain: 0.18, duration: 0.45 });
+      voice({ noise: true, filterType: 'bandpass', cutoff: 500, endCutoff: 5200, attack: 0.04, gain: 0.18, duration: 0.42 });
+      // 沉重能量推进次低音脉冲 (Sub-bass Punch)
+      tone('taiko', 52, 0, 0.35, 0.18);
+      voice({ frequency: 95, endFrequency: 35, gain: 0.35, duration: 0.4 });
       break;
     case 'zone':
       pendingFill = true;
