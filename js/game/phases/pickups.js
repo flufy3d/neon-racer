@@ -58,20 +58,23 @@ for (let i = lists.orbs.length - 1; i >= 0; i--) {
     playSound('pickup', run.combo);
     const cbCol = ui.comboColor(mult);
 
+    // 拾取特效锚点：以吃球点坐标为准，粒子与冲击波严格收束于当前车道
+    const fxPos = { x: o.position.x, y: o.position.y, z: o.position.z };
+
     // 能量球专属 3D 水晶破片碎裂系统（四面体/八面体/微晶片在空中剧烈翻滚炸裂，随战机冲刺向后流逝）
-    shatterOrb(o.position);
+    shatterOrb(fxPos);
 
-    // 三重物理本色火花爆发：
+    // 三重物理本色火花爆发（传入 spreadX = 0.26 严格收敛于车道宽度）：
     // 1. 白炽核心高能裂解（纯白 #ffffff）
-    burst(o.position, 0xffffff, 0.26, 0.35, 0.75, 12);
+    burst(fxPos, 0xffffff, 0.24, 0.32, 0.75, 12, 0.26);
     // 2. 内环电离等离子星芒（青蓝 0x00ffff）
-    burst(o.position, 0x00ffff, 0.22, 0.38, 0.85, 14);
+    burst(fxPos, 0x00ffff, 0.20, 0.35, 0.85, 14, 0.26);
     // 3. 外环聚变能场爆散（琥珀金 0xffd700）
-    burst(o.position, 0xffd700, 0.20, 0.42, 0.95, 10 + Math.min(8, mult * 2));
+    burst(fxPos, 0xffd700, 0.18, 0.38, 0.90, 10 + Math.min(8, mult * 2), 0.26);
 
-    // 连击 >= 2 扩散纯净青/金能量光环
-    if (mult >= 2) spawnShockwave(o.position, mult % 2 === 0 ? 0x00ffff : 0xffd700, 0.75);
-    ui.floatLabel('+' + gainAmt + (mult > 1 ? ' ×' + mult : ''), o.position, cbCol, 17 + mult * 3);
+    // 连击 >= 2 扩散单车道能量光环（maxRadius = 1.05m，展开直径 2.1m，严密内敛于 2.5m 单车道）
+    if (mult >= 2) spawnShockwave(fxPos, mult % 2 === 0 ? 0x00ffff : 0xffd700, 0.75, 1.05);
+    ui.floatLabel('+' + gainAmt + (mult > 1 ? ' ×' + mult : ''), fxPos, cbCol, 17 + mult * 3);
     ui.flash(cbCol, mult >= 3 ? 0.04 : 0.02, 180);
     ui.els.comboText.textContent = '×' + mult + ' COMBO ' + run.combo;
     ui.els.comboBox.style.color = ui.comboColor(mult);

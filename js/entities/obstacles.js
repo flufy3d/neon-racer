@@ -51,6 +51,7 @@ export function makeOrb(x, y, z) {
 
   g.add(core, innerRing, outerRing);
   g.userData = {
+    spawnX: x,
     baseY: y,
     phase: Math.random() * Math.PI * 2,
     core,

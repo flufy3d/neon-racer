@@ -64,7 +64,7 @@ function initParticlePool() {
   }
 }
 
-export function burst(pos, color, size = 0.20, maxLife = 0.45, power = 1, count = 30) {
+export function burst(pos, color, size = 0.20, maxLife = 0.45, power = 1, count = 30, spreadX = 1) {
   if (particlePool.length === 0) initParticlePool();
   let item = particlePool.find(p => !p.active);
   if (!item) {
@@ -95,7 +95,7 @@ export function burst(pos, color, size = 0.20, maxLife = 0.45, power = 1, count 
     const spd = (0.3 + Math.random() * 0.7) * 11 * power;
 
     item.vel[i].set(
-      Math.sin(phi) * Math.cos(theta) * spd,
+      Math.sin(phi) * Math.cos(theta) * spd * spreadX,
       Math.abs(Math.sin(phi) * Math.sin(theta)) * spd * 0.75 + 1.0 * power,
       Math.cos(phi) * spd
     );
@@ -199,12 +199,13 @@ export function initShockwavePool() {
       active: false,
       life: 0,
       maxLife: 1,
-      power: 1
+      power: 1,
+      maxRadius: 0
     });
   }
 }
 
-export function spawnShockwave(pos, color, power = 1) {
+export function spawnShockwave(pos, color, power = 1, maxRadius = 0) {
   if (shockwavePool.length === 0) initShockwavePool();
   let s = shockwavePool.find(item => !item.active);
   if (!s) {
@@ -219,10 +220,11 @@ export function spawnShockwave(pos, color, power = 1) {
   s.life = 0.45 * power;
   s.maxLife = s.life;
   s.power = power;
+  s.maxRadius = maxRadius;
   s.mat.color.set(color);
   s.mat.opacity = 0.85;
   s.m.position.set(pos.x, Math.max(0.06, pos.y), pos.z);
-  s.m.scale.setScalar(0.2 * power);
+  s.m.scale.setScalar(maxRadius > 0 ? 0.15 * maxRadius : 0.2 * power);
   s.m.visible = true;
 }
 
@@ -247,7 +249,9 @@ export function updateShockwaves(pdt, move = 0) {
 
     const progress = 1 - Math.max(0, s.life) / s.maxLife;
     const ease = 1 - Math.pow(1 - progress, 3);
-    const targetScale = (0.2 + ease * 6.5) * s.power;
+    const targetScale = s.maxRadius > 0
+      ? (0.15 + ease * 0.85) * s.maxRadius
+      : (0.2 + ease * 6.5) * s.power;
     s.m.scale.setScalar(targetScale);
     s.mat.opacity = 0.82 * Math.pow(1 - progress, 1.5);
   }
@@ -469,20 +473,20 @@ export function shatterOrb(pos) {
     s.maxLife = s.life;
     s.baseScale = 0.85 + Math.random() * 0.55;
 
-    // 随机散布在能量球体积内
-    const px = pos.x + (Math.random() - 0.5) * 0.35;
+    // 随机散布在能量球体积内（横向紧凑散布，确保破片初始坐标居于当前车道中轴）
+    const px = pos.x + (Math.random() - 0.5) * 0.20;
     const py = pos.y + (Math.random() - 0.5) * 0.35;
     const pz = pos.z + (Math.random() - 0.5) * 0.35;
     s.mesh.position.set(px, py, pz);
 
-    // 强烈的向外爆裂放射速度
+    // 强烈的向外爆裂放射速度（严格约束水平 X 轴分量乘 0.22，将爆发能量导向垂直 Y 轴与向后 Z 轴）
     const theta = Math.random() * Math.PI * 2;
     const phi = Math.acos((Math.random() * 2) - 1);
-    const spd = 5.0 + Math.random() * 6.5;
+    const spd = 4.5 + Math.random() * 5.5;
 
     s.vel.set(
-      Math.sin(phi) * Math.cos(theta) * spd,
-      Math.sin(phi) * Math.sin(theta) * spd * 0.8 + 1.2,
+      Math.sin(phi) * Math.cos(theta) * spd * 0.22,
+      Math.abs(Math.sin(phi) * Math.sin(theta)) * spd * 0.85 + 2.2,
       Math.cos(phi) * spd * 0.85
     );
 
@@ -511,7 +515,7 @@ export function updateOrbShards(pdt, move = 0) {
       continue;
     }
 
-    s.vel.x *= Math.exp(-2.2 * pdt);
+    s.vel.x *= Math.exp(-3.8 * pdt);
     s.vel.z *= Math.exp(-2.2 * pdt);
     s.vel.y -= 11.0 * pdt;
 
