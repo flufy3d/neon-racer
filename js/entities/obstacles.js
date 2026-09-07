@@ -86,6 +86,7 @@ export function spawnPooledOrb(scene, x, y, z) {
   }
   orb.position.set(x, y, z);
   orb.rotation.set(0, 0, 0);
+  orb.userData.spawnX = x;
   orb.userData.baseY = y;
   orb.userData.phase = Math.random() * Math.PI * 2;
   orb.userData.active = true;

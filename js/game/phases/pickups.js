@@ -46,6 +46,9 @@ for (let i = lists.orbs.length - 1; i >= 0; i--) {
   }
   if (prevZ <= 1.15 && o.position.z >= -1.15 && Math.abs(o.position.x - view.ship.position.x) < 1.15
     && Math.abs(o.position.y - view.ship.position.y) < 1.25) {
+    // 关键！在 releasePooledOrb(o) 释放对象池之前，必须优先完整捕获吃球三维物理坐标！
+    // 否则 releasePooledOrb 会立刻执行 orb.position.set(0, -999, 0)，导致后续所有粒子特效都被强制移至中间道（x=0）！
+    const fxPos = { x: o.position.x, y: o.position.y, z: o.position.z };
     releasePooledOrb(o); lists.orbs.splice(i, 1);
     run.orbCount++;
     run.combo++;
@@ -57,9 +60,6 @@ for (let i = lists.orbs.length - 1; i >= 0; i--) {
     bumpScore();
     playSound('pickup', run.combo);
     const cbCol = ui.comboColor(mult);
-
-    // 拾取特效锚点：以吃球点坐标为准，粒子与冲击波严格收束于当前车道
-    const fxPos = { x: o.position.x, y: o.position.y, z: o.position.z };
 
     // 能量球专属 3D 水晶破片碎裂系统（四面体/八面体/微晶片在空中剧烈翻滚炸裂，随战机冲刺向后流逝）
     shatterOrb(fxPos);
