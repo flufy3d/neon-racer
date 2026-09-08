@@ -104,7 +104,17 @@ export function poseShip(m, t) {
     pl.g.position.set(pl.sx * (0.22 + 0.1 * plateK), pl.sy * (0.13 + 0.16 * plateK), 0.45);
   }
 
-  const spineK = seg(m, 4);
+  const boostK = seg(m, 4);
+  for (const b of p.boosters) {
+    b.g.visible = boostK > 0.01;
+    b.g.scale.setScalar(0.3 + 0.7 * boostK);
+    b.g.position.set(b.side * (0.3 + 0.16 * boostK), 0.18 + 0.18 * boostK, 0.75);
+    b.g.rotation.z = -b.side * 0.18 * boostK;
+    b.flame.material.color.setHex(PHYSICAL_PLUME_HEX);
+    b.flame.scale.set(1, flameLen * 0.7, 1);
+  }
+
+  const spineK = seg(m, 5);
   p.spine.visible = spineK > 0.01;
   p.spine.scale.set(1, spineK, 0.5 + 0.5 * spineK);
   p.spine.position.y = 0.04 - 0.14 * (1 - spineK);
@@ -121,15 +131,6 @@ export function poseShip(m, t) {
     sh.m.position.set(Math.cos(a) * r, 0.3 + Math.sin(t * 2.4 + sh.i) * 0.22, 0.3 + Math.sin(a) * r * 0.7);
     sh.m.rotation.set(t * 2, t * 2.6, 0);
     sh.m.scale.setScalar(lanceK);
-  }
-
-  for (const b of p.boosters) {
-    b.g.visible = lanceK > 0.01;
-    b.g.scale.setScalar(0.3 + 0.7 * lanceK);
-    b.g.position.set(b.side * (0.3 + 0.16 * lanceK), 0.18 + 0.18 * lanceK, 0.75);
-    b.g.rotation.z = -b.side * 0.18 * lanceK;
-    b.flame.material.color.setHex(PHYSICAL_PLUME_HEX);
-    b.flame.scale.set(1, flameLen * 0.7, 1);
   }
 
   // ── 左右变轨动力推进物理学模拟（差动推力、矢量偏转、马赫环与 RCS 侧推） ──

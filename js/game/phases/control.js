@@ -1,5 +1,5 @@
 import { playSound } from '../../audio.js';
-import { CENTER_X, GRAVITY, MAX_TIER, STABILIZER_ACCEL, STABILIZER_GAIN, TRACK_HALF } from '../../core/constants.js';
+import { CENTER_X, DOUBLE_JUMP_TIER, GRAVITY, MAX_TIER, STABILIZER_ACCEL, STABILIZER_GAIN, TRACK_HALF } from '../../core/constants.js';
 import { run, view } from '../../core/state.js';
 import { burst, spawnShockwave } from '../../entities/particles.js';
 import { updateGroundGlow } from '../../scene/ground.js';
@@ -72,7 +72,7 @@ if (!run.grounded) {
   view.ship.position.y += run.vy * dt;
   if (view.ship.position.y <= 0.95) {
     view.ship.position.y = 0.95; run.grounded = true; run.vy = 0;
-    run.airJumps = run.tier >= MAX_TIER ? 1 : 0;
+    run.airJumps = run.tier >= DOUBLE_JUMP_TIER ? 1 : 0;
     landPos.set(view.ship.position.x, 0.08, 0.5);
     burst(landPos, 0x66ccff, 0.28, 0.35, 0.65, 24);
     spawnShockwave(landPos, 0x00ffff, 0.45);

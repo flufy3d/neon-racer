@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 export const COMBO_COLORS = ['#00ffff', '#38ffff', '#70ffff', '#ffd700', '#ffea38', '#fff6aa'];
 export const SHIELD_RECHARGE = 30;
-const TIERS_UI = ['初始形态', '引擎过载', '能量护盾', '磁力场', '超载核心', '量子跃迁'];
+const TIERS_UI = ['初始形态', '引擎过载', '能量护盾', '磁力场', '量子跃迁', '超载核心'];
 export const TIER_THRESHOLDS = [18, 45, 85, 140, 215];
 const MAX_TIER = TIER_THRESHOLDS.length;
 
@@ -151,7 +151,7 @@ export function updateHUD(s) {
     els.abEls.forEach((el, i) => {
       const active = s.tier >= i + 1;
       el.classList.toggle('locked', !active);
-      el.classList.toggle('ready', active && (i === 1 ? s.shieldReady : i === 4 ? s.airJumpReady : true));
+      el.classList.toggle('ready', active && (i === 1 ? s.shieldReady : i === 3 ? s.airJumpReady : true));
     });
   }
   const shieldText = s.tier < 2 ? '' : s.shieldReady ? '[就绪]' : `[充能 ${s.charge}/${SHIELD_RECHARGE}]`;
@@ -159,7 +159,7 @@ export function updateHUD(s) {
     lastShieldText = shieldText;
     els.shieldState.textContent = shieldText;
   }
-  const jumpText = s.tier < MAX_TIER ? '' : s.airJumpReady ? '[就绪]' : '[已用]';
+  const jumpText = s.tier < 4 ? '' : s.airJumpReady ? '[就绪]' : '[已用]';
   if (jumpText !== lastJumpText) {
     lastJumpText = jumpText;
     els.jumpState.textContent = jumpText;

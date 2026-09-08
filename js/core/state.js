@@ -28,7 +28,7 @@ export const run = {
   beatGlow: 0, beatCount: 0, timeScale: 1, slowMoTimer: 0, slowMoMaxDuration: 0,
   camSweepX: 0, camSweepY: 0, camSweepZ: 0, lastSpeedMark: 26, camRoll: 0, camY: 4.6,
   overTimerId: null, shieldReady: false, invuln: 0, orbCountAtShieldEvent: 0, tier: 0,
-  shipMorph: 0, morphRoll: 0, shipBank: 0, airFlip: 0, airJumps: 0, latVel: 0,
+  shipMorph: 0, morphRoll: 0, shipBank: 0, airFlip: 0, airJumps: 0, lastJumpTime: 0, latVel: 0,
   stabilizerEngaged: false, dualHoldTime: 0, lastGuidedLane: null, lastGuidedDist: -Infinity,
   validPrevLanes: new Set([0, 1, 2]), lastPatternDist: -Infinity, showPending: false
 };

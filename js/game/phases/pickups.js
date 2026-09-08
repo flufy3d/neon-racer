@@ -1,5 +1,5 @@
 import { playSound } from '../../audio.js';
-import { COMBO_WINDOW, MAX_TIER, TIER_COLORS, TIER_NAMES, TOASTS } from '../../core/constants.js';
+import { COMBO_WINDOW, DOUBLE_JUMP_TIER, MAX_TIER, TIER_COLORS, TIER_NAMES, TOASTS } from '../../core/constants.js';
 import { lists, run, view } from '../../core/state.js';
 import { releasePooledOrb } from '../../entities/obstacles.js';
 import { burst, shatterOrb, spawnShockwave } from '../../entities/particles.js';
@@ -96,7 +96,7 @@ for (let i = lists.orbs.length - 1; i >= 0; i--) {
       run.tier = nt;
       applyShipTier();
       run.morphRoll = Math.PI * 2;
-      if (run.tier >= MAX_TIER) run.airJumps = 1;
+      if (run.tier >= DOUBLE_JUMP_TIER) run.airJumps = 1;
       if (run.tier >= 2 && !run.shieldReady) { run.shieldReady = true; run.orbCountAtShieldEvent = run.orbCount; }
 
       // 彻底消除慢动作停顿阻滞，保持 100% 极速冲刺心流！

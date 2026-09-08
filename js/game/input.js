@@ -1,5 +1,5 @@
 import { pauseAudioRun, playSound, resumeAudioRun } from '../audio.js';
-import { JUMP_V, MAX_TIER, SWIPE_AIRJUMP, SWIPE_JUMP, TIER_COLORS } from '../core/constants.js';
+import { DOUBLE_JUMP_TIER, JUMP_V, MAX_TIER, SWIPE_AIRJUMP, SWIPE_JUMP, TIER_COLORS } from '../core/constants.js';
 import { $ } from '../core/dom.js';
 import { run, view } from '../core/state.js';
 import { burst, spawnShockwave } from '../entities/particles.js';
@@ -16,21 +16,25 @@ const airJumpPos = new THREE.Vector3();
 
 function jump() {
   if (run.state !== 'playing' || run.paused) return;
+  const now = performance.now();
   if (run.grounded) {
     run.vy = JUMP_V;
     run.grounded = false;
-    run.airJumps = run.tier >= MAX_TIER ? 1 : 0;
+    run.airJumps = run.tier >= DOUBLE_JUMP_TIER ? 1 : 0;
+    run.lastJumpTime = now;
     view.ship.scale.set(0.8, 1.35, 0.8);
     playSound('jump');
   } else if (run.airJumps > 0) {
-    // T5 量子跃迁: 空中二段跳
+    // 防误触保护：一段起跳后 120ms 内不触发二段跳，避免快速误触或手势粘连在贴地处浪费
+    if (now - (run.lastJumpTime || 0) < 120) return;
+    // T4 量子跃迁: 空中二段跳
     run.airJumps--;
     run.vy = JUMP_V * 0.88;
     run.airFlip = Math.PI * 2;
     airJumpPos.set(view.ship.position.x, view.ship.position.y - 0.35, view.ship.position.z);
-    spawnShockwave(airJumpPos, TIER_COLORS[MAX_TIER], 0.85);
+    spawnShockwave(airJumpPos, TIER_COLORS[DOUBLE_JUMP_TIER], 0.85);
     burst(airJumpPos, 0xffffff, 0.35, 0.45, 1.1, 32);
-    burst(airJumpPos, TIER_COLORS[MAX_TIER], 0.32, 0.65, 1.3, 44);
+    burst(airJumpPos, TIER_COLORS[DOUBLE_JUMP_TIER], 0.32, 0.65, 1.3, 44);
     ui.floatLabel('量子跃迁', view.ship.position, '#c08cff', 16);
     playSound('airJump');
     updateHUD();
@@ -82,9 +86,12 @@ addEventListener('pointerdown', e => {
     x: e.clientX,
     startX: e.clientX,
     baseY: e.clientY,
+    startY: e.clientY,
     startTime: performance.now(),
     isJump: false,
-    jumpTriggered: false
+    jumpTriggered: false,
+    hasJumpedThisTouch: false,
+    maxMoveDist: 0
   });
 });
 
@@ -94,6 +101,9 @@ addEventListener('pointermove', e => {
   p.x = e.clientX;
   const dy = p.baseY - e.clientY;
   const dx = Math.abs(e.clientX - p.startX);
+  const totalDist = Math.hypot(e.clientX - p.startX, e.clientY - p.startY);
+  if (totalDist > p.maxMoveDist) p.maxMoveDist = totalDist;
+
   const now = performance.now();
   const isInitialFlick = (now - p.startTime) < 100;
   if (isInitialFlick && dy > 12 && dy > dx * 1.0) {
@@ -108,9 +118,10 @@ addEventListener('pointermove', e => {
     }
     p.baseY = e.clientY;
     p.startX = e.clientX;
-  } else if (dy >= need && dy > dx * 1.1 && (run.grounded || run.airJumps > 0)) {
+  } else if (!p.hasJumpedThisTouch && dy >= need && dy > dx * 1.1 && (run.grounded || run.airJumps > 0)) {
     p.isJump = true;
     p.jumpTriggered = true;
+    p.hasJumpedThisTouch = true;
     if (!hasOtherActiveSteering(e.pointerId)) run.latVel = 0;
     jump();
     p.baseY = e.clientY;
@@ -121,13 +132,25 @@ addEventListener('pointermove', e => {
 const releasePointer = e => {
   const p = activePointers.get(e.pointerId);
   if (p) {
+    const now = performance.now();
     const dy = p.baseY - e.clientY;
     const dx = Math.abs(e.clientX - p.startX);
     const need = run.grounded ? SWIPE_JUMP : SWIPE_AIRJUMP;
-    if (dy >= need && dy > dx * 1.1 && (run.grounded || run.airJumps > 0)) {
+    const totalDist = Math.hypot(e.clientX - p.startX, e.clientY - p.startY);
+
+    if (!p.hasJumpedThisTouch && dy >= need && dy > dx * 1.1 && (run.grounded || run.airJumps > 0)) {
       p.isJump = true;
       p.jumpTriggered = true;
+      p.hasJumpedThisTouch = true;
       jump();
+    } else if (!p.hasJumpedThisTouch && !run.grounded && run.airJumps > 0) {
+      // 空中轻点（Tap）二段跳判定：滞空、有跳跃配额、触摸位移微小 (< 18px)、触屏时间极短 (< 240ms)
+      if (totalDist < 18 && (now - p.startTime) < 240) {
+        p.isJump = true;
+        p.jumpTriggered = true;
+        p.hasJumpedThisTouch = true;
+        jump();
+      }
     }
     if (p.isJump && !hasOtherActiveSteering(e.pointerId)) run.latVel = 0;
     activePointers.delete(e.pointerId);

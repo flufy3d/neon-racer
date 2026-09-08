@@ -59,7 +59,7 @@ function resetGame() {
   ui.els.comboBox.style.opacity = 0;
   ui.els.comboBar.style.transform = 'scaleX(1)';
   run.tier = 0;
-  run.airJumps = 0; run.airFlip = 0; run.morphRoll = 0; run.shipBank = 0; run.shipMorph = 0;
+  run.airJumps = 0; run.lastJumpTime = 0; run.airFlip = 0; run.morphRoll = 0; run.shipBank = 0; run.shipMorph = 0;
   applyShipTier();
   poseShip(0, 0);
   view.camera.fov = 70;

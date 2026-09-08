@@ -1,9 +1,9 @@
-import { MAX_TIER, TIER_COLORS } from '../core/constants.js';
+import { DOUBLE_JUMP_TIER, MAX_TIER, TIER_COLORS } from '../core/constants.js';
 import { run } from '../core/state.js';
 import * as ui from '../ui.js';
 
 export function addScore(base) {
-  const g = base * (run.tier >= 4 ? 2 : 1);
+  const g = base * (run.tier >= 5 ? 2 : 1);
   run.score += g;
   return g;
 }
@@ -35,7 +35,7 @@ export function updateHUD() {
   hudState.orbCount = run.orbCount;
   hudState.maxCombo = run.maxCombo;
   hudState.tier = run.tier;
-  hudState.airJumpReady = run.tier >= MAX_TIER && (run.grounded || run.airJumps > 0);
+  hudState.airJumpReady = run.tier >= DOUBLE_JUMP_TIER && (run.grounded || run.airJumps > 0);
   hudState.shieldReady = run.shieldReady;
   hudState.charge = run.orbCount - run.orbCountAtShieldEvent;
   hudState.tierColorHex = TIER_COLOR_HEXES[run.tier] || 'ffffff';

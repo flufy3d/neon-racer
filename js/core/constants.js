@@ -22,7 +22,9 @@ export const TOASTS = { 5: '手感来了!', 10: '连击狂潮!', 15: '火力全�
 
 export const TIER_COLORS = [0x00ffff, 0x66ff22, 0xffee00, 0xff8822, 0xff22cc, 0xb066ff];
 
-export const TIER_NAMES = ['', '引擎过载 · 鸭翼展开!', '能量护盾 · 装甲环绕!', '磁力场 · 磁叉伸展!', '超载核心 · 双倍得分!!', '量子跃迁 · 空中二段跳!!!'];
+export const TIER_NAMES = ['', '引擎过载 · 鸭翼展开!', '能量护盾 · 装甲环绕!', '磁力场 · 磁叉伸展!', '量子跃迁 · 空中二段跳!!', '超载核心 · 终极双倍得分!!!'];
+
+export const DOUBLE_JUMP_TIER = 4;
 
 export const MAX_TIER = TIER_COLORS.length - 1;
 

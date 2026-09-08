@@ -676,12 +676,13 @@ const AUX_NOZZLES_T3 = Object.freeze([
   { pos: [-0.72, -0.06, 0.85], isLeft: true },
   { pos: [0.72, -0.06, 0.85], isLeft: false }
 ]);
-const AUX_NOZZLES_T5 = Object.freeze([
+const AUX_NOZZLES_T4 = Object.freeze([
   { pos: [-0.72, -0.06, 0.85], isLeft: true },
   { pos: [0.72, -0.06, 0.85], isLeft: false },
   { pos: [-0.46, 0.36, 1.30], isLeft: true },
   { pos: [0.46, 0.36, 1.30], isLeft: false }
 ]);
+const AUX_NOZZLES_T5 = AUX_NOZZLES_T4;
 const EMPTY_AUX_NOZZLES = Object.freeze([]);
 
 export function updateShipTrail(dt, t) {
@@ -832,8 +833,8 @@ export function updateShipTrail(dt, t) {
       }
     }
 
-    // 辅助升级引擎（T3 翼下引擎 & T5 背部推进器，均为飞船本体局部坐标）
-    const auxNozzles = run.tier >= 5 ? AUX_NOZZLES_T5 : (run.tier >= 3 ? AUX_NOZZLES_T3 : EMPTY_AUX_NOZZLES);
+    // 辅助升级引擎（T3 翼下引擎 & T4 背部推进器，均为飞船本体局部坐标）
+    const auxNozzles = run.tier >= 4 ? AUX_NOZZLES_T4 : (run.tier >= 3 ? AUX_NOZZLES_T3 : EMPTY_AUX_NOZZLES);
 
     const auxCount = Math.max(1, Math.round(1.0 + spdRatio * 1.5));
     for (let k = 0; k < auxNozzles.length; k++) {
