@@ -1,6 +1,6 @@
-import { GATE_CHANCE, GATE_INTRO_DIST, GATE_LOW_CLEAR, LANES } from '../core/constants.js';
+import { ARMOR_CHANCE, ARMOR_INTRO_DIST, ARMOR_MIN_GAP, GATE_CHANCE, GATE_INTRO_DIST, GATE_LOW_CLEAR, LANES } from '../core/constants.js';
 import { lists, run, view } from '../core/state.js';
-import { spawnPooledObstacle, spawnPooledOrb } from './obstacles.js';
+import { spawnPooledArmor, spawnPooledObstacle, spawnPooledOrb } from './obstacles.js';
 import { playSound } from '../audio.js';
 import * as ui from '../ui.js';
 
@@ -151,6 +151,12 @@ export function spawnPattern(overshoot = 0, gap = 15) {
       const o = spawnPooledOrb(view.scene, LANES[freeLane], 1.2, -140 - i * 2 + overshoot);
       lists.orbs.push(o);
     }
+  }
+  // 护甲核心：满足最小间隔后按概率投放在自由车道（必然可达），置于能量球串尾端之外
+  if (run.dist >= ARMOR_INTRO_DIST && run.dist - run.lastArmorDist > ARMOR_MIN_GAP && Math.random() < ARMOR_CHANCE) {
+    const a = spawnPooledArmor(view.scene, LANES[freeLane], 1.2, -152 + overshoot);
+    lists.armorOrbs.push(a);
+    run.lastArmorDist = run.dist;
   }
 }
 

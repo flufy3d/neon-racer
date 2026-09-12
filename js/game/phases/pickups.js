@@ -1,7 +1,7 @@
 import { playSound } from '../../audio.js';
-import { COMBO_WINDOW, DOUBLE_JUMP_TIER, MAX_TIER, TIER_COLORS, TIER_NAMES, TOASTS } from '../../core/constants.js';
+import { ARMOR_FULL_SCORE, ARMOR_PICKUP_SCORE, COMBO_WINDOW, DOUBLE_JUMP_TIER, MAX_TIER, TIER_COLORS, TIER_NAMES, TOASTS } from '../../core/constants.js';
 import { lists, run, view } from '../../core/state.js';
-import { releasePooledOrb } from '../../entities/obstacles.js';
+import { releasePooledArmor, releasePooledOrb } from '../../entities/obstacles.js';
 import { burst, shatterOrb, spawnShockwave } from '../../entities/particles.js';
 import { applyShipTier } from '../../entities/ship.js';
 import * as ui from '../../ui.js';
@@ -120,6 +120,46 @@ for (let i = lists.orbs.length - 1; i >= 0; i--) {
         }, k * 90);
       }
     }
+  }
+}
+
+for (let i = lists.armorOrbs.length - 1; i >= 0; i--) {
+  const o = lists.armorOrbs[i];
+  const prevZ = o.position.z;
+  o.position.z += move;
+  o.position.y = o.userData.baseY + Math.sin(t * 4 + o.userData.phase) * 0.15;
+  o.rotation.y += dt * 2.2;
+  if (o.userData.ring) {
+    o.userData.ring.rotation.x = t * 1.8 + o.userData.phase;
+    o.userData.ring.rotation.y = Math.sin(t * 2.4 + o.userData.phase) * 0.5;
+  }
+  if (o.position.z > 10) { releasePooledArmor(o); lists.armorOrbs.splice(i, 1); continue; }
+  // T3 磁力场同样吸附护甲核心
+  if (run.tier >= 3 && o.position.z < 4 && o.position.z > -16) {
+    const md = Math.hypot(o.position.x - view.ship.position.x, o.userData.baseY - view.ship.position.y);
+    if (md < 4.5) {
+      const pull = Math.min(1, dt * 7);
+      o.position.x += (view.ship.position.x - o.position.x) * pull;
+      o.userData.baseY += (view.ship.position.y - o.userData.baseY) * pull;
+    }
+  }
+  if (prevZ <= 1.15 && o.position.z >= -1.15 && Math.abs(o.position.x - view.ship.position.x) < 1.15
+    && Math.abs(o.position.y - view.ship.position.y) < 1.25) {
+    const fxPos = { x: o.position.x, y: o.position.y, z: o.position.z };
+    releasePooledArmor(o); lists.armorOrbs.splice(i, 1);
+    const had = run.armorReady;
+    run.armorReady = true;
+    applyShipTier();
+    const gainAmt = addScore(had ? ARMOR_FULL_SCORE : ARMOR_PICKUP_SCORE);
+    run.fovKick += 2;
+    bumpScore();
+    playSound('armorPickup');
+    burst(fxPos, 0x66ff88, 0.26, 0.4, 0.9, 22, 0.26);
+    burst(fxPos, 0xffffff, 0.2, 0.3, 0.7, 12, 0.26);
+    spawnShockwave(fxPos, 0x66ff88, 0.9);
+    ui.floatLabel((had ? '护甲已满 +' : '护甲装备 +') + gainAmt, fxPos, '#66ff88', 18);
+    if (!had) ui.toast('应急护甲已装备 · 抵挡一次撞击', '#66ff88');
+    ui.flash('#66ff88', 0.05, 200);
   }
 }
 

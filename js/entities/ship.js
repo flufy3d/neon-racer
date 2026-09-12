@@ -1,4 +1,5 @@
 import { run, view } from '../core/state.js';
+import { shipArmorGeo, shipArmorMat } from '../scene/materials.js';
 import { poseShip } from './ship-pose.js';
 import * as THREE from 'three';
 
@@ -189,6 +190,17 @@ export function buildShip() {
   view.ship.add(shieldBubble);
   p.shieldBubble = shieldBubble;
 
+  // 应急护甲（护甲核心获得）：八面体线框装甲笼环绕机体，与 T2 青色护盾罩区分
+  const armorRingPivot = new THREE.Group();
+  const armorRing = new THREE.Mesh(shipArmorGeo, shipArmorMat);
+  armorRing.rotation.z = Math.PI / 4;
+  armorRingPivot.add(armorRing);
+  armorRingPivot.rotation.x = 0.0;
+  armorRingPivot.visible = false;
+  view.ship.add(armorRingPivot);
+  p.armorRingPivot = armorRingPivot;
+  p.armorRing = armorRing;
+
   const aura = new THREE.Mesh(
     new THREE.TorusGeometry(0.95, 0.04, 8, 48),
     new THREE.MeshBasicMaterial({ color: 0x00ffff, fog: false })
@@ -260,5 +272,6 @@ for (const side of [-1, 1]) {
 
 export function applyShipTier() {
   view.ship.userData.shieldBubble.visible = run.tier >= 2 && run.shieldReady;
+  view.ship.userData.armorRingPivot.visible = run.armorReady;
 }
 

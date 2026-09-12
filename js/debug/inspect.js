@@ -1,8 +1,9 @@
 import { MILESTONE_ZONES, TIER_COLORS } from '../core/constants.js';
 import { getAudioSnapshot, getBeatGrid } from '../audio.js';
 import { lists, run, view } from '../core/state.js';
-import { makeGate, makeLow, makeOrb, makeOverheadArch, makeRoadsideRelay, makeWall, makeWarpBeacon } from '../entities/obstacles.js';
+import { makeArmorCore, makeGate, makeLow, makeOrb, makeOverheadArch, makeRoadsideRelay, makeWall, makeWarpBeacon } from '../entities/obstacles.js';
 import { stepFrame } from '../game/loop.js';
+import { applyShipTier } from '../entities/ship.js';
 import { updateGroundGlow } from '../scene/ground.js';
 import { gateCoreMat, gateEdgeMat, lowCoreMat, lowEdgeMat, wallCoreMat, wallEdgeMat } from '../scene/materials.js';
 
@@ -24,9 +25,11 @@ window.__neon = {
   updateGroundGlow,
   stepFrame,
   beatGrid: getBeatGrid,
+  applyShipTier,
   makeWall,
   makeLow,
   makeGate,
+  makeArmorCore,
   makeOrb,
   makeOverheadArch,
   makeRoadsideRelay,

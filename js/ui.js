@@ -15,6 +15,7 @@ const els = {
   tierBar: $('tierBar'), tierNext: $('tierNext'), maxComboEl: $('maxCombo'),
   shieldState: $('shieldState'), jumpState: $('jumpState'),
   abEls: [$('ab1'), $('ab2'), $('ab3'), $('ab4'), $('ab5')],
+  armorRow: $('abArmor'), armorState: $('armorState'),
   rushTag: $('rushTag'), rushText: $('rushText')
 };
 export { els };
@@ -75,6 +76,7 @@ let lastShieldReadyAb = null;
 let lastAirJumpReadyAb = null;
 let lastShieldText = null;
 let lastJumpText = null;
+let lastArmorReady = null;
 let lastRushOn = false;
 let lastRushText = '';
 
@@ -94,6 +96,7 @@ export function resetHUDCache() {
   lastAirJumpReadyAb = null;
   lastShieldText = null;
   lastJumpText = null;
+  lastArmorReady = null;
   lastRushOn = false;
   lastRushText = '';
   els.rushTag.classList.remove('on');
@@ -169,6 +172,11 @@ export function updateHUD(s) {
   if (jumpText !== lastJumpText) {
     lastJumpText = jumpText;
     els.jumpState.textContent = jumpText;
+  }
+  if (s.armorReady !== lastArmorReady) {
+    lastArmorReady = s.armorReady;
+    els.armorRow.classList.toggle('locked', !s.armorReady);
+    els.armorState.textContent = s.armorReady ? '[就绪]' : '';
   }
   const rushOn = s.rushTimer > 0;
   if (rushOn !== lastRushOn) {

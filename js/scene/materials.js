@@ -126,3 +126,17 @@ export const gateCoreMat = new THREE.MeshBasicMaterial({ color: 0xbb44ff, transp
 
 export const gateCableMat = new THREE.MeshBasicMaterial({ color: 0x1a0a2e });
 
+// 护甲核心共享单例（绿色八面体晶体 + 陀螺环，与青金能量球明确区分）
+export const armorCoreGeo = new THREE.OctahedronGeometry(0.3);
+
+export const armorCoreMat = new THREE.MeshBasicMaterial({ color: 0x66ff88, fog: false });
+
+export const armorRingGeo = new THREE.TorusGeometry(0.58, 0.035, 8, 24);
+
+export const armorRingMat = new THREE.MeshBasicMaterial({ color: 0x44ff66, fog: false });
+
+// 机体应急护甲笼（八面体线框罩，绕机体旋转，比细环更有装甲存在感）
+export const shipArmorGeo = new THREE.OctahedronGeometry(1.08);
+
+export const shipArmorMat = new THREE.MeshBasicMaterial({ color: 0x66ff88, wireframe: true, transparent: true, opacity: 0.55, fog: false });
+

@@ -26,7 +26,8 @@ const hudState = {
   shieldReady: false,
   charge: 0,
   tierColorHex: '',
-  rushTimer: 0
+  rushTimer: 0,
+  armorReady: false
 };
 
 export function updateHUD() {
@@ -41,6 +42,7 @@ export function updateHUD() {
   hudState.charge = run.orbCount - run.orbCountAtShieldEvent;
   hudState.tierColorHex = TIER_COLOR_HEXES[run.tier] || 'ffffff';
   hudState.rushTimer = run.rushTimer;
+  hudState.armorReady = run.armorReady;
   ui.updateHUD(hudState);
 }
 

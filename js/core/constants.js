@@ -52,6 +52,13 @@ export const GATE_INTRO_DIST = 260;     // 闸门登场里程（先让玩家熟�
 export const GATE_CHANCE = 0.35;        // 非低障障碍中闸门的替换概率
 export const GATE_LOW_CLEAR = 8;        // 同车道 low→gate 安全余量（米）；实际窗口 = 0.7×车速 + 此值，覆盖跳跃滞空距离
 
+// 护甲核心：绿色特殊拾取物，吃到直接装备一层应急护甲（任意形态可用，抵挡一次撞击）
+export const ARMOR_PICKUP_SCORE = 80;   // 装备护甲的得分
+export const ARMOR_FULL_SCORE = 150;    // 护甲已在身时的替代得分
+export const ARMOR_INTRO_DIST = 150;    // 护甲核心登场里程
+export const ARMOR_MIN_GAP = 500;       // 两次护甲核心的最小间隔里程
+export const ARMOR_CHANCE = 0.2;        // 满足间隔后每个 pattern 的投放概率
+
 // Rush Wave：周期性冲刺浪潮
 export const RUSH_FIRST_AT = 35;        // 首次触发（存活秒数）
 export const RUSH_PERIOD = 45;          // 上一轮结束后到下一轮的间隔

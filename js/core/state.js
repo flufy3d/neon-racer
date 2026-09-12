@@ -17,7 +17,7 @@ export const view = {
 };
 
 export const lists = {
-  obstacles: [], orbs: [], pillars: [], roadside: [], arches: [],
+  obstacles: [], orbs: [], armorOrbs: [], pillars: [], roadside: [], arches: [],
   warpBeacons: [], sideFibres: [], particles: [], streaks: [], shockwaves: []
 };
 
@@ -30,6 +30,7 @@ export const run = {
   beatGlow: 0, beatCount: 0, timeScale: 1, slowMoTimer: 0, slowMoMaxDuration: 0,
   camSweepX: 0, camSweepY: 0, camSweepZ: 0, lastSpeedMark: 26, camRoll: 0, camY: 4.6,
   overTimerId: null, shieldReady: false, invuln: 0, orbCountAtShieldEvent: 0, tier: 0,
+  armorReady: false, lastArmorDist: -Infinity,
   shipMorph: 0, morphRoll: 0, shipBank: 0, airFlip: 0, airJumps: 0, lastJumpTime: 0, latVel: 0,
   stabilizerEngaged: false, dualHoldTime: 0, lastGuidedLane: null, lastGuidedDist: -Infinity,
   validPrevLanes: new Set([0, 1, 2]), lastPatternDist: -Infinity, showPending: false,

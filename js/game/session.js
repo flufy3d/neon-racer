@@ -8,7 +8,7 @@ import { applyShipTier } from '../entities/ship.js';
 import { lowCoreMat, lowEdgeMat, wallCoreMat, wallEdgeMat } from '../scene/materials.js';
 import { BG_BASE, currentLowCoreCol, currentLowEdgeCol, currentWallCoreCol, currentWallEdgeCol } from '../scene/palette.js';
 import * as ui from '../ui.js';
-import { resetObstaclePool, resetOrbPool } from '../entities/obstacles.js';
+import { resetArmorPool, resetObstaclePool, resetOrbPool } from '../entities/obstacles.js';
 import { resetPillars, resetStreaks } from './phases/world.js';
 import { resetFeedbackCache } from './phases/feedback.js';
 import { updateHUD } from './hud.js';
@@ -17,11 +17,12 @@ import { activePointers, keys } from './input.js';
 function resetGame() {
   resetOrbPool();
   resetObstaclePool();
+  resetArmorPool();
   resetStreaks();
   resetPillars();
   for (const o of [...lists.roadside, ...lists.arches, ...lists.warpBeacons]) view.scene.remove(o);
   resetParticlePools();
-  lists.obstacles = []; lists.orbs = []; lists.pillars = []; lists.roadside = []; lists.arches = []; lists.warpBeacons = []; lists.particles = []; lists.streaks = [];
+  lists.obstacles = []; lists.orbs = []; lists.armorOrbs = []; lists.pillars = []; lists.roadside = []; lists.arches = []; lists.warpBeacons = []; lists.particles = []; lists.streaks = [];
   if (view.singularityHalo) {
     view.singularityHalo.material.opacity = 0;
     view.singularityHalo.visible = false;
@@ -49,6 +50,7 @@ function resetGame() {
   run.camSweepX = 0; run.camSweepY = 0; run.camSweepZ = 0;
   run.lastSpeedMark = 26; run.camRoll = 0; run.camY = 4.6;
   run.shieldReady = false; run.invuln = 0; run.orbCountAtShieldEvent = 0;
+  run.armorReady = false; run.lastArmorDist = -Infinity;
   run.maxCombo = 0;
   run.latVel = 0; run.stabilizerEngaged = false; run.dualHoldTime = 0; activePointers.clear();
   run.lastGuidedLane = null; run.lastGuidedDist = -Infinity;

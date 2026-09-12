@@ -250,6 +250,20 @@ export function playSound(event, value = 0) {
       voice({ noise: true, filterType: 'bandpass', cutoff: 900, endCutoff: 2600, gain: 0.11, duration: 0.18 });
       tone('bell', scaleNote(track, 7), 0.02, 0.14, 0.05);
       break;
+    case 'armorPickup':
+      // 护甲核心：沉稳的装备上膛感（低琶音 + 金属敲击）
+      chime([0, 4, 7], 0.06, 'bell', 0.09);
+      voice({ frequency: 330, endFrequency: 660, gain: 0.07, duration: 0.25 });
+      voice({ noise: true, filterType: 'bandpass', cutoff: 3600, gain: 0.06, duration: 0.06 });
+      break;
+    case 'armorBreak':
+      // 护甲碎裂：金属崩解 + 低频冲击
+      rack.duck(t, 0.3, 0.4);
+      voice({ noise: true, filterType: 'bandpass', cutoff: 2800, endCutoff: 400, gain: 0.2, duration: 0.3 });
+      voice({ frequency: 520, endFrequency: 110, type: 'triangle', gain: 0.18, duration: 0.28 });
+      tone('bell', scaleNote(track, 2), 0.03, 0.15, 0.06, -0.4);
+      tone('bell', scaleNote(track, 4), 0.1, 0.18, 0.05, 0.4);
+      break;
     case 'crash':
       voice({ frequency: 155, endFrequency: 30, gain: 0.5, duration: 0.65 });
       voice({ noise: true, cutoff: 4000, endCutoff: 180, gain: 0.36, duration: 0.75 });

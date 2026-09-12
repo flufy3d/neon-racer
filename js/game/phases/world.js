@@ -1,7 +1,7 @@
 import { playSound } from '../../audio.js';
 import { GATE_CRASH_Y, GATE_PASS_SCORE } from '../../core/constants.js';
 import { lists, run, view } from '../../core/state.js';
-import { burst, shatterObstacle, shieldBreakFx } from '../../entities/particles.js';
+import { burst, shatterObstacle, shieldBreakFx, spawnShockwave } from '../../entities/particles.js';
 import { releasePooledObstacle } from '../../entities/obstacles.js';
 import { applyShipTier } from '../../entities/ship.js';
 import { pillarGeo, pillarMat, streakGeo, streakMat } from '../../scene/materials.js';
@@ -236,7 +236,23 @@ for (let i = lists.obstacles.length - 1; i >= 0; i--) {
     }
     if (crashing) {
       if (run.invuln <= 0) {
-        if (run.shieldReady && run.tier >= 2) {
+        if (run.armorReady) {
+          // 应急护甲（护甲核心获得）：任意形态可用，优先于 T2 护盾消耗
+          run.armorReady = false;
+          applyShipTier();
+          run.invuln = 1.3;
+          playSound('armorBreak');
+          shatterObstacle(o);
+          burst(view.ship.position, 0x66ff88, 0.3, 0.5, 1.1, 30);
+          spawnShockwave(view.ship.position, 0x66ff88, 1.6);
+          triggerSlowMo(0.2, 0.45);
+          run.fovKick += 5;
+          ui.floatLabel('护甲抵挡!', o.position, '#66ff88', 20);
+          run.shakeTime = Math.max(run.shakeTime, 0.4);
+          releasePooledObstacle(o);
+          lists.obstacles.splice(i, 1);
+          continue;
+        } else if (run.shieldReady && run.tier >= 2) {
           run.shieldReady = false;
           run.orbCountAtShieldEvent = run.orbCount;
           run.invuln = 1.3;

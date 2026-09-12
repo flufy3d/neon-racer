@@ -1,5 +1,5 @@
 import { LANES } from '../core/constants.js';
-import { archBeamGeo, archFrameMat, archNeonGeo, archNeonMat, archPillarGeo, beaconBaseGeo, beaconBeamMat, beaconCoreGeo, beaconPillarGeo, beaconRingMat, gateBodyMat, gateBottomGeo, gateBoxGeo, gateCableGeo, gateCableMat, gateCoreMat, gateEdgeMat, gateEdgesGeo, gateScanGeo, lowBodyMat, lowBoxGeo, lowCoreMat, lowEdgeMat, lowEdgesGeo, lowGuideGeo, lowScanGeo, orbCoreGeo, orbCoreMat, orbInnerRingGeo, orbOuterRingGeo, orbRingMat1, orbRingMat2, pillarGeo, pillarMat, relayBaseGeo, relayCoreGeo, relayPillarGeo, relayRingGeo, towerBeaconGeo, towerBodyMat, towerCapGeo, towerCapMat, towerGeo1, towerSpireMat, wallBodyMat, wallBoxGeo, wallCoreMat, wallEdgeMat, wallEdgesGeo, wallPylonGeo, wallScanGeo } from '../scene/materials.js';
+import { archBeamGeo, archFrameMat, archNeonGeo, archNeonMat, archPillarGeo, armorCoreGeo, armorCoreMat, armorRingGeo, armorRingMat, beaconBaseGeo, beaconBeamMat, beaconCoreGeo, beaconPillarGeo, beaconRingMat, gateBodyMat, gateBottomGeo, gateBoxGeo, gateCableGeo, gateCableMat, gateCoreMat, gateEdgeMat, gateEdgesGeo, gateScanGeo, lowBodyMat, lowBoxGeo, lowCoreMat, lowEdgeMat, lowEdgesGeo, lowGuideGeo, lowScanGeo, orbCoreGeo, orbCoreMat, orbInnerRingGeo, orbOuterRingGeo, orbRingMat1, orbRingMat2, pillarGeo, pillarMat, relayBaseGeo, relayCoreGeo, relayPillarGeo, relayRingGeo, towerBeaconGeo, towerBodyMat, towerCapGeo, towerCapMat, towerGeo1, towerSpireMat, wallBodyMat, wallBoxGeo, wallCoreMat, wallEdgeMat, wallEdgesGeo, wallPylonGeo, wallScanGeo } from '../scene/materials.js';
 import { orbHaloMat } from '../scene/textures.js';
 import * as THREE from 'three';
 
@@ -132,6 +132,68 @@ export function resetOrbPool() {
     orb.visible = false;
     orb.userData.active = false;
     orb.position.set(0, -999, 0);
+  }
+}
+
+// 护甲核心：绿色八面体晶体，吃到直接装备应急护甲（实体结构区别于能量球，独立小池）
+export function makeArmorCore(x, y, z) {
+  const g = new THREE.Group();
+  const core = new THREE.Mesh(armorCoreGeo, armorCoreMat);
+  const halo = new THREE.Sprite(orbHaloMat);
+  halo.scale.set(2.1, 2.1, 1);
+  core.add(halo);
+  const ring = new THREE.Mesh(armorRingGeo, armorRingMat);
+  ring.rotation.x = Math.PI / 2;
+  g.add(core, ring);
+  g.userData = { spawnX: x, baseY: y, phase: Math.random() * Math.PI * 2, core, ring };
+  g.position.set(x, y, z);
+  return g;
+}
+
+export const ARMOR_POOL_CAPACITY = 4;
+export const armorPool = [];
+
+export function initArmorPool(scene) {
+  if (armorPool.length > 0) return;
+  for (let i = 0; i < ARMOR_POOL_CAPACITY; i++) {
+    const o = makeArmorCore(0, -999, 0);
+    o.visible = false;
+    o.userData.active = false;
+    armorPool.push(o);
+    if (scene) scene.add(o);
+  }
+}
+
+export function spawnPooledArmor(scene, x, y, z) {
+  if (armorPool.length === 0 && scene) initArmorPool(scene);
+  let o = armorPool.find(c => !c.userData.active);
+  if (!o) {
+    o = makeArmorCore(0, -999, 0);
+    armorPool.push(o);
+    if (scene) scene.add(o);
+  }
+  o.position.set(x, y, z);
+  o.rotation.set(0, 0, 0);
+  o.userData.spawnX = x;
+  o.userData.baseY = y;
+  o.userData.phase = Math.random() * Math.PI * 2;
+  o.userData.active = true;
+  o.visible = true;
+  if (o.userData.ring) o.userData.ring.rotation.set(Math.PI / 2, 0, 0);
+  return o;
+}
+
+export function releasePooledArmor(o) {
+  o.visible = false;
+  o.userData.active = false;
+  o.position.set(0, -999, 0);
+}
+
+export function resetArmorPool() {
+  for (const o of armorPool) {
+    o.visible = false;
+    o.userData.active = false;
+    o.position.set(0, -999, 0);
   }
 }
 

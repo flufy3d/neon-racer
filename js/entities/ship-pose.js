@@ -224,6 +224,14 @@ export function poseShip(m, t) {
     sb.material.opacity = run.invuln > 0 ? 0.35 : 0.16;
   }
 
+  const ar = p.armorRingPivot;
+  if (ar && ar.visible) {
+    ar.rotation.y = t * 2.4;
+    const armorPulse = 1 + Math.sin(t * 6) * 0.08;
+    ar.scale.setScalar(armorPulse);
+    p.armorRing.material.opacity = 0.65 + Math.sin(t * 6) * 0.2;
+  }
+
   if (view.grid) {
     view.grid.material.color.copy(col).multiplyScalar(0.5);
     view.railMat.color.copy(col).multiplyScalar(0.9);
