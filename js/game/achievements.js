@@ -39,8 +39,8 @@ export const ACHIEVEMENTS = [
   { id: 'score10k',   icon: '❊', name: '单局破万',   desc: '单局总分突破 10000',         rarity: 'rare',   scope: 'run',   metric: 'totalScore', target: 10000 },
   { id: 'marathon',   icon: '◷', name: '马拉松',     desc: '单局存活 3 分钟',            rarity: 'rare',   scope: 'run',   metric: 'elapsed',   target: 180 },
   { id: 'runs10',     icon: '⟡', name: '常客',       desc: '累计完成 10 局',             rarity: 'common', scope: 'total', metric: 'runs',      target: 10 },
-  { id: 'totalDist',  icon: '✪', name: '里程传奇',   desc: '累计行驶里程 50 KM',         rarity: 'epic',   scope: 'total', metric: 'totalDist', target: 50000 },
-  { id: 'totalOrbs',  icon: '◆', name: '吃球狂人',   desc: '累计收集 1000 颗能量球',     rarity: 'rare',   scope: 'total', metric: 'totalOrbs', target: 1000 },
+  { id: 'totalDist',  icon: '✪', name: '里程传奇',   desc: '累计行驶里程 50 KM',         rarity: 'epic',   scope: 'total', metric: 'dist', target: 50000 },
+  { id: 'totalOrbs',  icon: '◆', name: '吃球狂人',   desc: '累计收集 1000 颗能量球',     rarity: 'rare',   scope: 'total', metric: 'orbs', target: 1000 },
   { id: 'record1',    icon: '★', name: '破纪录者',   desc: '刷新一次最高分纪录',         rarity: 'epic',   scope: 'total', event: 'record',     target: 1 }
 ];
 const defById = Object.fromEntries(ACHIEVEMENTS.map(d => [d.id, d]));
