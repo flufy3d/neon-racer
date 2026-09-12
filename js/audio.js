@@ -158,7 +158,7 @@ export function getAudioSnapshot() {
 
 export function playSound(event, value = 0) {
   if (!rack || status === 'paused' || status === 'idle') return;
-  if (status === 'over' && event !== 'crash' && event !== 'summary') return;
+  if (status === 'over' && event !== 'crash' && event !== 'summary' && event !== 'achievement') return;
   const t = audioCtx.currentTime + 0.005;
   const cooldown = event === 'pickup' ? 0.035 : event === 'nearMiss' ? 0.09 : 0.05;
   if (t - (eventTimes.get(event) ?? -Infinity) < cooldown) return;
@@ -293,5 +293,15 @@ export function playSound(event, value = 0) {
       voice({ time: t + 0.12, noise: true, filterType: 'bandpass', cutoff: 2800, endCutoff: 600, gain: 0.14, duration: 0.15, pan: 0.3 });
       break;
     case 'summary': tone('bell', scaleNote(track, clamp(Math.floor(value), 0, 9)), 0, 0.1, 0.055); break;
+    case 'achievement': {
+      // 成就解锁：比 evolve 更清亮的宽八度上行琶音 + 星尘高频扫频 + 低音收底
+      rack.duck(t, 0.5, 0.5);
+      chime([0, 4, 7, 12, 16], 0.06, 'bell', 0.12);
+      voice({ frequency: 880, endFrequency: 3400, type: 'sine', gain: 0.08, duration: 0.42 });
+      voice({ noise: true, filterType: 'bandpass', cutoff: 1400, endCutoff: 6600, attack: 0.03, gain: 0.11, duration: 0.5 });
+      if (value >= 1) chime([19, 24], 0.08, 'bell', 0.07);
+      tone('taiko', 52, 0.26, 0.35, 0.15);
+      break;
+    }
   }
 }

@@ -41,5 +41,7 @@ export const run = {
   // 悬挂闸门：同车道低障最近出现里程（跳跃滞空窗口保护）与首次登场提示
   lowLaneDist: [-Infinity, -Infinity, -Infinity], gateIntroduced: false,
   // 滑铲：slideTimer 剩余时长，slideK 姿态平滑系数（0~1）
-  slideTimer: 0, slideK: 0
+  slideTimer: 0, slideK: 0,
+  // 成就系统单局计数器（achievements.js 的 resetRunCounters 填充）
+  ach: null
 };

@@ -5,6 +5,7 @@ import { run, view } from '../core/state.js';
 import { burst, spawnShockwave } from '../entities/particles.js';
 import * as ui from '../ui.js';
 import { updateHUD } from './hud.js';
+import { isArchiveOpen } from './achievements.js';
 import { startGame, updateFsBtn } from './session.js';
 import * as THREE from 'three';
 
@@ -68,8 +69,8 @@ addEventListener('keydown', e => {
   } else if (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') {
     e.preventDefault();
     if (run.state === 'playing') jump();
-    else startGame();
-  } else if (e.code === 'Enter' && run.state !== 'playing') startGame();
+    else if (!isArchiveOpen()) startGame();
+  } else if (e.code === 'Enter' && run.state !== 'playing' && !isArchiveOpen()) startGame();
 });
 
 addEventListener('keyup', e => {

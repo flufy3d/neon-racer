@@ -4,6 +4,7 @@ import { lists, run, view } from '../../core/state.js';
 import { makeOverheadArch, makeRoadsideRelay, makeRoadsideStructure, makeWarpBeacon } from '../../entities/obstacles.js';
 import { spawnPillarInstance } from './world.js';
 import { spawnPattern } from '../../entities/spawner.js';
+import { achEvent } from '../achievements.js';
 import * as ui from '../../ui.js';
 
 // Rush Wave 冲刺浪潮：速度涌增 + 生成加密 + 得分加成的周期性高潮段
@@ -15,6 +16,8 @@ function updateRush(dt) {
       run.rushNextAt = run.elapsed + RUSH_PERIOD;
       ui.toast('浪潮退去 · 速度回落', '#66ccff');
       playSound('rushEnd');
+      // 活着撑到浪潮自然退去 = 完整存活一轮
+      achEvent('rushSurvived');
     }
   } else if (run.elapsed >= run.rushNextAt && run.slowMoTimer <= 0) {
     run.rushTimer = RUSH_DURATION;

@@ -6,6 +6,7 @@ import { burst, shatterOrb, spawnShockwave } from '../../entities/particles.js';
 import { applyShipTier } from '../../entities/ship.js';
 import * as ui from '../../ui.js';
 import { addScore, bumpScore, calcTier, updateHUD } from '../hud.js';
+import { achEvent } from '../achievements.js';
 
 export function updateComboAndOrbs(dt, t, move) {
 if (run.combo > 0) {
@@ -54,6 +55,7 @@ for (let i = lists.orbs.length - 1; i >= 0; i--) {
     run.combo++;
     if (run.combo > run.maxCombo) run.maxCombo = run.combo;
     run.comboTimer = COMBO_WINDOW;
+    achEvent('orb');
     const mult = ui.multOf(run.combo);
     const gainAmt = addScore(25 * mult);
     run.fovKick += 1.5;
@@ -108,6 +110,7 @@ for (let i = lists.orbs.length - 1; i >= 0; i--) {
       ui.flash(colHex, 0.12, 280);
       ui.evolutionBanner(run.tier, TIER_NAMES[run.tier], colHex);
       playSound('evolve');
+      achEvent('tier');
 
       // 双重正交量子激波脉冲环（机身扫描 + 尾部推进）
       spawnShockwave(view.ship.position, TIER_COLORS[run.tier], 1.8);
@@ -153,6 +156,7 @@ for (let i = lists.armorOrbs.length - 1; i >= 0; i--) {
     const had = run.armorReady;
     run.armorReady = true;
     applyShipTier();
+    achEvent('armorEquip');
     const gainAmt = addScore(had ? ARMOR_FULL_SCORE : ARMOR_PICKUP_SCORE);
     run.fovKick += 2;
     bumpScore();

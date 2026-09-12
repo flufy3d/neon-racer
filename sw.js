@@ -1,4 +1,4 @@
-const CACHE = 'neon-racer-v38';
+const CACHE = 'neon-racer-v39';
 const ASSETS = [
   './',
   './index.html',
@@ -21,6 +21,7 @@ const ASSETS = [
   './js/entities/ship.js',
   './js/entities/spawner.js',
   './js/game.js',
+  './js/game/achievements.js',
   './js/game/hud.js',
   './js/game/input.js',
   './js/game/loop.js',

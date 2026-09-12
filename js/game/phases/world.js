@@ -7,6 +7,7 @@ import { applyShipTier } from '../../entities/ship.js';
 import { pillarGeo, pillarMat, streakGeo, streakMat } from '../../scene/materials.js';
 import * as ui from '../../ui.js';
 import { addScore, bumpScore } from '../hud.js';
+import { achEvent } from '../achievements.js';
 import { triggerSlowMo } from '../loop.js';
 import { gameOver } from '../session.js';
 import * as THREE from 'three';
@@ -243,6 +244,7 @@ for (let i = lists.obstacles.length - 1; i >= 0; i--) {
           applyShipTier();
           run.invuln = 1.3;
           playSound('armorBreak');
+          achEvent('armorBlock');
           shatterObstacle(o);
           burst(view.ship.position, 0x66ff88, 0.3, 0.5, 1.1, 30);
           spawnShockwave(view.ship.position, 0x66ff88, 1.6);
@@ -294,6 +296,7 @@ for (let i = lists.obstacles.length - 1; i >= 0; i--) {
         // 滑铲穿过悬挂闸门：+70 奖励 + 绿色粒子与冲击波（非滑铲状态已在上面的撞毁分支拦截）
         const g = addScore(GATE_PASS_SCORE * GATE_SLIDE_MULT);
         ui.floatLabel('滑铲穿越 +' + g, o.position, '#66ffcc', 20);
+        achEvent('gateSlide');
         run.fovKick += 3;
         playSound('gatePass');
         burst(o.position, 0x66ffcc, 0.24, 0.45, 0.9, 18, 0.4);
@@ -302,6 +305,7 @@ for (let i = lists.obstacles.length - 1; i >= 0; i--) {
       } else if (o.userData.type === 'low' && dx < 1.85 && !run.grounded) {
         const g = addScore(40);
         ui.floatLabel('完美跳跃 +' + g, o.position, '#ffffff', 19);
+        achEvent('perfectJump');
         run.fovKick += 2.5;
         playSound('perfectJump');
         burst(o.position, 0xffffff, 0.32, 0.45, 0.9, 28);
@@ -310,6 +314,7 @@ for (let i = lists.obstacles.length - 1; i >= 0; i--) {
       } else if (dx >= 1.85 && dx < 3.6) {
         const g = addScore(30);
         ui.floatLabel('擦身而过 +' + g, o.position, '#aaffff', 16);
+        achEvent('nearMiss');
         run.fovKick += 1.5;
         playSound('nearMiss', o.position.x - view.ship.position.x);
       }

@@ -102,6 +102,7 @@
     <div class="startTip"><span>!</span> 下甩滑铲穿过悬挂闸门 · 绿色晶体送护甲 · 浪潮期得分×2</div>
 
     <button id="startBtn"><span>启 动 引 擎</span><small>INITIALIZE RUN</small></button>
+    <button id="achBtn"><span>成 就 档 案</span><small>ACHIEVEMENT ARCHIVE</small></button>
   </section>
 </div>
 
@@ -155,6 +156,26 @@
     </div>
 
     <button id="restartBtn"><span>再 来 一 局</span><small>REBOOT RUN</small></button>
+    <button id="achBtn2" class="achLink"><span></span>成 就 档 案 // ARCHIVE</button>
+  </section>
+</div>
+
+<div class="overlay hidden" id="achieveScreen" role="dialog" aria-labelledby="achTitle" aria-modal="true">
+  <div class="startScanlines" aria-hidden="true"></div>
+  <section class="achievePanel">
+    <div class="startTopline">
+      <span><i></i> ACHIEVEMENT ARCHIVE</span>
+      <span id="achCount">0 / 0 UNLOCKED</span>
+    </div>
+
+    <div class="achieveHead">
+      <p>PILOT RECORD // 飞行员履历</p>
+      <h2 id="achTitle">成 就 档 案</h2>
+    </div>
+
+    <div id="achGrid" class="achGrid" aria-label="成就列表"></div>
+
+    <button id="achClose"><span>返 回</span><small>CLOSE ARCHIVE</small></button>
   </section>
 </div>
 

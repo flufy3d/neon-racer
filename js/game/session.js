@@ -13,6 +13,7 @@ import { resetPillars, resetStreaks } from './phases/world.js';
 import { resetFeedbackCache } from './phases/feedback.js';
 import { updateHUD } from './hud.js';
 import { activePointers, keys } from './input.js';
+import { onGameEnd, resetRunCounters } from './achievements.js';
 
 function resetGame() {
   resetOrbPool();
@@ -59,6 +60,7 @@ function resetGame() {
   run.rushTimer = 0; run.rushBoost = 0; run.rushNextAt = RUSH_FIRST_AT;
   run.rhythmTarget = null; run.rhythmK = 0; run.lastSpawnBeat = null;
   run.lowLaneDist = [-Infinity, -Infinity, -Infinity]; run.gateIntroduced = false;
+  resetRunCounters();
   lists.shockwaves = [];
   resetFeedbackCache();
   ui.els.vig.style.opacity = 0;
@@ -122,6 +124,7 @@ export function gameOver() {
     run.best = sc;
     localStorage.setItem('neonRacerBest', run.best);
   }
+  onGameEnd(isRecord);
   ui.els.bestEl.textContent = run.best;
   ui.prepareRunSummary({
     score: sc, distanceMeters: run.dist, orbCount: run.orbCount, maxCombo: run.maxCombo,

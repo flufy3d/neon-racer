@@ -1,4 +1,5 @@
 import { run, view } from '../core/state.js';
+import { achTick } from './achievements.js';
 import { updateAmbient, updateMenu } from './phases/ambient.js';
 import { updateShipControl } from './phases/control.js';
 import { updateRunFeedbackAndCamera, updateTransientFx } from './phases/feedback.js';
@@ -56,6 +57,7 @@ function advanceFrame(dt, t) {
     updateScenery(simDt, t, move);
     updateObstacles(simDt, t, move);
     updateComboAndOrbs(simDt, t, move);
+    achTick(simDt);
     updateRunFeedbackAndCamera(dt, t, move);
   }
   updateTransientFx(dt, t);

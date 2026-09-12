@@ -3,6 +3,10 @@ import { getAudioSnapshot, getBeatGrid } from '../audio.js';
 import { lists, run, view } from '../core/state.js';
 import { makeArmorCore, makeGate, makeLow, makeOrb, makeOverheadArch, makeRoadsideRelay, makeWall, makeWarpBeacon } from '../entities/obstacles.js';
 import { stepFrame } from '../game/loop.js';
+import {
+  ACHIEVEMENTS, achEvent, achTick, onGameEnd, resetRunCounters,
+  openArchive, closeArchive, isArchiveOpen, isUnlocked, unlockedCount, getTotals
+} from '../game/achievements.js';
 import { applyShipTier } from '../entities/ship.js';
 import { updateGroundGlow } from '../scene/ground.js';
 import { gateCoreMat, gateEdgeMat, lowCoreMat, lowEdgeMat, wallCoreMat, wallEdgeMat } from '../scene/materials.js';
@@ -47,6 +51,22 @@ window.__neon = {
   get gateEdgeMat() { return gateEdgeMat; },
   get gateCoreMat() { return gateCoreMat; },
   MILESTONE_ZONES,
-  TIER_COLORS
+  TIER_COLORS,
+  // 成就系统测试口：achEvent/achTick/onGameEnd 可直接驱动判定链路
+  achEvent,
+  achTick,
+  achGameEnd: onGameEnd,
+  achReset: resetRunCounters,
+  achOpen: openArchive,
+  achClose: closeArchive,
+  get achOpenState() { return isArchiveOpen(); },
+  achDefs: ACHIEVEMENTS,
+  get achState() {
+    return {
+      totals: getTotals(),
+      count: unlockedCount(),
+      unlocked: ACHIEVEMENTS.filter(d => isUnlocked(d.id)).map(d => d.id)
+    };
+  }
 };
 

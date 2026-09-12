@@ -352,3 +352,35 @@ export function evolutionBanner(tier, title, color = '#00ffff') {
   }, 1600);
 }
 
+// 成就解锁横幅：与 evolution/milestone 同范式的动态自毁横幅，def = { icon, name, desc }
+export function achievementBanner(def, color = '#ffd700') {
+  document.querySelectorAll('.achieve-banner').forEach(e => e.remove());
+  const el = document.createElement('div');
+  el.className = 'achieve-banner';
+  el.style.setProperty('--ach-col', color);
+  el.innerHTML = `
+    <div class="achieve-tag">
+      ◆ 成就解锁 // ACHIEVEMENT ◆
+    </div>
+    <div class="achieve-title">
+      <span class="achieve-icon" aria-hidden="true">${def.icon}</span>${def.name}
+    </div>
+    <div class="achieve-desc">${def.desc}</div>
+  `;
+  document.body.appendChild(el);
+
+  requestAnimationFrame(() => {
+    el.style.opacity = '1';
+    el.style.transform = 'translate(-50%, -50%) scale(1.06)';
+    setTimeout(() => {
+      if (el.parentNode) el.style.transform = 'translate(-50%, -50%) scale(1.0)';
+    }, 180);
+  });
+
+  setTimeout(() => {
+    el.style.opacity = '0';
+    el.style.transform = 'translate(-50%, -85%) scale(0.95)';
+    setTimeout(() => el.remove(), 500);
+  }, 1800);
+}
+
