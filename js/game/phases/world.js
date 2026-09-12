@@ -1,4 +1,5 @@
 import { playSound } from '../../audio.js';
+import { GATE_CRASH_Y, GATE_PASS_SCORE } from '../../core/constants.js';
 import { lists, run, view } from '../../core/state.js';
 import { burst, shatterObstacle, shieldBreakFx } from '../../entities/particles.js';
 import { releasePooledObstacle } from '../../entities/obstacles.js';
@@ -153,7 +154,8 @@ if (!streakInstancedMesh && view.scene) {
 }
 
 run.streakTimer -= dt;
-if (run.speed > 40 && run.streakTimer <= 0) {
+// 38 而非 40：Rush Wave 加速期（+13 m/s）在低速段也能拉出速度线
+if (run.speed > 38 && run.streakTimer <= 0) {
   run.streakTimer = 0.05 + Math.random() * 0.07;
   for (let i = 0; i < STREAK_MAX; i++) {
     if (!streakActive[i]) {
@@ -208,6 +210,10 @@ for (let i = lists.obstacles.length - 1; i >= 0; i--) {
         o.userData.leftPylon.scale.x = pulse;
         o.userData.rightPylon.scale.x = pulse;
       }
+    } else if (o.userData.type === 'gate') {
+      o.userData.scan.position.y = 3.2 + Math.sin(t * 6 + o.userData.phase) * 1.15;
+      // 缆索悬挂的视觉微摆；碰撞高度固定，不随摆动变化
+      if (o.userData.bottom) o.userData.bottom.position.y = 1.78 + Math.sin(t * 2.1 + o.userData.phase) * 0.05;
     } else if (o.userData.type === 'low') {
       o.userData.scan.scale.x = 0.88 + Math.sin(t * 8 + o.userData.phase) * 0.12;
       if (o.userData.guide) {
@@ -219,9 +225,15 @@ for (let i = lists.obstacles.length - 1; i >= 0; i--) {
   if (!o.userData.passed && prevZ <= 1.0 && o.position.z >= -1.0) {
     o.userData.passed = true;
     const dx = Math.abs(o.position.x - view.ship.position.x);
-    const hitTop = o.userData.type === 'wall' ? 3.2 : 0.76;
-    const bottom = view.ship.position.y - 0.35;
-    const crashing = dx < 1.85 && bottom < hitTop;
+    // wall 挡满全高必须换道；low 需跳过；gate 恰好相反——滞空即撞，贴地才可过
+    let crashing;
+    if (o.userData.type === 'gate') {
+      crashing = dx < 1.85 && view.ship.position.y > GATE_CRASH_Y;
+    } else {
+      const hitTop = o.userData.type === 'wall' ? 3.2 : 0.76;
+      const bottom = view.ship.position.y - 0.35;
+      crashing = dx < 1.85 && bottom < hitTop;
+    }
     if (crashing) {
       if (run.invuln <= 0) {
         if (run.shieldReady && run.tier >= 2) {
@@ -257,7 +269,14 @@ for (let i = lists.obstacles.length - 1; i >= 0; i--) {
       }
     }
     if (!crashing) {
-      if (o.userData.type === 'low' && dx < 1.85 && !run.grounded) {
+      if (o.userData.type === 'gate' && dx < 1.85) {
+        // 贴地穿过悬挂闸门：主动贴地的风险走位奖励
+        const g = addScore(GATE_PASS_SCORE);
+        ui.floatLabel('贴地穿行 +' + g, o.position, '#cc88ff', 17);
+        run.fovKick += 1.8;
+        playSound('gatePass');
+        bumpScore();
+      } else if (o.userData.type === 'low' && dx < 1.85 && !run.grounded) {
         const g = addScore(40);
         ui.floatLabel('完美跳跃 +' + g, o.position, '#ffffff', 19);
         run.fovKick += 2.5;

@@ -1,5 +1,5 @@
 import { endAudioRun, playSound, startAudioRun } from '../audio.js';
-import { MILESTONE_ZONES, TIER_COLORS } from '../core/constants.js';
+import { MILESTONE_ZONES, RUSH_FIRST_AT, TIER_COLORS } from '../core/constants.js';
 import { $ } from '../core/dom.js';
 import { lists, run, view } from '../core/state.js';
 import { explode, resetParticlePools } from '../entities/particles.js';
@@ -53,6 +53,9 @@ function resetGame() {
   run.latVel = 0; run.stabilizerEngaged = false; run.dualHoldTime = 0; activePointers.clear();
   run.lastGuidedLane = null; run.lastGuidedDist = -Infinity;
   run.validPrevLanes = new Set([0, 1, 2]); run.lastPatternDist = -Infinity;
+  run.rushTimer = 0; run.rushBoost = 0; run.rushNextAt = RUSH_FIRST_AT;
+  run.rhythmTarget = null; run.rhythmK = 0; run.lastSpawnBeat = null;
+  run.lowLaneDist = [-Infinity, -Infinity, -Infinity]; run.gateIntroduced = false;
   lists.shockwaves = [];
   resetFeedbackCache();
   ui.els.vig.style.opacity = 0;

@@ -45,3 +45,18 @@ export const PARTICLE_POOL_SIZE = 24;
 
 export const MAX_PARTICLES_PER_BURST = 240;
 
+// 悬挂闸门：顶部垂帘式能量闸，贴地滑行可通过，滞空即撞
+export const GATE_CRASH_Y = 1.2;        // 舰体 y 超过此值撞闸（贴地悬浮 y≈0.95~1.02，含余量）
+export const GATE_PASS_SCORE = 35;      // 贴地穿过闸门的奖励分
+export const GATE_INTRO_DIST = 260;     // 闸门登场里程（先让玩家熟悉基础节奏）
+export const GATE_CHANCE = 0.35;        // 非低障障碍中闸门的替换概率
+export const GATE_LOW_CLEAR = 8;        // 同车道 low→gate 安全余量（米）；实际窗口 = 0.7×车速 + 此值，覆盖跳跃滞空距离
+
+// Rush Wave：周期性冲刺浪潮
+export const RUSH_FIRST_AT = 35;        // 首次触发（存活秒数）
+export const RUSH_PERIOD = 45;          // 上一轮结束后到下一轮的间隔
+export const RUSH_DURATION = 11;        // 每轮持续秒数
+export const RUSH_BOOST = 13;           // 速度加成 m/s（平滑逼近）
+export const RUSH_GAP_MULT = 0.72;      // 浪潮期生成间距倍率
+export const RUSH_SCORE_MULT = 2;       // 浪潮期得分倍率
+

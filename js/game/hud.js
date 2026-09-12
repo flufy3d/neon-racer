@@ -1,9 +1,9 @@
-import { DOUBLE_JUMP_TIER, MAX_TIER, TIER_COLORS } from '../core/constants.js';
+import { DOUBLE_JUMP_TIER, MAX_TIER, RUSH_SCORE_MULT, TIER_COLORS } from '../core/constants.js';
 import { run } from '../core/state.js';
 import * as ui from '../ui.js';
 
 export function addScore(base) {
-  const g = base * (run.tier >= 5 ? 2 : 1);
+  const g = base * (run.tier >= 5 ? 2 : 1) * (run.rushTimer > 0 ? RUSH_SCORE_MULT : 1);
   run.score += g;
   return g;
 }
@@ -25,7 +25,8 @@ const hudState = {
   airJumpReady: false,
   shieldReady: false,
   charge: 0,
-  tierColorHex: ''
+  tierColorHex: '',
+  rushTimer: 0
 };
 
 export function updateHUD() {
@@ -39,6 +40,7 @@ export function updateHUD() {
   hudState.shieldReady = run.shieldReady;
   hudState.charge = run.orbCount - run.orbCountAtShieldEvent;
   hudState.tierColorHex = TIER_COLOR_HEXES[run.tier] || 'ffffff';
+  hudState.rushTimer = run.rushTimer;
   ui.updateHUD(hudState);
 }
 

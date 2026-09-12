@@ -33,6 +33,12 @@ canvas { display: block; }
 #comboBox.pop { animation: pop .22s ease-out; }
 @keyframes pop { 0% { transform: scale(1.55); } 100% { transform: scale(1); } }
 #comboBar { height: 4px; width: 130px; margin: 6px auto 0; border-radius: 2px; background: currentColor; box-shadow: 0 0 10px currentColor; transform-origin: center; will-change: transform; }
+#rushTag { position: absolute; top: 21%; left: 50%; transform: translateX(-50%) scale(.8); opacity: 0;
+  transition: opacity .25s, transform .25s; font-weight: bold; font-size: clamp(16px, 2.6vw, 26px);
+  letter-spacing: 4px; color: #ff8822; text-shadow: 0 0 14px #ff8822, 0 0 42px #ff5511;
+  white-space: nowrap; pointer-events: none; }
+#rushTag.on { opacity: 1; transform: translateX(-50%) scale(1); animation: rushPulse 1s ease-in-out infinite; }
+@keyframes rushPulse { 0%, 100% { text-shadow: 0 0 14px #ff8822, 0 0 42px #ff5511; } 50% { text-shadow: 0 0 24px #ffaa44, 0 0 70px #ff7722; } }
 #toast { position: absolute; top: 30%; width: 100%; text-align: center; font-size: clamp(24px, 4vw, 40px);
   font-weight: bold; letter-spacing: 8px; opacity: 0; }
 #toast.show { animation: toastAnim 1.5s ease-out forwards; }
@@ -394,6 +400,7 @@ kbd.wideKey { min-width: 44px; font-size: 7px; }
   .drow { font-size: 10px; padding: 1.5px 0; }
   #comboBox { top: 22%; font-size: clamp(24px, 7vw, 36px); }
   #comboBar { width: 90px; }
+  #rushTag { top: 29%; font-size: clamp(12px, 3.4vw, 18px); letter-spacing: 2px; }
   #toast { font-size: clamp(17px, 5vw, 28px); letter-spacing: 3px; }
   #overScreen { padding: 10px; }
   .resultPanel { padding: 14px 12px 16px; }
@@ -438,6 +445,7 @@ kbd.wideKey { min-width: 44px; font-size: 7px; }
   .ab { display: inline-flex; font-size: 0; letter-spacing: 0; gap: 0; padding: 3px 5px 0 0; }
   .ab b { display: none; }
   #comboBox { top: 27%; }
+  #rushTag { top: 33%; }
   #toast { top: 40%; }
   .evolution-banner { top: 20%; max-width: 96vw; }
   .evolution-tag {

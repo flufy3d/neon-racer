@@ -128,6 +128,23 @@ export function getAudioBeat() {
   return transport.visual(clockTime());
 }
 
+// 音游化 spawn 的节拍网格：以最近一个已消耗整拍的音频时钟时刻为锚点，
+// 按 16 分音符步长外推。absStep 为绝对步序号（浮点），timeAtStep 反推任意步的时钟时刻。
+// BPM 平滑变化带来的外推误差在每次重锚时自动归零。非播放态返回 null。
+export function getBeatGrid() {
+  if (status !== 'playing' || !isFinite(transport.beatTime) || transport.beatCount === 0) return null;
+  const now = clockTime();
+  const beatDur = 60 / Math.max(transport.bpm, 30);
+  const stepDur = beatDur / 4;
+  const baseStep = (transport.beatCount - 1) * 4;
+  return {
+    now,
+    beatDur,
+    absStep: baseStep + (now - transport.beatTime) / stepDur,
+    timeAtStep: s => transport.beatTime + (s - baseStep) * stepDur
+  };
+}
+
 // Read-only inspection for timing, rotation and lifecycle verification.
 export function getAudioSnapshot() {
   return {
@@ -212,6 +229,26 @@ export function playSound(event, value = 0) {
       break;
     case 'speed':
       chime([0, 2, 4], 0.08, 'lead', 0.06);
+      break;
+    case 'rushStart':
+      // 冲刺浪潮开启：上行警笛扫频 + 定音鼓 + 密集噪波，宣告高潮段来临
+      pendingFill = true;
+      rack.duck(t, 0.45, 0.32);
+      chime([0, 4, 7, 12], 0.05, 'bell', 0.12);
+      voice({ frequency: 160, endFrequency: 1400, type: 'sawtooth', gain: 0.14, duration: 0.5, cutoff: 3000 });
+      voice({ noise: true, filterType: 'bandpass', cutoff: 400, endCutoff: 4800, gain: 0.16, duration: 0.6 });
+      tone('taiko', 45, 0.12, 0.4, 0.2);
+      break;
+    case 'rushEnd':
+      chime([7, 4, 0], 0.09, 'bell', 0.06);
+      break;
+    case 'gateIntro':
+      voice({ frequency: 520, endFrequency: 130, type: 'triangle', gain: 0.16, duration: 0.4 });
+      chime([0, 3], 0.09, 'bell', 0.08);
+      break;
+    case 'gatePass':
+      voice({ noise: true, filterType: 'bandpass', cutoff: 900, endCutoff: 2600, gain: 0.11, duration: 0.18 });
+      tone('bell', scaleNote(track, 7), 0.02, 0.14, 0.05);
       break;
     case 'crash':
       voice({ frequency: 155, endFrequency: 30, gain: 0.5, duration: 0.65 });

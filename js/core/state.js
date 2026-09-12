@@ -7,6 +7,8 @@
 // 用对象而不是模块顶层 let，是因为 ES module 的 import 绑定是只读的：
 // 想让多个模块写同一份状态，就必须让状态有一个显式的宿主。
 
+import { RUSH_FIRST_AT } from './constants.js';
+
 export const view = {
   scene: undefined, camera: undefined, renderer: undefined, composer: undefined, clock: undefined,
   bloomPass: undefined, railMat: undefined, grid: undefined, ship: undefined, shipGlowMat: undefined,
@@ -30,5 +32,11 @@ export const run = {
   overTimerId: null, shieldReady: false, invuln: 0, orbCountAtShieldEvent: 0, tier: 0,
   shipMorph: 0, morphRoll: 0, shipBank: 0, airFlip: 0, airJumps: 0, lastJumpTime: 0, latVel: 0,
   stabilizerEngaged: false, dualHoldTime: 0, lastGuidedLane: null, lastGuidedDist: -Infinity,
-  validPrevLanes: new Set([0, 1, 2]), lastPatternDist: -Infinity, showPending: false
+  validPrevLanes: new Set([0, 1, 2]), lastPatternDist: -Infinity, showPending: false,
+  // Rush Wave 冲刺浪潮
+  rushTimer: 0, rushNextAt: RUSH_FIRST_AT, rushBoost: 0,
+  // 音游化 spawn：障碍抵达时刻锚定在音乐 16 分音符网格（绝对步序号）
+  rhythmTarget: null, rhythmK: 0, lastSpawnBeat: null,
+  // 悬挂闸门：同车道低障最近出现里程（跳跃滞空窗口保护）与首次登场提示
+  lowLaneDist: [-Infinity, -Infinity, -Infinity], gateIntroduced: false
 };

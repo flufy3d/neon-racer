@@ -1,22 +1,31 @@
-import { LANES } from '../core/constants.js';
+import { GATE_CHANCE, GATE_INTRO_DIST, GATE_LOW_CLEAR, LANES } from '../core/constants.js';
 import { lists, run, view } from '../core/state.js';
-import { makeOrb, spawnPooledObstacle, spawnPooledOrb } from './obstacles.js';
+import { spawnPooledObstacle, spawnPooledOrb } from './obstacles.js';
+import { playSound } from '../audio.js';
+import * as ui from '../ui.js';
+
+// 非低障障碍的类型选择：闸门登场后按概率替换能量墙。
+// 同车道刚出现过低障时退回墙——跳跃滞空（~0.7s）会撞上紧随的闸门，属不可解陷阱；
+// 保护窗口随车速缩放（0.7×车速 ≈ 滞空里程），避免低障频繁导致闸门被永久堵死。
+function pickBlockType(lane) {
+  if (Math.random() < 0.4) return 'low';
+  if (run.dist >= GATE_INTRO_DIST
+    && run.dist - run.lowLaneDist[lane] > 0.7 * run.speed + GATE_LOW_CLEAR
+    && Math.random() < GATE_CHANCE) return 'gate';
+  return 'wall';
+}
 
 function buildPatternPlan(freeLane) {
   const plan = [];
   for (let lane = 0; lane < 3; lane++) {
     if (lane === freeLane) continue;
     if (Math.random() < 0.75) {
-      plan.push({ lane, type: Math.random() < 0.4 ? 'low' : 'wall' });
+      plan.push({ lane, type: pickBlockType(lane) });
     } else if (Math.random() < 0.5) {
       plan.push({ lane, type: 'orb' });
     }
   }
   return plan;
-}
-
-function isGuidedPattern(plan) {
-  return plan.filter(item => item.type === 'wall' || item.type === 'low').length === 2;
 }
 
 export function spawnPattern(overshoot = 0, gap = 15) {
@@ -59,6 +68,7 @@ export function spawnPattern(overshoot = 0, gap = 15) {
   }
   let plan = buildPatternPlan(freeLane);
 
+  // 可达性拓扑只统计"贴地必撞"的车道（wall/low）；gate 贴地即可穿过，仍算开口车道
   let obsSet = new Set(
     plan.filter(item => item.type === 'wall' || item.type === 'low').map(item => item.lane)
   );
@@ -116,8 +126,19 @@ export function spawnPattern(overshoot = 0, gap = 15) {
   run.validPrevLanes = nextValid.size > 0 ? nextValid : new Set(openLanes);
   run.lastPatternDist = run.dist;
 
+  // 最终方案确定后记录低障车道里程（供 pickBlockType 的闸门安全间距判断），
+  // 并在首次出现闸门时提前预告玩法。
   for (const item of plan) {
-    if (item.type === 'wall' || item.type === 'low') {
+    if (item.type === 'low') run.lowLaneDist[item.lane] = run.dist;
+  }
+  if (!run.gateIntroduced && plan.some(item => item.type === 'gate')) {
+    run.gateIntroduced = true;
+    ui.toast('悬挂闸门 · 贴地滑行通过!', '#cc88ff');
+    playSound('gateIntro');
+  }
+
+  for (const item of plan) {
+    if (item.type === 'wall' || item.type === 'low' || item.type === 'gate') {
       const obj = spawnPooledObstacle(view.scene, item.type, item.lane, -140 + overshoot);
       lists.obstacles.push(obj);
     } else {

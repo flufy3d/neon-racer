@@ -300,10 +300,11 @@ export function shatterObstacle(obstacle) {
   const pos = obstacle.position;
   const type = obstacle.userData?.type || 'wall';
   const isWall = type === 'wall';
-  const centerY = isWall ? 1.6 : 0.42;
-  const spreadY = isWall ? 2.4 : 0.55;
-  const themeHex = isWall ? 0xff1155 : 0xffaa00;
-  const altHex = isWall ? 0xff3388 : 0xffcc22;
+  const isGate = type === 'gate';
+  const centerY = isWall ? 1.6 : isGate ? 3.2 : 0.42;
+  const spreadY = isWall ? 2.4 : isGate ? 2.2 : 0.55;
+  const themeHex = isGate ? 0xbb44ff : isWall ? 0xff1155 : 0xffaa00;
+  const altHex = isGate ? 0xdd88ff : isWall ? 0xff3388 : 0xffcc22;
 
   const count = 16;
   let allocated = 0;

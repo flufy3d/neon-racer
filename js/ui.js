@@ -14,7 +14,8 @@ const els = {
   distStat: $('distStat'), orbStat: $('orbStat'), tierNameEl: $('tierName'),
   tierBar: $('tierBar'), tierNext: $('tierNext'), maxComboEl: $('maxCombo'),
   shieldState: $('shieldState'), jumpState: $('jumpState'),
-  abEls: [$('ab1'), $('ab2'), $('ab3'), $('ab4'), $('ab5')]
+  abEls: [$('ab1'), $('ab2'), $('ab3'), $('ab4'), $('ab5')],
+  rushTag: $('rushTag'), rushText: $('rushText')
 };
 export { els };
 
@@ -74,6 +75,8 @@ let lastShieldReadyAb = null;
 let lastAirJumpReadyAb = null;
 let lastShieldText = null;
 let lastJumpText = null;
+let lastRushOn = false;
+let lastRushText = '';
 
 export function resetHUDCache() {
   lastScore = -1;
@@ -91,6 +94,9 @@ export function resetHUDCache() {
   lastAirJumpReadyAb = null;
   lastShieldText = null;
   lastJumpText = null;
+  lastRushOn = false;
+  lastRushText = '';
+  els.rushTag.classList.remove('on');
 }
 
 export function updateHUD(s) {
@@ -163,6 +169,18 @@ export function updateHUD(s) {
   if (jumpText !== lastJumpText) {
     lastJumpText = jumpText;
     els.jumpState.textContent = jumpText;
+  }
+  const rushOn = s.rushTimer > 0;
+  if (rushOn !== lastRushOn) {
+    lastRushOn = rushOn;
+    els.rushTag.classList.toggle('on', rushOn);
+  }
+  if (rushOn) {
+    const rushText = 'RUSH WAVE ×2 · ' + Math.ceil(s.rushTimer) + 's';
+    if (rushText !== lastRushText) {
+      lastRushText = rushText;
+      els.rushText.textContent = rushText;
+    }
   }
 }
 
@@ -274,6 +292,20 @@ export function milestoneBanner(zoneName, distText, color = '#00ffff') {
   el.className = 'milestone-banner';
   el.style.setProperty('--zone-col', color);
   el.innerHTML = `<div class="milestone-dist">${distText}</div><div class="milestone-zone">${zoneName}</div>`;
+  document.body.appendChild(el);
+  setTimeout(() => {
+    el.style.opacity = '0';
+    el.style.transform = 'translate(-50%, -70%)';
+    setTimeout(() => el.remove(), 600);
+  }, 1600);
+}
+
+export function rushBanner() {
+  document.querySelectorAll('.rush-banner').forEach(e => e.remove());
+  const el = document.createElement('div');
+  el.className = 'milestone-banner rush-banner';
+  el.style.setProperty('--zone-col', '#ff8822');
+  el.innerHTML = `<div class="milestone-dist">RUSH WAVE</div><div class="milestone-zone">冲刺浪潮 · 得分 ×2</div>`;
   document.body.appendChild(el);
   setTimeout(() => {
     el.style.opacity = '0';

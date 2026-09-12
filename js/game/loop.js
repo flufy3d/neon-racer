@@ -67,3 +67,10 @@ export function animate() {
   advanceFrame(Math.min(view.clock.getDelta(), 0.05), view.clock.elapsedTime);
 }
 
+// 调试/无头测试用手动步进：固定 dt 推进一帧。窗口被合成器节流、RAF 停摆时仍可驱动模拟。
+let manualTime = 0;
+export function stepFrame(dt = 1 / 60) {
+  manualTime += dt;
+  advanceFrame(dt, manualTime);
+}
+

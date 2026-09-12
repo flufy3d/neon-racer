@@ -106,3 +106,23 @@ export const beaconBeamMat = new THREE.MeshBasicMaterial({
 
 export const beaconRingMat = new THREE.MeshBasicMaterial({ color: 0xffdd44, fog: false });
 
+// 悬挂闸门共享单例（顶部垂帘式能量闸：贴地可过，滞空即撞；固定紫色识别色）
+// 闸体下沿 = GATE_CRASH_Y + GATE_SHIP_TOP ≈ 1.75，向上 2.9m，缆索延伸至 7.25
+export const gateBoxGeo = new THREE.BoxGeometry(2.4, 2.9, 0.5);
+
+export const gateEdgesGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(2.44, 2.94, 0.52));
+
+export const gateScanGeo = new THREE.BoxGeometry(2.38, 0.08, 0.54);
+
+export const gateBottomGeo = new THREE.BoxGeometry(2.4, 0.1, 0.54);
+
+export const gateCableGeo = new THREE.BoxGeometry(0.07, 2.6, 0.07);
+
+export const gateBodyMat = new THREE.MeshBasicMaterial({ color: 0x0d0518, transparent: true, opacity: 0.92, depthWrite: true });
+
+export const gateEdgeMat = new THREE.LineBasicMaterial({ color: 0xbb44ff });
+
+export const gateCoreMat = new THREE.MeshBasicMaterial({ color: 0xbb44ff, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
+
+export const gateCableMat = new THREE.MeshBasicMaterial({ color: 0x1a0a2e });
+

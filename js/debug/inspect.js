@@ -1,9 +1,10 @@
 import { MILESTONE_ZONES, TIER_COLORS } from '../core/constants.js';
-import { getAudioSnapshot } from '../audio.js';
+import { getAudioSnapshot, getBeatGrid } from '../audio.js';
 import { lists, run, view } from '../core/state.js';
-import { makeLow, makeOrb, makeOverheadArch, makeRoadsideRelay, makeWall, makeWarpBeacon } from '../entities/obstacles.js';
+import { makeGate, makeLow, makeOrb, makeOverheadArch, makeRoadsideRelay, makeWall, makeWarpBeacon } from '../entities/obstacles.js';
+import { stepFrame } from '../game/loop.js';
 import { updateGroundGlow } from '../scene/ground.js';
-import { lowCoreMat, lowEdgeMat, wallCoreMat, wallEdgeMat } from '../scene/materials.js';
+import { gateCoreMat, gateEdgeMat, lowCoreMat, lowEdgeMat, wallCoreMat, wallEdgeMat } from '../scene/materials.js';
 
 window.__neon = {
   get audio() { return getAudioSnapshot(); },
@@ -21,8 +22,11 @@ window.__neon = {
   get groundGlow() { return view.groundGlow; },
   get groundGlowMat() { return view.groundGlowMat; },
   updateGroundGlow,
+  stepFrame,
+  beatGrid: getBeatGrid,
   makeWall,
   makeLow,
+  makeGate,
   makeOrb,
   makeOverheadArch,
   makeRoadsideRelay,
@@ -37,6 +41,8 @@ window.__neon = {
   get lowEdgeMat() { return lowEdgeMat; },
   get wallCoreMat() { return wallCoreMat; },
   get lowCoreMat() { return lowCoreMat; },
+  get gateEdgeMat() { return gateEdgeMat; },
+  get gateCoreMat() { return gateCoreMat; },
   MILESTONE_ZONES,
   TIER_COLORS
 };

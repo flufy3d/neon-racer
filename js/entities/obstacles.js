@@ -1,5 +1,5 @@
 import { LANES } from '../core/constants.js';
-import { archBeamGeo, archFrameMat, archNeonGeo, archNeonMat, archPillarGeo, beaconBaseGeo, beaconBeamMat, beaconCoreGeo, beaconPillarGeo, beaconRingMat, lowBodyMat, lowBoxGeo, lowCoreMat, lowEdgeMat, lowEdgesGeo, lowGuideGeo, lowScanGeo, orbCoreGeo, orbCoreMat, orbInnerRingGeo, orbOuterRingGeo, orbRingMat1, orbRingMat2, pillarGeo, pillarMat, relayBaseGeo, relayCoreGeo, relayPillarGeo, relayRingGeo, towerBeaconGeo, towerBodyMat, towerCapGeo, towerCapMat, towerGeo1, towerSpireMat, wallBodyMat, wallBoxGeo, wallCoreMat, wallEdgeMat, wallEdgesGeo, wallPylonGeo, wallScanGeo } from '../scene/materials.js';
+import { archBeamGeo, archFrameMat, archNeonGeo, archNeonMat, archPillarGeo, beaconBaseGeo, beaconBeamMat, beaconCoreGeo, beaconPillarGeo, beaconRingMat, gateBodyMat, gateBottomGeo, gateBoxGeo, gateCableGeo, gateCableMat, gateCoreMat, gateEdgeMat, gateEdgesGeo, gateScanGeo, lowBodyMat, lowBoxGeo, lowCoreMat, lowEdgeMat, lowEdgesGeo, lowGuideGeo, lowScanGeo, orbCoreGeo, orbCoreMat, orbInnerRingGeo, orbOuterRingGeo, orbRingMat1, orbRingMat2, pillarGeo, pillarMat, relayBaseGeo, relayCoreGeo, relayPillarGeo, relayRingGeo, towerBeaconGeo, towerBodyMat, towerCapGeo, towerCapMat, towerGeo1, towerSpireMat, wallBodyMat, wallBoxGeo, wallCoreMat, wallEdgeMat, wallEdgesGeo, wallPylonGeo, wallScanGeo } from '../scene/materials.js';
 import { orbHaloMat } from '../scene/textures.js';
 import * as THREE from 'three';
 
@@ -34,6 +34,27 @@ export function makeLow(lane, z) {
   g.add(b, e, scan, guide);
   g.position.set(LANES[lane], 0, z);
   g.userData = { type: 'low', lane, scan, guide, phase: Math.random() * Math.PI * 2 };
+  return g;
+}
+
+// 悬挂闸门：闸体占据 1.75~4.65 高度，下沿亮条为碰撞警示线，缆索向上没入远景
+export function makeGate(lane, z) {
+  const g = new THREE.Group();
+  const b = new THREE.Mesh(gateBoxGeo, gateBodyMat);
+  b.position.y = 3.2;
+  const e = new THREE.LineSegments(gateEdgesGeo, gateEdgeMat);
+  e.position.y = 3.2;
+  const scan = new THREE.Mesh(gateScanGeo, gateCoreMat);
+  scan.position.y = 3.2;
+  const bottom = new THREE.Mesh(gateBottomGeo, gateCoreMat);
+  bottom.position.y = 1.78;
+  const cableL = new THREE.Mesh(gateCableGeo, gateCableMat);
+  cableL.position.set(-0.9, 5.95, 0);
+  const cableR = new THREE.Mesh(gateCableGeo, gateCableMat);
+  cableR.position.set(0.9, 5.95, 0);
+  g.add(b, e, scan, bottom, cableL, cableR);
+  g.position.set(LANES[lane], 0, z);
+  g.userData = { type: 'gate', lane, scan, bottom, phase: Math.random() * Math.PI * 2 };
   return g;
 }
 
@@ -115,8 +136,10 @@ export function resetOrbPool() {
 }
 
 export const OBSTACLE_POOL_CAPACITY = 24;
+export const GATE_POOL_CAPACITY = 14;
 export const wallPool = [];
 export const lowPool = [];
+export const gatePool = [];
 
 export function initObstaclePool(scene) {
   if (wallPool.length === 0) {
@@ -139,14 +162,24 @@ export function initObstaclePool(scene) {
       if (scene) scene.add(l);
     }
   }
+  if (gatePool.length === 0) {
+    for (let i = 0; i < GATE_POOL_CAPACITY; i++) {
+      const g = makeGate(0, -999);
+      g.visible = false;
+      g.userData.active = false;
+      g.userData.passed = false;
+      gatePool.push(g);
+      if (scene) scene.add(g);
+    }
+  }
 }
 
 export function spawnPooledObstacle(scene, type, lane, z) {
-  const pool = type === 'wall' ? wallPool : lowPool;
+  const pool = type === 'wall' ? wallPool : type === 'gate' ? gatePool : lowPool;
   if (pool.length === 0 && scene) initObstaclePool(scene);
   let obj = pool.find(o => !o.userData.active);
   if (!obj) {
-    obj = type === 'wall' ? makeWall(lane, z) : makeLow(lane, z);
+    obj = type === 'wall' ? makeWall(lane, z) : type === 'gate' ? makeGate(lane, z) : makeLow(lane, z);
     pool.push(obj);
     if (scene) scene.add(obj);
   }
@@ -162,6 +195,9 @@ export function spawnPooledObstacle(scene, type, lane, z) {
     if (obj.userData.scan) obj.userData.scan.position.y = 1.6;
     if (obj.userData.leftPylon) obj.userData.leftPylon.scale.set(1, 1, 1);
     if (obj.userData.rightPylon) obj.userData.rightPylon.scale.set(1, 1, 1);
+  } else if (type === 'gate') {
+    if (obj.userData.scan) obj.userData.scan.position.y = 3.2;
+    if (obj.userData.bottom) obj.userData.bottom.position.y = 1.78;
   } else if (type === 'low') {
     if (obj.userData.scan) obj.userData.scan.scale.set(1, 1, 1);
     if (obj.userData.guide) obj.userData.guide.scale.set(1, 1, 1);
@@ -184,6 +220,9 @@ export function resetObstaclePool() {
   }
   for (const l of lowPool) {
     releasePooledObstacle(l);
+  }
+  for (const g of gatePool) {
+    releasePooledObstacle(g);
   }
 }
 
