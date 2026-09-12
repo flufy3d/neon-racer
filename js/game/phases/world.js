@@ -1,5 +1,5 @@
 import { playSound } from '../../audio.js';
-import { GATE_CRASH_Y, GATE_PASS_SCORE, GATE_SLIDE_MULT } from '../../core/constants.js';
+import { GATE_PASS_SCORE, GATE_SLIDE_MULT } from '../../core/constants.js';
 import { lists, run, view } from '../../core/state.js';
 import { burst, shatterObstacle, shieldBreakFx, spawnShockwave } from '../../entities/particles.js';
 import { releasePooledObstacle } from '../../entities/obstacles.js';
@@ -225,10 +225,11 @@ for (let i = lists.obstacles.length - 1; i >= 0; i--) {
   if (!o.userData.passed && prevZ <= 1.0 && o.position.z >= -1.0) {
     o.userData.passed = true;
     const dx = Math.abs(o.position.x - view.ship.position.x);
-    // wall 挡满全高必须换道；low 需跳过；gate 恰好相反——滞空即撞，贴地才可过
+    // wall 挡满全高必须换道；low 需跳过；gate 必须滑铲——悬浮/滞空一律算撞
     let crashing;
     if (o.userData.type === 'gate') {
-      crashing = dx < 1.85 && view.ship.position.y > GATE_CRASH_Y;
+      const sliding = run.slideTimer > 0 && run.grounded;
+      crashing = dx < 1.85 && !sliding;
     } else {
       const hitTop = o.userData.type === 'wall' ? 3.2 : 0.76;
       const bottom = view.ship.position.y - 0.35;
@@ -268,6 +269,10 @@ for (let i = lists.obstacles.length - 1; i >= 0; i--) {
           lists.obstacles.splice(i, 1);
           continue;
         } else {
+          // 坠毁瞬间把撞上的障碍一并打碎，撞击有视觉着点
+          shatterObstacle(o);
+          releasePooledObstacle(o);
+          lists.obstacles.splice(i, 1);
           gameOver();
           break;
         }
@@ -286,16 +291,13 @@ for (let i = lists.obstacles.length - 1; i >= 0; i--) {
     }
     if (!crashing) {
       if (o.userData.type === 'gate' && dx < 1.85) {
-        // 穿过悬挂闸门：滑铲姿态奖励翻倍并有额外特效，普通贴地也有奖励
-        const sliding = run.slideK > 0.5;
-        const g = addScore(GATE_PASS_SCORE * (sliding ? GATE_SLIDE_MULT : 1));
-        ui.floatLabel((sliding ? '滑铲穿越 +' : '贴地穿行 +') + g, o.position, sliding ? '#66ffcc' : '#cc88ff', sliding ? 20 : 17);
-        run.fovKick += sliding ? 3 : 1.8;
+        // 滑铲穿过悬挂闸门：+70 奖励 + 绿色粒子与冲击波（非滑铲状态已在上面的撞毁分支拦截）
+        const g = addScore(GATE_PASS_SCORE * GATE_SLIDE_MULT);
+        ui.floatLabel('滑铲穿越 +' + g, o.position, '#66ffcc', 20);
+        run.fovKick += 3;
         playSound('gatePass');
-        if (sliding) {
-          burst(o.position, 0x66ffcc, 0.24, 0.45, 0.9, 18, 0.4);
-          spawnShockwave(o.position, 0x66ffcc, 1.1);
-        }
+        burst(o.position, 0x66ffcc, 0.24, 0.45, 0.9, 18, 0.4);
+        spawnShockwave(o.position, 0x66ffcc, 1.1);
         bumpScore();
       } else if (o.userData.type === 'low' && dx < 1.85 && !run.grounded) {
         const g = addScore(40);

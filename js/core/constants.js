@@ -45,9 +45,8 @@ export const PARTICLE_POOL_SIZE = 24;
 
 export const MAX_PARTICLES_PER_BURST = 240;
 
-// 悬挂闸门：顶部垂帘式能量闸，贴地滑行可通过，滞空即撞
-export const GATE_CRASH_Y = 1.2;        // 舰体 y 超过此值撞闸（贴地悬浮 y≈0.95~1.02，含余量）
-export const GATE_PASS_SCORE = 35;      // 贴地穿过闸门的奖励分
+// 悬挂闸门：顶部垂帘式能量闸，悬浮/滞空一律撞毁，唯有滑铲才能通过
+export const GATE_PASS_SCORE = 35;      // 滑铲穿闸基础分（实际得分 = 基础分 × GATE_SLIDE_MULT）
 export const GATE_SLIDE_MULT = 2;       // 滑铲姿态穿闸的奖励倍率
 export const GATE_INTRO_DIST = 260;     // 闸门登场里程（先让玩家熟悉基础节奏）
 export const GATE_CHANCE = 0.35;        // 非低障障碍中闸门的替换概率

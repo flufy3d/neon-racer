@@ -133,7 +133,7 @@ export function spawnPattern(overshoot = 0, gap = 15) {
   }
   if (!run.gateIntroduced && plan.some(item => item.type === 'gate')) {
     run.gateIntroduced = true;
-    ui.toast('悬挂闸门 · 贴地滑行通过!', '#cc88ff');
+    ui.toast('悬挂闸门 · 下甩滑铲通过!', '#cc88ff');
     playSound('gateIntro');
   }
 
