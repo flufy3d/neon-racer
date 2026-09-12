@@ -1,5 +1,5 @@
 import { playSound } from '../../audio.js';
-import { CENTER_X, DOUBLE_JUMP_TIER, GRAVITY, MAX_TIER, STABILIZER_ACCEL, STABILIZER_GAIN, TRACK_HALF } from '../../core/constants.js';
+import { CENTER_X, DOUBLE_JUMP_TIER, GRAVITY, MAX_TIER, SLIDE_DROP_Y, SLIDE_SQUASH_Y, SLIDE_STRETCH_XZ, STABILIZER_ACCEL, STABILIZER_GAIN, TRACK_HALF } from '../../core/constants.js';
 import { run, view } from '../../core/state.js';
 import { burst, spawnShockwave } from '../../entities/particles.js';
 import { updateGroundGlow } from '../../scene/ground.js';
@@ -67,6 +67,18 @@ run.shipBank += (bankTarget - run.shipBank) * Math.min(1, dt * 10);
 view.ship.rotation.z = run.shipBank + run.morphRoll;
 view.ship.rotation.x = -run.airFlip;
 
+// 滑铲姿态系数：目标 0/1 平滑过渡，驱动机体压扁拉伸与贴地高度
+run.slideK += ((run.slideTimer > 0 ? 1 : 0) - run.slideK) * Math.min(1, dt * 12);
+if (run.slideK < 0.004) run.slideK = 0;
+if (run.slideTimer > 0) {
+  run.slideTimer -= dt;
+  if (run.slideTimer <= 0) run.slideTimer = 0;
+  // 滑铲拖尾火花
+  if (Math.random() < dt * 46) {
+    burst(view.ship.position, 0x66ffcc, 0.13, 0.3, 0.5, 5, 0.6);
+  }
+}
+
 if (!run.grounded) {
   run.vy += GRAVITY * dt;
   view.ship.position.y += run.vy * dt;
@@ -80,11 +92,15 @@ if (!run.grounded) {
     run.shakeTime = Math.max(run.shakeTime, 0.12);
   }
 } else {
-  view.ship.position.y = 0.95 + Math.sin(t * 3.2) * 0.07;
+  // 滑铲姿态：压低贴地并高频细抖，比常规悬浮明显更低
+  view.ship.position.y = 0.95 - SLIDE_DROP_Y * run.slideK
+    + Math.sin(t * (3.2 + run.slideK * 22)) * (0.07 - run.slideK * 0.045);
 }
-view.ship.scale.x += (1 - view.ship.scale.x) * Math.min(1, dt * 9);
-view.ship.scale.y += (1 - view.ship.scale.y) * Math.min(1, dt * 9);
-view.ship.scale.z += (1 - view.ship.scale.z) * Math.min(1, dt * 9);
+const slideStY = 1 - (1 - SLIDE_SQUASH_Y) * run.slideK;
+const slideStXZ = 1 + SLIDE_STRETCH_XZ * run.slideK;
+view.ship.scale.x += (slideStXZ - view.ship.scale.x) * Math.min(1, dt * 9);
+view.ship.scale.y += (slideStY - view.ship.scale.y) * Math.min(1, dt * 9);
+view.ship.scale.z += (slideStXZ - view.ship.scale.z) * Math.min(1, dt * 9);
 
 if (run.invuln > 0) {
   run.invuln -= dt;

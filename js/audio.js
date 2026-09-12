@@ -250,6 +250,11 @@ export function playSound(event, value = 0) {
       voice({ noise: true, filterType: 'bandpass', cutoff: 900, endCutoff: 2600, gain: 0.11, duration: 0.18 });
       tone('bell', scaleNote(track, 7), 0.02, 0.14, 0.05);
       break;
+    case 'slide':
+      // 滑铲：贴地摩擦啸叫 + 低频压感
+      voice({ noise: true, filterType: 'bandpass', cutoff: 1500, endCutoff: 320, gain: 0.14, duration: 0.26 });
+      voice({ frequency: 210, endFrequency: 85, type: 'triangle', gain: 0.07, duration: 0.22 });
+      break;
     case 'armorPickup':
       // 护甲核心：沉稳的装备上膛感（低琶音 + 金属敲击）
       chime([0, 4, 7], 0.06, 'bell', 0.09);

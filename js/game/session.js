@@ -51,6 +51,7 @@ function resetGame() {
   run.lastSpeedMark = 26; run.camRoll = 0; run.camY = 4.6;
   run.shieldReady = false; run.invuln = 0; run.orbCountAtShieldEvent = 0;
   run.armorReady = false; run.lastArmorDist = -Infinity;
+  run.slideTimer = 0; run.slideK = 0;
   run.maxCombo = 0;
   run.latVel = 0; run.stabilizerEngaged = false; run.dualHoldTime = 0; activePointers.clear();
   run.lastGuidedLane = null; run.lastGuidedDist = -Infinity;

@@ -126,14 +126,28 @@ export const gateCoreMat = new THREE.MeshBasicMaterial({ color: 0xbb44ff, transp
 
 export const gateCableMat = new THREE.MeshBasicMaterial({ color: 0x1a0a2e });
 
-// 护甲核心共享单例（绿色八面体晶体 + 陀螺环，与青金能量球明确区分）
-export const armorCoreGeo = new THREE.OctahedronGeometry(0.3);
+// 护甲核心共享单例（高饱和绿色大晶体 + 顶天立地光柱，与青白能量球强区分）
+export const armorCoreGeo = new THREE.OctahedronGeometry(0.44);
 
-export const armorCoreMat = new THREE.MeshBasicMaterial({ color: 0x66ff88, fog: false });
+export const armorCoreMat = new THREE.MeshBasicMaterial({ color: 0x22ee55, fog: false });
 
-export const armorRingGeo = new THREE.TorusGeometry(0.58, 0.035, 8, 24);
+export const armorRingGeo = new THREE.TorusGeometry(0.78, 0.05, 8, 6);
 
 export const armorRingMat = new THREE.MeshBasicMaterial({ color: 0x44ff66, fog: false });
+
+export const armorPillarGeo = new THREE.CylinderGeometry(0.16, 0.16, 8, 8, 1, true);
+
+armorPillarGeo.translate(0, 4, 0);
+
+export const armorPillarMat = new THREE.MeshBasicMaterial({
+  color: 0x44ff66,
+  transparent: true,
+  opacity: 0.4,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  fog: false,
+  side: THREE.DoubleSide
+});
 
 // 机体应急护甲笼（八面体线框罩，绕机体旋转，比细环更有装甲存在感）
 export const shipArmorGeo = new THREE.OctahedronGeometry(1.08);

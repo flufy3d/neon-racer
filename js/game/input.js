@@ -1,5 +1,5 @@
 import { pauseAudioRun, playSound, resumeAudioRun } from '../audio.js';
-import { DOUBLE_JUMP_TIER, JUMP_V, MAX_TIER, SWIPE_AIRJUMP, SWIPE_JUMP, TIER_COLORS } from '../core/constants.js';
+import { DOUBLE_JUMP_TIER, JUMP_V, MAX_TIER, SLIDE_DURATION, SLIDE_FASTFALL_V, SWIPE_AIRJUMP, SWIPE_JUMP, TIER_COLORS } from '../core/constants.js';
 import { $ } from '../core/dom.js';
 import { run, view } from '../core/state.js';
 import { burst, spawnShockwave } from '../entities/particles.js';
@@ -13,6 +13,22 @@ export const activePointers = new Map();
 export const keys = { left: false, right: false };
 
 const airJumpPos = new THREE.Vector3();
+const slidePos = new THREE.Vector3();
+
+// 滑铲：贴地滑行动作，是穿过悬挂闸门的正确姿势。
+// 滞空时触发则先俯冲落地，落地后继续滑完剩余时长。
+function slide() {
+  if (run.state !== 'playing' || run.paused) return;
+  if (run.slideTimer > 0) return;
+  run.slideTimer = SLIDE_DURATION;
+  if (!run.grounded) {
+    run.vy = Math.min(run.vy, SLIDE_FASTFALL_V);
+    run.airJumps = 0;
+  }
+  slidePos.set(view.ship.position.x, 0.12, view.ship.position.z + 0.4);
+  spawnShockwave(slidePos, 0x66ffcc, 0.7);
+  playSound('slide');
+}
 
 function jump() {
   if (run.state !== 'playing' || run.paused) return;
@@ -20,6 +36,7 @@ function jump() {
   if (run.grounded) {
     run.vy = JUMP_V;
     run.grounded = false;
+    run.slideTimer = 0;
     run.airJumps = run.tier >= DOUBLE_JUMP_TIER ? 1 : 0;
     run.lastJumpTime = now;
     view.ship.scale.set(0.8, 1.35, 0.8);
@@ -45,7 +62,10 @@ addEventListener('keydown', e => {
   if (e.repeat) return;
   if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = true;
   else if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = true;
-  else if (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') {
+  else if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+    e.preventDefault();
+    slide();
+  } else if (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') {
     e.preventDefault();
     if (run.state === 'playing') jump();
     else startGame();
@@ -86,11 +106,13 @@ addEventListener('pointerdown', e => {
     x: e.clientX,
     startX: e.clientX,
     baseY: e.clientY,
+    minY: e.clientY,
     startY: e.clientY,
     startTime: performance.now(),
     isJump: false,
     jumpTriggered: false,
     hasJumpedThisTouch: false,
+    hasSlid: false,
     maxMoveDist: 0
   });
 });
@@ -99,6 +121,7 @@ addEventListener('pointermove', e => {
   const p = activePointers.get(e.pointerId);
   if (!p) return;
   p.x = e.clientX;
+  if (e.clientY < p.minY) p.minY = e.clientY;
   const dy = p.baseY - e.clientY;
   const dx = Math.abs(e.clientX - p.startX);
   const totalDist = Math.hypot(e.clientX - p.startX, e.clientY - p.startY);
@@ -111,6 +134,13 @@ addEventListener('pointermove', e => {
   }
   const need = run.grounded ? SWIPE_JUMP : SWIPE_AIRJUMP;
   if (e.clientY > p.baseY) {
+    // 下甩滑铲：以触摸历史最高点为基准，累计下移 ≥24px 且纵向占优即触发（每次触摸一次）
+    const downDy = e.clientY - p.minY;
+    if (!p.hasSlid && downDy >= 24 && downDy > dx * 1.1) {
+      p.hasSlid = true;
+      if (!hasOtherActiveSteering(e.pointerId)) run.latVel = 0;
+      slide();
+    }
     p.baseY = e.clientY;
   } else if (dx > dy * 1.2) {
     if (!p.jumpTriggered && dx >= 16) {

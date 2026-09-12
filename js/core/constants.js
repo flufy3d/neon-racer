@@ -48,9 +48,17 @@ export const MAX_PARTICLES_PER_BURST = 240;
 // 悬挂闸门：顶部垂帘式能量闸，贴地滑行可通过，滞空即撞
 export const GATE_CRASH_Y = 1.2;        // 舰体 y 超过此值撞闸（贴地悬浮 y≈0.95~1.02，含余量）
 export const GATE_PASS_SCORE = 35;      // 贴地穿过闸门的奖励分
+export const GATE_SLIDE_MULT = 2;       // 滑铲姿态穿闸的奖励倍率
 export const GATE_INTRO_DIST = 260;     // 闸门登场里程（先让玩家熟悉基础节奏）
 export const GATE_CHANCE = 0.35;        // 非低障障碍中闸门的替换概率
 export const GATE_LOW_CLEAR = 8;        // 同车道 low→gate 安全余量（米）；实际窗口 = 0.7×车速 + 此值，覆盖跳跃滞空距离
+
+// 滑铲：下甩/↓ 触发的贴地滑行动作，穿过悬挂闸门的正确姿势
+export const SLIDE_DURATION = 0.75;     // 滑铲持续秒数
+export const SLIDE_FASTFALL_V = -26;    // 滞空时触发的俯冲下降速度
+export const SLIDE_SQUASH_Y = 0.5;      // 滑铲时机体纵向压扁系数
+export const SLIDE_STRETCH_XZ = 0.32;   // 滑铲时机体横向/纵向拉伸增量
+export const SLIDE_DROP_Y = 0.38;       // 滑铲时机体压低量
 
 // 护甲核心：绿色特殊拾取物，吃到直接装备一层应急护甲（任意形态可用，抵挡一次撞击）
 export const ARMOR_PICKUP_SCORE = 80;   // 装备护甲的得分

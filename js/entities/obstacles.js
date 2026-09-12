@@ -1,6 +1,6 @@
 import { LANES } from '../core/constants.js';
-import { archBeamGeo, archFrameMat, archNeonGeo, archNeonMat, archPillarGeo, armorCoreGeo, armorCoreMat, armorRingGeo, armorRingMat, beaconBaseGeo, beaconBeamMat, beaconCoreGeo, beaconPillarGeo, beaconRingMat, gateBodyMat, gateBottomGeo, gateBoxGeo, gateCableGeo, gateCableMat, gateCoreMat, gateEdgeMat, gateEdgesGeo, gateScanGeo, lowBodyMat, lowBoxGeo, lowCoreMat, lowEdgeMat, lowEdgesGeo, lowGuideGeo, lowScanGeo, orbCoreGeo, orbCoreMat, orbInnerRingGeo, orbOuterRingGeo, orbRingMat1, orbRingMat2, pillarGeo, pillarMat, relayBaseGeo, relayCoreGeo, relayPillarGeo, relayRingGeo, towerBeaconGeo, towerBodyMat, towerCapGeo, towerCapMat, towerGeo1, towerSpireMat, wallBodyMat, wallBoxGeo, wallCoreMat, wallEdgeMat, wallEdgesGeo, wallPylonGeo, wallScanGeo } from '../scene/materials.js';
-import { orbHaloMat } from '../scene/textures.js';
+import { archBeamGeo, archFrameMat, archNeonGeo, archNeonMat, archPillarGeo, armorCoreGeo, armorCoreMat, armorPillarGeo, armorPillarMat, armorRingGeo, armorRingMat, beaconBaseGeo, beaconBeamMat, beaconCoreGeo, beaconPillarGeo, beaconRingMat, gateBodyMat, gateBottomGeo, gateBoxGeo, gateCableGeo, gateCableMat, gateCoreMat, gateEdgeMat, gateEdgesGeo, gateScanGeo, lowBodyMat, lowBoxGeo, lowCoreMat, lowEdgeMat, lowEdgesGeo, lowGuideGeo, lowScanGeo, orbCoreGeo, orbCoreMat, orbInnerRingGeo, orbOuterRingGeo, orbRingMat1, orbRingMat2, pillarGeo, pillarMat, relayBaseGeo, relayCoreGeo, relayPillarGeo, relayRingGeo, towerBeaconGeo, towerBodyMat, towerCapGeo, towerCapMat, towerGeo1, towerSpireMat, wallBodyMat, wallBoxGeo, wallCoreMat, wallEdgeMat, wallEdgesGeo, wallPylonGeo, wallScanGeo } from '../scene/materials.js';
+import { armorHaloMat, orbHaloMat } from '../scene/textures.js';
 import * as THREE from 'three';
 
 export function makeWall(lane, z) {
@@ -135,17 +135,18 @@ export function resetOrbPool() {
   }
 }
 
-// 护甲核心：绿色八面体晶体，吃到直接装备应急护甲（实体结构区别于能量球，独立小池）
+// 护甲核心：高饱和绿色大晶体 + 绿色光晕 + 顶天立地光柱，远距离即可与能量球区分
 export function makeArmorCore(x, y, z) {
   const g = new THREE.Group();
   const core = new THREE.Mesh(armorCoreGeo, armorCoreMat);
-  const halo = new THREE.Sprite(orbHaloMat);
-  halo.scale.set(2.1, 2.1, 1);
+  const halo = new THREE.Sprite(armorHaloMat);
+  halo.scale.set(3.2, 3.2, 1);
   core.add(halo);
   const ring = new THREE.Mesh(armorRingGeo, armorRingMat);
   ring.rotation.x = Math.PI / 2;
-  g.add(core, ring);
-  g.userData = { spawnX: x, baseY: y, phase: Math.random() * Math.PI * 2, core, ring };
+  const pillar = new THREE.Mesh(armorPillarGeo, armorPillarMat);
+  g.add(core, ring, pillar);
+  g.userData = { spawnX: x, baseY: y, phase: Math.random() * Math.PI * 2, core, ring, pillar };
   g.position.set(x, y, z);
   return g;
 }

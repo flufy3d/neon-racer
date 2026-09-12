@@ -133,6 +133,9 @@ for (let i = lists.armorOrbs.length - 1; i >= 0; i--) {
     o.userData.ring.rotation.x = t * 1.8 + o.userData.phase;
     o.userData.ring.rotation.y = Math.sin(t * 2.4 + o.userData.phase) * 0.5;
   }
+  if (o.userData.pillar) {
+    o.userData.pillar.material.opacity = 0.28 + Math.sin(t * 5 + o.userData.phase) * 0.14;
+  }
   if (o.position.z > 10) { releasePooledArmor(o); lists.armorOrbs.splice(i, 1); continue; }
   // T3 磁力场同样吸附护甲核心
   if (run.tier >= 3 && o.position.z < 4 && o.position.z > -16) {

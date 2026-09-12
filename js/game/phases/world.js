@@ -1,5 +1,5 @@
 import { playSound } from '../../audio.js';
-import { GATE_CRASH_Y, GATE_PASS_SCORE } from '../../core/constants.js';
+import { GATE_CRASH_Y, GATE_PASS_SCORE, GATE_SLIDE_MULT } from '../../core/constants.js';
 import { lists, run, view } from '../../core/state.js';
 import { burst, shatterObstacle, shieldBreakFx, spawnShockwave } from '../../entities/particles.js';
 import { releasePooledObstacle } from '../../entities/obstacles.js';
@@ -286,11 +286,16 @@ for (let i = lists.obstacles.length - 1; i >= 0; i--) {
     }
     if (!crashing) {
       if (o.userData.type === 'gate' && dx < 1.85) {
-        // 贴地穿过悬挂闸门：主动贴地的风险走位奖励
-        const g = addScore(GATE_PASS_SCORE);
-        ui.floatLabel('贴地穿行 +' + g, o.position, '#cc88ff', 17);
-        run.fovKick += 1.8;
+        // 穿过悬挂闸门：滑铲姿态奖励翻倍并有额外特效，普通贴地也有奖励
+        const sliding = run.slideK > 0.5;
+        const g = addScore(GATE_PASS_SCORE * (sliding ? GATE_SLIDE_MULT : 1));
+        ui.floatLabel((sliding ? '滑铲穿越 +' : '贴地穿行 +') + g, o.position, sliding ? '#66ffcc' : '#cc88ff', sliding ? 20 : 17);
+        run.fovKick += sliding ? 3 : 1.8;
         playSound('gatePass');
+        if (sliding) {
+          burst(o.position, 0x66ffcc, 0.24, 0.45, 0.9, 18, 0.4);
+          spawnShockwave(o.position, 0x66ffcc, 1.1);
+        }
         bumpScore();
       } else if (o.userData.type === 'low' && dx < 1.85 && !run.grounded) {
         const g = addScore(40);

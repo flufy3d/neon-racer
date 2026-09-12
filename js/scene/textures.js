@@ -16,6 +16,22 @@ function makeGlowTexture() {
 
 export const orbHaloMat = new THREE.SpriteMaterial({ map: makeGlowTexture(), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
 
+// 护甲核心专用绿色光晕：贴图内烘焙绿色渐变，与能量球的青白光晕远距离即可区分
+function makeArmorGlowTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, 'rgba(220,255,230,1)');
+  grad.addColorStop(0.35, 'rgba(60,255,120,0.6)');
+  grad.addColorStop(1, 'rgba(0,255,80,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
+}
+
+export const armorHaloMat = new THREE.SpriteMaterial({ map: makeArmorGlowTexture(), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+
 function makeGroundGlowTexture() {
   const c = document.createElement('canvas');
   c.width = c.height = 64;

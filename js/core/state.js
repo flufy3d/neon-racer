@@ -39,5 +39,7 @@ export const run = {
   // 音游化 spawn：障碍抵达时刻锚定在音乐 16 分音符网格（绝对步序号）
   rhythmTarget: null, rhythmK: 0, lastSpawnBeat: null,
   // 悬挂闸门：同车道低障最近出现里程（跳跃滞空窗口保护）与首次登场提示
-  lowLaneDist: [-Infinity, -Infinity, -Infinity], gateIntroduced: false
+  lowLaneDist: [-Infinity, -Infinity, -Infinity], gateIntroduced: false,
+  // 滑铲：slideTimer 剩余时长，slideK 姿态平滑系数（0~1）
+  slideTimer: 0, slideK: 0
 };
