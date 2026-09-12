@@ -67,10 +67,10 @@ export const ARMOR_MIN_GAP = 500;       // 两次护甲核心的最小间隔里�
 export const ARMOR_CHANCE = 0.2;        // 满足间隔后每个 pattern 的投放概率
 
 // Rush Wave：周期性冲刺浪潮
-export const RUSH_FIRST_AT = 35;        // 首次触发（存活秒数）
+export const RUSH_FIRST_AT = 50;        // 首次触发（存活秒数；让基础速度先稳定下来）
 export const RUSH_PERIOD = 45;          // 上一轮结束后到下一轮的间隔
 export const RUSH_DURATION = 11;        // 每轮持续秒数
 export const RUSH_BOOST = 13;           // 速度加成 m/s（平滑逼近）
-export const RUSH_GAP_MULT = 0.72;      // 浪潮期生成间距倍率
+export const RUSH_GAP_MULT = 0.78;      // 浪潮期生成间距倍率
 export const RUSH_SCORE_MULT = 2;       // 浪潮期得分倍率
 

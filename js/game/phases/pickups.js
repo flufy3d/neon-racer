@@ -111,6 +111,8 @@ for (let i = lists.orbs.length - 1; i >= 0; i--) {
       ui.evolutionBanner(run.tier, TIER_NAMES[run.tier], colHex);
       playSound('evolve');
       achEvent('tier');
+      // 庆祝间隙：升档后生成放宽 3.5 秒（不覆盖 Rush 后更长的平流层）
+      run.calmTimer = Math.max(run.calmTimer, 3.5);
 
       // 双重正交量子激波脉冲环（机身扫描 + 尾部推进）
       spawnShockwave(view.ship.position, TIER_COLORS[run.tier], 1.8);

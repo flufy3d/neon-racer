@@ -58,6 +58,7 @@ function resetGame() {
   run.lastGuidedLane = null; run.lastGuidedDist = -Infinity;
   run.validPrevLanes = new Set([0, 1, 2]); run.lastPatternDist = -Infinity;
   run.rushTimer = 0; run.rushBoost = 0; run.rushNextAt = RUSH_FIRST_AT;
+  run.calmTimer = 0;
   run.rhythmTarget = null; run.rhythmK = 0; run.lastSpawnBeat = null;
   run.lowLaneDist = [-Infinity, -Infinity, -Infinity]; run.gateIntroduced = false;
   resetRunCounters();

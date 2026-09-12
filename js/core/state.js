@@ -36,6 +36,8 @@ export const run = {
   validPrevLanes: new Set([0, 1, 2]), lastPatternDist: -Infinity, showPending: false,
   // Rush Wave 冲刺浪潮
   rushTimer: 0, rushNextAt: RUSH_FIRST_AT, rushBoost: 0,
+  // 喘息期：Rush 结束/升档后生成放宽的剩余秒数（张力释放）
+  calmTimer: 0,
   // 音游化 spawn：障碍抵达时刻锚定在音乐 16 分音符网格（绝对步序号）
   rhythmTarget: null, rhythmK: 0, lastSpawnBeat: null,
   // 悬挂闸门：同车道低障最近出现里程（跳跃滞空窗口保护）与首次登场提示

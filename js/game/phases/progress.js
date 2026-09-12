@@ -14,10 +14,12 @@ function updateRush(dt) {
     if (run.rushTimer <= 0) {
       run.rushTimer = 0;
       run.rushNextAt = run.elapsed + RUSH_PERIOD;
-      ui.toast('浪潮退去 · 速度回落', '#66ccff');
+      ui.toast('浪潮退去 · 平流层喘息', '#66ccff');
       playSound('rushEnd');
       // 活着撑到浪潮自然退去 = 完整存活一轮
       achEvent('rushSurvived');
+      // 张力释放：浪潮结束后 7 秒稀疏平流层
+      run.calmTimer = 7;
     }
   } else if (run.elapsed >= run.rushNextAt && run.slowMoTimer <= 0) {
     run.rushTimer = RUSH_DURATION;
@@ -35,8 +37,13 @@ function updateRush(dt) {
 // 躲避动作永远落在节拍点。目标网格点在每次生成后立刻锚定（上次落点 + K 步），
 // BPM 随车速平滑变化导致的漂移在每次重锚时自动归零。
 function spawnStep() {
-  let gap = Math.max(15, 26 - run.elapsed * 0.25);
+  // 间距「时间制」：gapTime 即波次抵达间隔（秒），随时间从 1.0s 收紧到 0.45s 底线，
+  // 名义间距随车速放大 → 音游取整误差缩回 ±半步，高速不再跌破下限
+  const gapTime = Math.max(0.45, 1.0 - run.elapsed * 0.004);
+  let gap = Math.max(14, run.speed * gapTime);
   if (run.rushTimer > 0) gap *= RUSH_GAP_MULT;
+  // 喘息期：Rush 后 / 升档瞬间的张力释放，波次放宽 35%
+  if (run.calmTimer > 0) gap *= 1.35;
 
   const grid = getBeatGrid();
   if (!grid) {
@@ -82,7 +89,9 @@ function spawnStep() {
 export function updateRunProgress(dt) {
 run.elapsed += dt;
 updateRush(dt);
-run.speed = Math.min(72, 26 + run.elapsed * 0.55 + run.rushBoost);
+if (run.calmTimer > 0) run.calmTimer = Math.max(0, run.calmTimer - dt);
+// 渐近速度曲线：前期爬升快（成长爽感）、后期趋缓（心流通道）；极速 72 只在 Rush 波内触及
+run.speed = Math.min(72, 26 + 40 * (1 - Math.exp(-run.elapsed / 95)) + run.rushBoost);
 run.maxSpeed = Math.max(run.maxSpeed, run.speed);
 const move = run.speed * dt;
 run.dist += move;
