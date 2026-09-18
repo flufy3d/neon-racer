@@ -1,3 +1,4 @@
+import { sampleQuality } from '../core/quality.js';
 import { run, view } from '../core/state.js';
 import { achTick } from './achievements.js';
 import { updateAmbient, updateMenu } from './phases/ambient.js';
@@ -66,7 +67,9 @@ function advanceFrame(dt, t) {
 
 export function animate() {
   requestAnimationFrame(animate);
-  advanceFrame(Math.min(view.clock.getDelta(), 0.05), view.clock.elapsedTime);
+  const raw = view.clock.getDelta();
+  sampleQuality(raw);
+  advanceFrame(Math.min(raw, 0.05), view.clock.elapsedTime);
 }
 
 // 调试/无头测试用手动步进：固定 dt 推进一帧。窗口被合成器节流、RAF 停摆时仍可驱动模拟。

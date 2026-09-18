@@ -1,3 +1,4 @@
+import { applyQuality, bindQuality, quality } from '../core/quality.js';
 import { lists, view } from '../core/state.js';
 import { initObstaclePool, initOrbPool } from '../entities/obstacles.js';
 import { buildShip } from '../entities/ship.js';
@@ -17,21 +18,24 @@ export function initScene() {
   view.camera.position.set(0, 4.6, 8.5);
   view.camera.lookAt(0, 1, -12);
 
-  view.renderer = new THREE.WebGLRenderer({ antialias: false });
+  view.renderer = new THREE.WebGLRenderer({
+    antialias: false,
+    alpha: false,
+    stencil: false,
+    powerPreference: 'high-performance'
+  });
   view.renderer.setSize(innerWidth, innerHeight);
-  view.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  view.renderer.setPixelRatio(quality.pixelRatio);
   document.body.appendChild(view.renderer.domElement);
 
-  const pr = Math.min(devicePixelRatio, 2);
-  const renderTarget = new THREE.WebGLRenderTarget(innerWidth * pr, innerHeight * pr, {
-    type: THREE.HalfFloatType,
-    samples: 0
-  });
-  view.composer = new EffectComposer(view.renderer, renderTarget);
+  // 交给 EffectComposer 依据 renderer 的 pixelRatio 自行创建 HalfFloat 离屏
+  // RenderTarget，避免此处尺寸与 composer 内部 pixelRatio 约定不一致导致重复分配。
+  view.composer = new EffectComposer(view.renderer);
   view.composer.setSize(innerWidth, innerHeight);
   view.composer.addPass(new RenderPass(view.scene, view.camera));
   view.bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 1.1, 0.6, 0.25);
   view.composer.addPass(view.bloomPass);
+  bindQuality(view.renderer, view.composer, view.bloomPass);
   window.composer = view.composer;
   window.bloomPass = view.bloomPass;
 
@@ -88,8 +92,7 @@ function onResize() {
   view.camera.aspect = innerWidth / innerHeight;
   view.camera.updateProjectionMatrix();
   view.renderer.setSize(innerWidth, innerHeight);
-  view.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-  view.composer.setSize(innerWidth, innerHeight);
+  applyQuality();
 }
 
 addEventListener('resize', onResize);

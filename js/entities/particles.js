@@ -1,5 +1,6 @@
 import { playSound } from '../audio.js';
 import { MAX_PARTICLES_PER_BURST, MAX_TIER, PARTICLE_POOL_SIZE, TIER_COLORS } from '../core/constants.js';
+import { quality } from '../core/quality.js';
 import { run, view } from '../core/state.js';
 import { jetNeedleTex, neonSparkTex, plumeJetTex, shockwaveRingTex } from '../scene/textures.js';
 import * as ui from '../ui.js';
@@ -75,7 +76,8 @@ export function burst(pos, color, size = 0.20, maxLife = 0.45, power = 1, count 
   }
   if (!item) return;
 
-  const actualCount = Math.min(count, MAX_PARTICLES_PER_BURST);
+  // 自适应画质：按档位缩放每次爆发的粒子数，移动端显著降低填充率压力
+  const actualCount = Math.max(1, Math.min(Math.round(count * quality.fx), MAX_PARTICLES_PER_BURST));
   item.count = actualCount;
   item.life = maxLife;
   item.maxLife = maxLife;
@@ -106,6 +108,9 @@ export function burst(pos, color, size = 0.20, maxLife = 0.45, power = 1, count 
   }
 
   item.geo.setDrawRange(0, actualCount);
+  // 只上传实际使用的顶点区间，而非整个 240 容量缓冲
+  item.posAttr.clearUpdateRanges();
+  item.posAttr.addUpdateRange(0, actualCount * 3);
   item.posAttr.needsUpdate = true;
   item.pts.visible = true;
   item.active = true;
@@ -163,6 +168,8 @@ export function updateBurstParticles(pdt, move = 0) {
       continue;
     }
 
+    p.posAttr.clearUpdateRanges();
+    p.posAttr.addUpdateRange(0, cnt * 3);
     p.posAttr.needsUpdate = true;
     const progress = Math.max(0, p.life / p.maxLife);
     p.mat.opacity = Math.pow(progress, 1.4);
@@ -306,7 +313,7 @@ export function shatterObstacle(obstacle) {
   const themeHex = isGate ? 0xbb44ff : isWall ? 0xff1155 : 0xffaa00;
   const altHex = isGate ? 0xdd88ff : isWall ? 0xff3388 : 0xffcc22;
 
-  const count = 16;
+  const count = Math.max(5, Math.round(16 * quality.fx));
   let allocated = 0;
 
   // 1. 激活三维几何立体破片
@@ -450,7 +457,7 @@ export function initOrbShardPool() {
 
 export function shatterOrb(pos) {
   if (orbShardPool.length === 0) initOrbShardPool();
-  const count = 10;
+  const count = Math.max(4, Math.round(10 * quality.fx));
   // 10 颗立体水晶破片：4 颗青蓝内环碎片 + 4 颗聚变金外环碎片 + 2 颗白炽晶核碎片
   // 100% 严格忠实于能量球本体三大材质色彩！
   const colors = [
@@ -549,7 +556,9 @@ export function updateOrbShards(pdt, move = 0) {
 }
 
 // ── 战斗机超音速马赫尾喷束（高密度连续向后排气流柱、高频推力光刃） ──
-const TRAIL_MAX = 1200;
+// 实际存活量 ≈ 每秒发射数 × 寿命（<200），移动端按画质缩减环缓冲可省下每帧
+// 全量顶点/颜色上传（原 1200 点 × 2 个属性 × 3 float）。
+const TRAIL_MAX = quality.mobile ? 480 : 900;
 let trailPoints = null;
 let trailGeo = null;
 let trailPosAttr = null;
@@ -748,8 +757,8 @@ export function updateShipTrail(dt, t) {
     const thrusters = (p && p.thrusters) || null;
     const nozzleRadius = 0.062;
 
-    // 单发单帧基础发射量：开局 6 颗/发 -> 极速 9 颗/发，形成短粗致密火炬
-    const baseCount = 6.0 + spdRatio * 3.0;
+    // 单发单帧基础发射量：开局 6 颗/发 -> 极速 9 颗/发，形成短粗致密火炬（按画质档位缩放）
+    const baseCount = (6.0 + spdRatio * 3.0) * (0.6 + quality.fx * 0.4);
 
     // 主引擎喷口（左右各一，本体局部坐标系）
     for (let k = 0; k < 2; k++) {
@@ -837,7 +846,7 @@ export function updateShipTrail(dt, t) {
     // 辅助升级引擎（T3 翼下引擎 & T4 背部推进器，均为飞船本体局部坐标）
     const auxNozzles = run.tier >= 4 ? AUX_NOZZLES_T4 : (run.tier >= 3 ? AUX_NOZZLES_T3 : EMPTY_AUX_NOZZLES);
 
-    const auxCount = Math.max(1, Math.round(1.0 + spdRatio * 1.5));
+    const auxCount = Math.max(1, Math.round((1.0 + spdRatio * 1.5) * quality.fx));
     for (let k = 0; k < auxNozzles.length; k++) {
       const n = auxNozzles[k];
       const steerBoost = n.isLeft ? Math.max(0, steer * 0.25) : Math.max(0, -steer * 0.25);

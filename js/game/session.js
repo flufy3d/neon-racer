@@ -1,5 +1,6 @@
 import { endAudioRun, playSound, startAudioRun } from '../audio.js';
 import { MILESTONE_ZONES, RUSH_FIRST_AT, TIER_COLORS } from '../core/constants.js';
+import { resetQualityAdaptive } from '../core/quality.js';
 import { $ } from '../core/dom.js';
 import { lists, run, view } from '../core/state.js';
 import { explode, resetParticlePools } from '../entities/particles.js';
@@ -95,6 +96,7 @@ export function startGame() {
   if (run.overTimerId) { clearTimeout(run.overTimerId); run.overTimerId = null; }
   ui.resetRunSummary();
   resetGame();
+  resetQualityAdaptive();
   run.beatCount = 0;
   startAudioRun();
   run.state = 'playing'; run.paused = false;

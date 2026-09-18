@@ -1,4 +1,4 @@
-const CACHE = 'neon-racer-v42';
+const CACHE = 'neon-racer-v43';
 const ASSETS = [
   './',
   './index.html',
@@ -13,6 +13,7 @@ const ASSETS = [
   './js/audio/transport.js',
   './js/core/constants.js',
   './js/core/dom.js',
+  './js/core/quality.js',
   './js/core/state.js',
   './js/debug/inspect.js',
   './js/entities/obstacles.js',

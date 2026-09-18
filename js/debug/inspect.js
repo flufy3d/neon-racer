@@ -1,5 +1,6 @@
 import { MILESTONE_ZONES, TIER_COLORS } from '../core/constants.js';
 import { getAudioSnapshot, getBeatGrid } from '../audio.js';
+import { quality } from '../core/quality.js';
 import { lists, run, view } from '../core/state.js';
 import { makeArmorCore, makeGate, makeLow, makeOrb, makeOverheadArch, makeRoadsideRelay, makeWall, makeWarpBeacon } from '../entities/obstacles.js';
 import { stepFrame } from '../game/loop.js';
@@ -20,6 +21,7 @@ window.__neon = {
   get bloomPass() { return view.bloomPass; },
   get ship() { return view.ship; },
   get view() { return view; },
+  get quality() { return quality; },
   get run() { return run; },
   get lists() { return lists; },
   get state() { return run.state; },
