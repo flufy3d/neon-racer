@@ -88,16 +88,25 @@ function pump() {
   setTimeout(() => { showing = false; pump(); }, 1400);
 }
 
-// —— 指标快照 ——
+// —— 判定表按类型预分桶：避免每次事件 / 巡检都 filter 出新数组 ——
+const RUN_EVENT_DEFS = {};
+for (const d of ACHIEVEMENTS) {
+  if (d.scope === 'run' && d.event) (RUN_EVENT_DEFS[d.event] ||= []).push(d);
+}
+const RUN_EAGER_DEFS = ACHIEVEMENTS.filter(d => d.scope === 'run' && d.eager);
+const RUN_METRIC_DEFS = ACHIEVEMENTS.filter(d => d.scope === 'run' && d.metric);
+const TOTAL_METRIC_DEFS = ACHIEVEMENTS.filter(d => d.scope === 'total' && d.metric);
+
+// —— 指标快照（复用同一对象，避免每次事件分配）——
+const _metrics = { dist: 0, speedKmh: 0, maxCombo: 0, totalScore: 0, elapsed: 0, tier: 0 };
 function liveMetrics() {
-  return {
-    dist: run.dist,
-    speedKmh: run.maxSpeed * 3.6,
-    maxCombo: run.maxCombo,
-    totalScore: Math.floor(run.dist) + run.score,
-    elapsed: run.elapsed,
-    tier: run.tier
-  };
+  _metrics.dist = run.dist;
+  _metrics.speedKmh = run.maxSpeed * 3.6;
+  _metrics.maxCombo = run.maxCombo;
+  _metrics.totalScore = Math.floor(run.dist) + run.score;
+  _metrics.elapsed = run.elapsed;
+  _metrics.tier = run.tier;
+  return _metrics;
 }
 
 function evalDefs(defs, valueOf) {
@@ -111,10 +120,11 @@ export function achEvent(type) {
   if (run.state !== 'playing' || !run.ach) return;
   if (run.ach[type] !== undefined) {
     run.ach[type]++;
-    evalDefs(ACHIEVEMENTS.filter(d => d.scope === 'run' && d.event === type), () => run.ach[type]);
+    evalDefs(RUN_EVENT_DEFS[type] || [], () => run.ach[type]);
   }
   // 连击/形态等随事件即时判定，不等巡检
-  evalDefs(ACHIEVEMENTS.filter(d => d.scope === 'run' && d.eager), d => liveMetrics()[d.metric]);
+  const metrics = liveMetrics();
+  evalDefs(RUN_EAGER_DEFS, d => metrics[d.metric]);
 }
 
 // —— 路径 2：连续指标巡检（主循环每 0.2s 模拟时调用）——
@@ -125,7 +135,7 @@ export function achTick(dt) {
   if (tickAcc < 0.2) return;
   tickAcc = 0;
   const metrics = liveMetrics();
-  evalDefs(ACHIEVEMENTS.filter(d => d.scope === 'run' && d.metric), d => metrics[d.metric]);
+  evalDefs(RUN_METRIC_DEFS, d => metrics[d.metric]);
 }
 
 // —— 路径 3：跨局累计（gameOver 结算时调用）——
@@ -133,7 +143,7 @@ export function onGameEnd(isRecord) {
   totals.runs++;
   totals.dist += run.dist;
   totals.orbs += run.orbCount;
-  evalDefs(ACHIEVEMENTS.filter(d => d.scope === 'total' && d.metric), d => totals[d.metric]);
+  evalDefs(TOTAL_METRIC_DEFS, d => totals[d.metric]);
   if (isRecord) unlock(defById.record1);
   save();
 }

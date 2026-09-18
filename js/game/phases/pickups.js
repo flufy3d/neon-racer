@@ -38,7 +38,9 @@ for (let i = lists.orbs.length - 1; i >= 0; i--) {
   }
   if (o.position.z > 10) { releasePooledOrb(o); lists.orbs.splice(i, 1); continue; }
   if (run.tier >= 3 && o.position.z < 4 && o.position.z > -16) {
-    const md = Math.hypot(o.position.x - view.ship.position.x, o.userData.baseY - view.ship.position.y);
+    const mdx = o.position.x - view.ship.position.x;
+    const mdy = o.userData.baseY - view.ship.position.y;
+    const md = Math.sqrt(mdx * mdx + mdy * mdy);
     if (md < 4.5) {
       const pull = Math.min(1, dt * 7);
       o.position.x += (view.ship.position.x - o.position.x) * pull;
@@ -82,9 +84,11 @@ for (let i = lists.orbs.length - 1; i >= 0; i--) {
     ui.els.comboBox.style.color = ui.comboColor(mult);
     ui.els.comboBox.style.opacity = 1;
     ui.els.comboBar.style.transform = 'scaleX(1)';
-    ui.els.comboBox.classList.remove('pop');
-    void ui.els.comboBox.offsetWidth;
-    ui.els.comboBox.classList.add('pop');
+    // WAAPI 缩放替代 remove/offsetWidth/add：吃球高频，避免强制同步布局
+    ui.els.comboBox.animate(
+      [{ transform: 'scale(1.55)' }, { transform: 'scale(1)' }],
+      { duration: 220, easing: 'ease-out' }
+    );
     if (TOASTS[run.combo]) ui.toast(TOASTS[run.combo], ui.comboColor(mult));
     if (run.tier >= 2 && !run.shieldReady && run.orbCount - run.orbCountAtShieldEvent >= ui.SHIELD_RECHARGE) {
       run.shieldReady = true;
@@ -156,7 +160,9 @@ for (let i = lists.armorOrbs.length - 1; i >= 0; i--) {
   if (o.position.z > 10) { releasePooledArmor(o); lists.armorOrbs.splice(i, 1); continue; }
   // T3 磁力场同样吸附护甲核心
   if (run.tier >= 3 && o.position.z < 4 && o.position.z > -16) {
-    const md = Math.hypot(o.position.x - view.ship.position.x, o.userData.baseY - view.ship.position.y);
+    const mdx = o.position.x - view.ship.position.x;
+    const mdy = o.userData.baseY - view.ship.position.y;
+    const md = Math.sqrt(mdx * mdx + mdy * mdy);
     if (md < 4.5) {
       const pull = Math.min(1, dt * 7);
       o.position.x += (view.ship.position.x - o.position.x) * pull;

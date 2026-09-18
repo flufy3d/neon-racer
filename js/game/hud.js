@@ -47,7 +47,9 @@ export function updateHUD() {
 }
 
 export function bumpScore() {
-  ui.els.scoreEl.classList.remove('bump');
-  void ui.els.scoreEl.offsetWidth;
-  ui.els.scoreEl.classList.add('bump');
+  // WAAPI 缩放走合成器，替代 remove/offsetWidth/add 的强制同步布局（吃球高频触发）
+  ui.els.scoreEl.animate(
+    [{ transform: 'scale(1.35)' }, { transform: 'scale(1)' }],
+    { duration: 200, easing: 'ease-out' }
+  );
 }

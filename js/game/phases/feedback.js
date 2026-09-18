@@ -3,7 +3,7 @@ import { COMBO_WINDOW, MILESTONE_ZONES } from '../../core/constants.js';
 import { $ } from '../../core/dom.js';
 import { lists, run, view } from '../../core/state.js';
 import { updateBurstParticles, updateShipTrail, updateShockwaves, updateShards, updateOrbShards, updateShipWreckage } from '../../entities/particles.js';
-import { archNeonMat, gateBodyMat, gateCoreMat, gateEdgeMat, lowBodyMat, lowCoreMat, lowEdgeMat, towerCapMat, towerSpireMat, wallBodyMat, wallCoreMat, wallEdgeMat } from '../../scene/materials.js';
+import { archNeonMat, gateCoreMat, gateEdgeMat, lowCoreMat, lowEdgeMat, towerCapMat, towerSpireMat, wallCoreMat, wallEdgeMat } from '../../scene/materials.js';
 import { BG_BASE, WHITE, currentLowCoreCol, currentLowEdgeCol, currentWallCoreCol, currentWallEdgeCol, targetLowCoreCol, targetLowEdgeCol, targetWallCoreCol, targetWallEdgeCol, tmpColB } from '../../scene/palette.js';
 import * as ui from '../../ui.js';
 import { showPaused } from '../session.js';
@@ -127,9 +127,6 @@ wallCoreMat.color.copy(currentWallCoreCol);
 lowCoreMat.color.copy(currentLowCoreCol);
 wallEdgeMat.color.copy(currentWallEdgeCol).lerp(WHITE, Math.min(1, run.beatGlow * 0.35 + rushK * 0.45));
 lowEdgeMat.color.copy(currentLowEdgeCol).lerp(WHITE, Math.min(1, run.beatGlow * 0.35 + rushK * 0.45));
-wallBodyMat.opacity = 0.92 + rushK * 0.06;
-lowBodyMat.opacity = 0.92 + rushK * 0.06;
-gateBodyMat.opacity = 0.92 + rushK * 0.06;
 // 闸门保持固定紫色识别色，只随节拍增亮
 gateCoreMat.opacity = 0.65 + run.beatGlow * 0.35;
 gateEdgeMat.color.setHex(0xbb44ff).lerp(WHITE, Math.min(1, run.beatGlow * 0.35 + rushK * 0.5));

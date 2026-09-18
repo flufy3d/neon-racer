@@ -17,9 +17,11 @@ export const wallPylonGeo = new THREE.BoxGeometry(0.06, 3.2, 0.54);
 
 export const lowGuideGeo = new THREE.BoxGeometry(2.4, 0.04, 0.52);
 
-export const wallBodyMat = new THREE.MeshBasicMaterial({ color: 0x160610, transparent: true, opacity: 0.92, depthWrite: true });
+// 障碍暗体：原先 transparent+0.92 会让大面积墙体落入透明队列（无法早期深度剔除、
+// 额外混合与排序），改为不透明后画面几乎无差别，移动端省下大量 overdraw。
+export const wallBodyMat = new THREE.MeshBasicMaterial({ color: 0x160610 });
 
-export const lowBodyMat = new THREE.MeshBasicMaterial({ color: 0x160d04, transparent: true, opacity: 0.92, depthWrite: true });
+export const lowBodyMat = new THREE.MeshBasicMaterial({ color: 0x160d04 });
 
 export const wallEdgeMat = new THREE.LineBasicMaterial({ color: 0xff1155 });
 
@@ -118,7 +120,7 @@ export const gateBottomGeo = new THREE.BoxGeometry(2.4, 0.1, 0.54);
 
 export const gateCableGeo = new THREE.BoxGeometry(0.07, 2.6, 0.07);
 
-export const gateBodyMat = new THREE.MeshBasicMaterial({ color: 0x0d0518, transparent: true, opacity: 0.92, depthWrite: true });
+export const gateBodyMat = new THREE.MeshBasicMaterial({ color: 0x0d0518 });
 
 export const gateEdgeMat = new THREE.LineBasicMaterial({ color: 0xbb44ff });
 

@@ -101,14 +101,18 @@ export function toast(text, color = '#ffd700') {
   els.toastEl.style.color = color;
   els.toastEl.style.textShadow = `0 0 18px ${color}, 0 0 50px ${color}`;
   els.toastEl.classList.remove('show');
-  void els.toastEl.offsetWidth;
-  els.toastEl.classList.add('show');
+  // 用双 rAF 代替 void offsetWidth 强制回流：让浏览器在下一帧重新触发动画，不阻塞主线程
+  requestAnimationFrame(() => requestAnimationFrame(() => els.toastEl.classList.add('show')));
 }
 
 let lastScore = -1;
 let lastSpeed = -1;
 let lastDist = -1;
 let lastOrbCount = -1;
+// 分数/速度/里程每帧都在变，但没必要每帧写 DOM（会触发样式重算与文本布局）。
+// 以 10Hz 节流这三项；形态、连击、护盾等事件型字段仍即时刷新。
+let hudFastAt = 0;
+const HUD_FAST_MS = 100;
 let lastMaxCombo = -1;
 let lastTier = -1;
 let lastTierColorHex = '';
@@ -125,6 +129,7 @@ let lastRushOn = false;
 let lastRushText = '';
 
 export function resetHUDCache() {
+  hudFastAt = 0;
   lastScore = -1;
   lastSpeed = -1;
   lastDist = -1;
@@ -147,20 +152,24 @@ export function resetHUDCache() {
 }
 
 export function updateHUD(s) {
-  const scoreVal = Math.floor(s.dist) + s.bonus;
-  if (scoreVal !== lastScore) {
-    lastScore = scoreVal;
-    els.scoreEl.textContent = 'SCORE ' + scoreVal;
-  }
-  const speedVal = Math.round(s.speed * 3.6);
-  if (speedVal !== lastSpeed) {
-    lastSpeed = speedVal;
-    els.speedEl.textContent = speedVal;
-  }
-  const distVal = Math.floor(s.dist);
-  if (distVal !== lastDist) {
-    lastDist = distVal;
-    els.distStat.textContent = distVal + ' m';
+  const now = performance.now();
+  if (now - hudFastAt >= HUD_FAST_MS) {
+    hudFastAt = now;
+    const scoreVal = Math.floor(s.dist) + s.bonus;
+    if (scoreVal !== lastScore) {
+      lastScore = scoreVal;
+      els.scoreEl.textContent = 'SCORE ' + scoreVal;
+    }
+    const speedVal = Math.round(s.speed * 3.6);
+    if (speedVal !== lastSpeed) {
+      lastSpeed = speedVal;
+      els.speedEl.textContent = speedVal;
+    }
+    const distVal = Math.floor(s.dist);
+    if (distVal !== lastDist) {
+      lastDist = distVal;
+      els.distStat.textContent = distVal + ' m';
+    }
   }
   if (s.orbCount !== lastOrbCount) {
     lastOrbCount = s.orbCount;
