@@ -22,10 +22,6 @@ function slide() {
   if (run.state !== 'playing' || run.paused) return;
   if (run.slideTimer > 0) return;
   run.slideTimer = SLIDE_DURATION;
-  // 刚性桶滚：目标角锁定到下一个 2π 整数倍，动作收尾一定回到水平
-  run.slideRollFrom = run.slideRoll;
-  run.slideRollTarget = Math.ceil((run.slideRoll + 1e-3) / (Math.PI * 2)) * Math.PI * 2;
-  run.slideRollT = 0;
   if (!run.grounded) {
     run.vy = Math.min(run.vy, SLIDE_FASTFALL_V);
     run.airJumps = 0;

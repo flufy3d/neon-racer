@@ -7,7 +7,7 @@
 // 用对象而不是模块顶层 let，是因为 ES module 的 import 绑定是只读的：
 // 想让多个模块写同一份状态，就必须让状态有一个显式的宿主。
 
-import { RUSH_FIRST_AT, SLIDE_ROLL_DUR } from './constants.js';
+import { RUSH_FIRST_AT } from './constants.js';
 
 export const view = {
   scene: undefined, camera: undefined, renderer: undefined, composer: undefined, clock: undefined,
@@ -42,10 +42,8 @@ export const run = {
   rhythmTarget: null, rhythmK: 0, lastSpawnBeat: null,
   // 悬挂闸门：同车道低障最近出现里程（跳跃滞空窗口保护）与首次登场提示
   lowLaneDist: [-Infinity, -Infinity, -Infinity], gateIntroduced: false,
-  // 滑铲：slideTimer 剩余时长，slideK 姿态平滑系数（0~1）
+  // 滑铲：slideTimer 剩余时长，slideK 姿态平滑系数（0~1，驱动机体贴地变形）
   slideTimer: 0, slideK: 0,
-  // 滑铲刚性桶滚：slideRoll 当前滚转角，从 slideRollFrom 缓动到 slideRollTarget（2π 整数倍，收尾必回正）
-  slideRoll: 0, slideRollFrom: 0, slideRollTarget: 0, slideRollT: SLIDE_ROLL_DUR,
   // 成就系统单局计数器（achievements.js 的 resetRunCounters 填充）
   ach: null
 };

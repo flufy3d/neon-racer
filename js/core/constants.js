@@ -55,10 +55,10 @@ export const GATE_LOW_CLEAR = 8;        // 同车道 low→gate 安全余量（�
 // 滑铲：下甩/↓ 触发的贴地滑行动作，穿过悬挂闸门的正确姿势
 export const SLIDE_DURATION = 0.75;     // 滑铲持续秒数
 export const SLIDE_FASTFALL_V = -26;    // 滞空时触发的俯冲下降速度
-export const SLIDE_DROP_Y = 0.16;       // 滑铲时机体压低量（刚性姿态，不做任何形变）
-export const SLIDE_ROLL_DUR = 0.8;      // 滑铲刚性桶滚一周秒数（略长于滑铲时长，收尾自然回正）
-export const SLIDE_WING_FOLD = 1.2;     // 滑铲收翼上折弧度（收紧回转半径，贴地滚转不扫到地面）
-export const SLIDE_PITCH = 0.13;        // 滑铲桶滚时机首下压弧度（螺旋下潜姿态）
+export const SLIDE_DROP_Y = 0.5;        // 滑铲时机体压低量（贴地掠行，机体保持刚性）
+export const SLIDE_WING_SWEEP = 0.95;   // 滑铲收翼后掠弧度（变后掠翼收紧成箭形）
+export const SLIDE_WING_DIP = 0.16;     // 滑铲翼面下压弧度（翼尖贴近地面）
+export const SLIDE_PITCH = 0.17;        // 滑铲时机首下压弧度（俯冲穿行姿态）
 
 // 护甲核心：绿色特殊拾取物，吃到直接装备一层应急护甲（任意形态可用，抵挡一次撞击）
 export const ARMOR_PICKUP_SCORE = 80;   // 装备护甲的得分

@@ -45,7 +45,8 @@ if (run.combo > 0) {
 }
 
 const jumpLift = Math.max(0, view.ship.position.y - 1.02);
-const targetCamY = 4.6 + jumpLift * 0.40;
+// 贴地掠行时镜头同步下沉压低，地面迎面掠过，强化"钻闸底"的速度压迫感
+const targetCamY = 4.6 + jumpLift * 0.40 - run.slideK * 1.15;
 run.camY += (targetCamY - run.camY) * Math.min(1, dt * 12);
 
 // 黑客帝国弧形环切运镜（Camera Orbit Sweep & Dutch Tilt）
@@ -71,7 +72,7 @@ view.camera.position.y = run.camY + run.camSweepY;
 view.camera.position.z = 8.5 + run.camSweepZ;
 
 const lookTargetX = view.ship.position.x * 0.5 - run.camSweepX * 0.28;
-const lookTargetY = 1 + jumpLift * 0.25 - run.camSweepY * 0.25;
+const lookTargetY = 1 + jumpLift * 0.25 - run.camSweepY * 0.25 - run.slideK * 0.35;
 view.camera.lookAt(lookTargetX, lookTargetY, -12);
 
 if (view.cyberSun) {

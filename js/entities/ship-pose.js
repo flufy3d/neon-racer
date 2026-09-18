@@ -1,4 +1,4 @@
-import { MAX_TIER, SLIDE_WING_FOLD, TIER_COLORS } from '../core/constants.js';
+import { MAX_TIER, SLIDE_WING_DIP, SLIDE_WING_SWEEP, TIER_COLORS } from '../core/constants.js';
 import { run, view } from '../core/state.js';
 import { BG_BASE, WHITE, tmpColA, tmpColB } from '../scene/palette.js';
 
@@ -50,7 +50,8 @@ export function poseShip(m, t) {
   const lanceK = seg(m, 5);
   p.lance.visible = lanceK > 0.01;
   p.lance.scale.set(0.5 + 0.5 * lanceK, lanceK, 0.5 + 0.5 * lanceK);
-  p.lance.position.z = -0.85 - 0.8 * lanceK;
+  // 滑铲时破风长矛回缩进机首，缩短正面长度
+  p.lance.position.z = -0.85 - 0.8 * lanceK + 0.85 * Math.min(1, run.slideK * 1.5);
 
   const span = curve(MORPH.wingSpan, m), sweep = curve(MORPH.wingSweep, m), rise = curve(MORPH.wingRise, m);
   const fin = curve(MORPH.tipFin, m);
@@ -59,14 +60,14 @@ export function poseShip(m, t) {
   const speedFlameK = 0.55 + spdRatio * 0.50;
   const flameLen = curve(MORPH.flameLen, m) * speedFlameK + Math.sin(t * 28) * (0.02 + spdRatio * 0.03);
   const podK = seg(m, 3), bladeK = seg(m, 4);
-  // 滑铲收翼：比压低更快（先锁翼再滚转），上折通过铰链旋转实现，机体不形变
-  const foldK = Math.min(1, run.slideK * 1.6);
+  // 滑铲贴地变形：变后掠翼收紧成箭形，部件顺桨压平（全部走铰链旋转/部件缩放，机体不形变）
+  const tuckK = Math.min(1, run.slideK * 1.5);
 
   for (const w of p.wings) {
-    w.g.rotation.y = -w.side * sweep;
-    w.g.rotation.z = w.side * (rise + foldK * SLIDE_WING_FOLD);
+    w.g.rotation.y = -w.side * (sweep + tuckK * SLIDE_WING_SWEEP);
+    w.g.rotation.z = w.side * (rise - tuckK * SLIDE_WING_DIP);
     w.g.scale.x = span;
-    w.tip.scale.y = fin;
+    w.tip.scale.y = fin * (1 - 0.5 * tuckK);
     w.tip.position.y = 0.02 + (fin - 1) * 0.055;
 
     w.pod.visible = podK > 0.01;
@@ -81,15 +82,15 @@ export function poseShip(m, t) {
 
     w.blade.visible = bladeK > 0.01;
     w.blade.scale.setScalar(0.3 + 0.7 * bladeK);
-    w.blade.rotation.z = -w.side * 0.95 * bladeK;
+    w.blade.rotation.z = -w.side * 0.95 * bladeK * (1 - tuckK);
   }
 
   const canK = seg(m, 1);
   for (const c of p.canards) {
     c.g.visible = canK > 0.01;
     c.g.scale.setScalar(0.25 + 0.75 * canK);
-    c.g.rotation.z = c.side * (-1.15 + 1.4 * canK);
-    c.g.rotation.y = -c.side * (0.5 - 0.32 * canK);
+    c.g.rotation.z = c.side * (-1.15 + 1.4 * canK) * (1 - 0.85 * tuckK);
+    c.g.rotation.y = -c.side * (0.5 - 0.32 * canK + tuckK * 0.9);
   }
   for (const v of p.vents) {
     v.m.visible = canK > 0.01;
@@ -103,9 +104,10 @@ export function poseShip(m, t) {
   for (const pl of p.plates) {
     pl.g.visible = plateK > 0.01;
     pl.g.scale.setScalar(0.4 + 0.6 * plateK);
-    pl.g.rotation.z = pl.sx * pl.sy * plateK * (0.5 + breathe);
+    // 滑铲时装甲板合拢贴体，收紧正面轮廓
+    pl.g.rotation.z = pl.sx * pl.sy * plateK * (0.5 + breathe) * (1 - tuckK);
     pl.g.rotation.y = -pl.sx * 0.14 * plateK;
-    pl.g.position.set(pl.sx * (0.22 + 0.1 * plateK), pl.sy * (0.13 + 0.16 * plateK), 0.45);
+    pl.g.position.set(pl.sx * (0.22 + 0.1 * plateK), pl.sy * (0.13 + 0.16 * plateK) * (1 - 0.35 * tuckK), 0.45);
   }
 
   const boostK = seg(m, 4);
@@ -114,6 +116,8 @@ export function poseShip(m, t) {
     b.g.scale.setScalar(0.3 + 0.7 * boostK);
     b.g.position.set(b.side * (0.3 + 0.16 * boostK), 0.18 + 0.18 * boostK, 0.75);
     b.g.rotation.z = -b.side * 0.18 * boostK;
+    // 滑铲时推进器下偏，向下排气形成气垫
+    b.g.rotation.x = tuckK * 0.75;
     b.flame.material.color.setHex(PHYSICAL_PLUME_HEX);
     b.flame.scale.set(1, flameLen * 0.7, 1);
   }
@@ -122,17 +126,20 @@ export function poseShip(m, t) {
   p.spine.visible = spineK > 0.01;
   p.spine.scale.set(1, spineK, 0.5 + 0.5 * spineK);
   p.spine.position.y = 0.04 - 0.14 * (1 - spineK);
+  // 滑铲时背鳍向后放平，消除背部迎风面
+  p.spine.rotation.x = tuckK * 1.15;
 
   p.halo.visible = lanceK > 0.01;
-  p.halo.scale.setScalar(0.3 + 0.7 * lanceK);
+  p.halo.scale.setScalar((0.3 + 0.7 * lanceK) * (1 - 0.3 * tuckK));
   p.halo.rotation.z = t * 1.4;
   p.halo.rotation.x = Math.PI / 2 + Math.sin(t * 1.1) * 0.55;
-  p.halo.position.set(0, 0.62 + 0.24 * lanceK + Math.sin(t * 2.2) * 0.03, 0.3);
+  p.halo.position.set(0, 0.62 + 0.24 * lanceK + Math.sin(t * 2.2) * 0.03 - 0.34 * tuckK, 0.3);
   for (const sh of p.shards) {
     sh.m.visible = lanceK > 0.01;
     const a = t * 1.7 + sh.i * Math.PI / 2;
-    const r = 0.75 + 0.45 * lanceK;
-    sh.m.position.set(Math.cos(a) * r, 0.3 + Math.sin(t * 2.4 + sh.i) * 0.22, 0.3 + Math.sin(a) * r * 0.7);
+    // 滑铲时环绕晶体收拢贴体
+    const r = (0.75 + 0.45 * lanceK) * (1 - 0.45 * tuckK);
+    sh.m.position.set(Math.cos(a) * r, 0.3 - 0.15 * tuckK + Math.sin(t * 2.4 + sh.i) * 0.22, 0.3 + Math.sin(a) * r * 0.7);
     sh.m.rotation.set(t * 2, t * 2.6, 0);
     sh.m.scale.setScalar(lanceK);
   }
@@ -201,12 +208,9 @@ export function poseShip(m, t) {
     for (const r of p.rcs) {
       // 左侧 RCS (side = -1) 在向右变轨 (steer > 0) 时喷射；右侧 RCS (side = 1) 在向左变轨 (steer < 0) 时喷射
       const activeSteer = r.side < 0 ? Math.max(0, steer) : Math.max(0, -steer);
-      // 滑铲桶滚：两侧 RCS 反向推力偶同时点火，提供滚转力矩
-      const rollFire = foldK > 0.05 ? foldK * (0.8 + Math.sin(t * 34 + r.side * 2.1) * 0.2) : 0;
-      const fireK = Math.max(activeSteer, rollFire);
-      if (fireK > 0.06) {
+      if (activeSteer > 0.06) {
         const rcsFlicker = 0.85 + Math.sin(t * 45 + r.side) * 0.15;
-        const rcsScale = fireK * rcsFlicker;
+        const rcsScale = activeSteer * rcsFlicker;
         r.plume.scale.set(rcsScale * 1.1, rcsScale * 1.5, rcsScale * 1.1);
         r.plume.visible = true;
       } else {
