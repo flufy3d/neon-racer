@@ -179,6 +179,9 @@ export function spawnPooledArmor(scene, x, y, z) {
   o.userData.baseY = y;
   o.userData.phase = Math.random() * Math.PI * 2;
   o.userData.active = true;
+  o.userData.hint = false;
+  o.userData.hintShown = false;
+  o.userData.hintRinged = false;
   o.visible = true;
   if (o.userData.ring) o.userData.ring.rotation.set(Math.PI / 2, 0, 0);
   return o;
@@ -253,6 +256,10 @@ export function spawnPooledObstacle(scene, type, lane, z) {
   obj.userData.active = true;
   obj.userData.passed = false;
   obj.userData.phase = Math.random() * Math.PI * 2;
+  // 首次登场高亮引导标记（由 spawner 置位，world/pickups 消费）
+  obj.userData.hint = false;
+  obj.userData.hintShown = false;
+  obj.userData.hintRinged = false;
 
   if (type === 'wall') {
     if (obj.userData.scan) obj.userData.scan.position.y = 1.6;

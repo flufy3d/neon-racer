@@ -131,7 +131,8 @@ export function spawnPattern(overshoot = 0, gap = 15) {
   for (const item of plan) {
     if (item.type === 'low') run.lowLaneDist[item.lane] = run.dist;
   }
-  if (!run.gateIntroduced && plan.some(item => item.type === 'gate')) {
+  const gateIntro = !run.gateIntroduced && plan.some(item => item.type === 'gate');
+  if (gateIntro) {
     run.gateIntroduced = true;
     ui.toast('悬挂闸门 · 下甩滑铲通过!', '#cc88ff');
     playSound('gateIntro');
@@ -140,6 +141,8 @@ export function spawnPattern(overshoot = 0, gap = 15) {
   for (const item of plan) {
     if (item.type === 'wall' || item.type === 'low' || item.type === 'gate') {
       const obj = spawnPooledObstacle(view.scene, item.type, item.lane, -140 + overshoot);
+      // 首个闸门挂上高亮引导：下沿脉动 + 提示环 + 滑铲提示标签（world.js 消费）
+      if (gateIntro && item.type === 'gate') obj.userData.hint = true;
       lists.obstacles.push(obj);
     } else {
       const o = spawnPooledOrb(view.scene, LANES[item.lane], 1.2, -140 + overshoot);
@@ -155,6 +158,8 @@ export function spawnPattern(overshoot = 0, gap = 15) {
   // 护甲核心：满足最小间隔后按概率投放在自由车道（必然可达），置于能量球串尾端之外
   if (run.dist >= ARMOR_INTRO_DIST && run.dist - run.lastArmorDist > ARMOR_MIN_GAP && Math.random() < ARMOR_CHANCE) {
     const a = spawnPooledArmor(view.scene, LANES[freeLane], 1.2, -152 + overshoot);
+    // 首个护甲核心挂上高亮引导：光柱加强脉动 + 提示环 + 拾取说明（pickups.js 消费）
+    if (!run.armorIntroduced) { run.armorIntroduced = true; a.userData.hint = true; }
     lists.armorOrbs.push(a);
     run.lastArmorDist = run.dist;
   }

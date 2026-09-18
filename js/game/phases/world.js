@@ -215,6 +215,21 @@ for (let i = lists.obstacles.length - 1; i >= 0; i--) {
       o.userData.scan.position.y = 3.2 + Math.sin(t * 6 + o.userData.phase) * 1.15;
       // 缆索悬挂的视觉微摆；碰撞高度固定，不随摆动变化
       if (o.userData.bottom) o.userData.bottom.position.y = 1.78 + Math.sin(t * 2.1 + o.userData.phase) * 0.05;
+      // 首次闸门高亮引导：下沿脉动 + 提示环 + 提前一段距离的滑铲提示
+      if (o.userData.hint) {
+        if (o.userData.bottom) {
+          const hp = 1 + Math.sin(t * 9) * 0.06;
+          o.userData.bottom.scale.set(hp, 1, hp);
+        }
+        if (!o.userData.hintRinged && o.position.z > -30 && o.position.z < -22) {
+          o.userData.hintRinged = true;
+          spawnShockwave({ x: o.position.x, y: 1.78, z: o.position.z }, 0xcc88ff, 1.3);
+        }
+        if (!o.userData.hintShown && o.position.z > -24 && o.position.z < -14) {
+          o.userData.hintShown = true;
+          ui.floatLabel('↓ 滑铲穿闸', { x: o.position.x, y: 2.1, z: o.position.z }, '#cc88ff', 18);
+        }
+      }
     } else if (o.userData.type === 'low') {
       o.userData.scan.scale.x = 0.88 + Math.sin(t * 8 + o.userData.phase) * 0.12;
       if (o.userData.guide) {

@@ -139,7 +139,19 @@ for (let i = lists.armorOrbs.length - 1; i >= 0; i--) {
     o.userData.ring.rotation.y = Math.sin(t * 2.4 + o.userData.phase) * 0.5;
   }
   if (o.userData.pillar) {
-    o.userData.pillar.material.opacity = 0.28 + Math.sin(t * 5 + o.userData.phase) * 0.14;
+    const hintK = o.userData.hint ? 1 : 0;
+    o.userData.pillar.material.opacity = 0.28 + hintK * 0.1 + Math.sin(t * (5 + hintK * 4) + o.userData.phase) * (0.14 + hintK * 0.08);
+  }
+  // 首个护甲核心高亮引导：提示环 + 提前一段距离的拾取说明
+  if (o.userData.hint) {
+    if (!o.userData.hintRinged && o.position.z > -32 && o.position.z < -24) {
+      o.userData.hintRinged = true;
+      spawnShockwave({ x: o.position.x, y: 1.0, z: o.position.z }, 0x66ff88, 1.2);
+    }
+    if (!o.userData.hintShown && o.position.z > -24 && o.position.z < -14) {
+      o.userData.hintShown = true;
+      ui.floatLabel('护甲核心 · 抵挡一次撞击', { x: o.position.x, y: 1.9, z: o.position.z }, '#66ff88', 18);
+    }
   }
   if (o.position.z > 10) { releasePooledArmor(o); lists.armorOrbs.splice(i, 1); continue; }
   // T3 磁力场同样吸附护甲核心
