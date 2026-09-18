@@ -1,7 +1,7 @@
 import { playSound } from '../../audio.js';
 import { ARMOR_FULL_SCORE, ARMOR_PICKUP_SCORE, COMBO_WINDOW, DOUBLE_JUMP_TIER, MAX_TIER, TIER_COLORS, TIER_NAMES, TOASTS } from '../../core/constants.js';
 import { lists, run, view } from '../../core/state.js';
-import { releasePooledArmor, releasePooledOrb } from '../../entities/obstacles.js';
+import { releasePooledArmor, releasePooledOrb, syncOrbInstances } from '../../entities/obstacles.js';
 import { burst, shatterOrb, spawnShockwave } from '../../entities/particles.js';
 import { applyShipTier } from '../../entities/ship.js';
 import * as ui from '../../ui.js';
@@ -21,37 +21,30 @@ if (run.combo > 0) {
 
 for (let i = lists.orbs.length - 1; i >= 0; i--) {
   const o = lists.orbs[i];
-  const prevZ = o.position.z;
-  o.position.z += move;
-  o.position.y = o.userData.baseY + Math.sin(t * 4 + o.userData.phase) * 0.15;
-  o.rotation.y += dt * 3;
-  if (o.userData.innerRing) {
-    o.userData.innerRing.rotation.x = t * 2.8 + o.userData.phase;
-    o.userData.innerRing.rotation.z = Math.sin(t * 1.8 + o.userData.phase) * 0.4;
-  }
-  if (o.userData.outerRing) {
-    o.userData.outerRing.rotation.y = t * -2.1 + o.userData.phase;
-    o.userData.outerRing.rotation.x = Math.cos(t * 1.5 + o.userData.phase) * 0.5;
-  } else if (o.userData.ring) {
-    o.userData.ring.rotation.x = t * 2 + o.userData.phase;
-    o.userData.ring.rotation.y = Math.sin(t * 3 + o.userData.phase) * 0.6;
-  }
-  if (o.position.z > 10) { releasePooledOrb(o); lists.orbs.splice(i, 1); continue; }
-  if (run.tier >= 3 && o.position.z < 4 && o.position.z > -16) {
-    const mdx = o.position.x - view.ship.position.x;
-    const mdy = o.userData.baseY - view.ship.position.y;
+  const prevZ = o.z;
+  o.z += move;
+  o.y = o.baseY + Math.sin(t * 4 + o.phase) * 0.15;
+  o.yaw += dt * 3;
+  o.innerRx = t * 2.8 + o.phase;
+  o.innerRz = Math.sin(t * 1.8 + o.phase) * 0.4;
+  o.outerRy = t * -2.1 + o.phase;
+  o.outerRx = Math.cos(t * 1.5 + o.phase) * 0.5;
+  if (o.z > 10) { releasePooledOrb(o); lists.orbs.splice(i, 1); continue; }
+  if (run.tier >= 3 && o.z < 4 && o.z > -16) {
+    const mdx = o.x - view.ship.position.x;
+    const mdy = o.baseY - view.ship.position.y;
     const md = Math.sqrt(mdx * mdx + mdy * mdy);
     if (md < 4.5) {
       const pull = Math.min(1, dt * 7);
-      o.position.x += (view.ship.position.x - o.position.x) * pull;
-      o.userData.baseY += (view.ship.position.y - o.userData.baseY) * pull;
+      o.x += (view.ship.position.x - o.x) * pull;
+      o.baseY += (view.ship.position.y - o.baseY) * pull;
     }
   }
-  if (prevZ <= 1.15 && o.position.z >= -1.15 && Math.abs(o.position.x - view.ship.position.x) < 1.15
-    && Math.abs(o.position.y - view.ship.position.y) < 1.25) {
+  if (prevZ <= 1.15 && o.z >= -1.15 && Math.abs(o.x - view.ship.position.x) < 1.15
+    && Math.abs(o.y - view.ship.position.y) < 1.25) {
     // 关键！在 releasePooledOrb(o) 释放对象池之前，必须优先完整捕获吃球三维物理坐标！
-    // 否则 releasePooledOrb 会立刻执行 orb.position.set(0, -999, 0)，导致后续所有粒子特效都被强制移至中间道（x=0）！
-    const fxPos = { x: o.position.x, y: o.position.y, z: o.position.z };
+    // 否则实例会被立刻隐藏，导致后续所有粒子特效都被强制移至中间道（x=0）！
+    const fxPos = { x: o.x, y: o.y, z: o.z };
     releasePooledOrb(o); lists.orbs.splice(i, 1);
     run.orbCount++;
     run.combo++;
@@ -190,6 +183,7 @@ for (let i = lists.armorOrbs.length - 1; i >= 0; i--) {
   }
 }
 
+syncOrbInstances();
 updateHUD();
 
 

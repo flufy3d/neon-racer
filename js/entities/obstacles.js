@@ -83,56 +83,129 @@ export function makeOrb(x, y, z) {
   return g;
 }
 
+// ── 能量球渲染：InstancedMesh（核心球 + 内/外陀螺环各 1 次 draw call，
+// 光晕用单批 Points 代替逐个 Sprite），全场景能量球合计仅 4 次 draw call。
+// 实体状态改为纯数据记录（不再每球一棵 Object3D 子树），pickups 每帧写字段，
+// syncOrbInstances() 统一合成实例矩阵。 ──
 export const ORB_POOL_CAPACITY = 72;
 export const orbPool = [];
 
+let orbCoreMesh = null;
+let orbInnerMesh = null;
+let orbOuterMesh = null;
+let orbHaloPoints = null;
+let orbHaloPosArr = null;
+let orbHaloPosAttr = null;
+const _orbDummy = new THREE.Object3D();
+
+function setOrbInstanceCount(n) {
+  orbCoreMesh.count = n;
+  orbInnerMesh.count = n;
+  orbOuterMesh.count = n;
+  orbHaloPoints.geometry.setDrawRange(0, n);
+}
+
 export function initOrbPool(scene) {
   if (orbPool.length > 0) return;
-  for (let i = 0; i < ORB_POOL_CAPACITY; i++) {
-    const orb = makeOrb(0, -999, 0);
-    orb.visible = false;
-    orb.userData.active = false;
-    orbPool.push(orb);
-    if (scene) scene.add(orb);
+  orbCoreMesh = new THREE.InstancedMesh(orbCoreGeo, orbCoreMat, ORB_POOL_CAPACITY);
+  orbInnerMesh = new THREE.InstancedMesh(orbInnerRingGeo, orbRingMat1, ORB_POOL_CAPACITY);
+  orbOuterMesh = new THREE.InstancedMesh(orbOuterRingGeo, orbRingMat2, ORB_POOL_CAPACITY);
+  for (const mesh of [orbCoreMesh, orbInnerMesh, orbOuterMesh]) {
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    mesh.frustumCulled = false;
+    mesh.count = 0;
+    if (scene) scene.add(mesh);
   }
+
+  orbHaloPosArr = new Float32Array(ORB_POOL_CAPACITY * 3);
+  for (let i = 0; i < ORB_POOL_CAPACITY; i++) {
+    orbPool.push({
+      active: false,
+      x: 0, y: -999, z: 0, baseY: 1.2, phase: 0, yaw: 0,
+      innerRx: Math.PI / 2, innerRz: 0,
+      outerRy: Math.PI / 4, outerRx: 0
+    });
+  }
+  orbHaloPosAttr = new THREE.BufferAttribute(orbHaloPosArr, 3);
+  orbHaloPosAttr.setUsage(THREE.DynamicDrawUsage);
+  const haloGeo = new THREE.BufferGeometry();
+  haloGeo.setAttribute('position', orbHaloPosAttr);
+  orbHaloPoints = new THREE.Points(haloGeo, new THREE.PointsMaterial({
+    size: 1.9,
+    map: orbHaloMat.map,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    fog: false
+  }));
+  orbHaloPoints.frustumCulled = false;
+  if (scene) scene.add(orbHaloPoints);
+
+  setOrbInstanceCount(0);
 }
 
 export function spawnPooledOrb(scene, x, y, z) {
-  if (orbPool.length === 0 && scene) initOrbPool(scene);
-  let orb = orbPool.find(o => !o.userData.active);
-  if (!orb) {
-    orb = makeOrb(0, -999, 0);
-    orbPool.push(orb);
-    if (scene) scene.add(orb);
-  }
-  orb.position.set(x, y, z);
-  orb.rotation.set(0, 0, 0);
-  orb.userData.spawnX = x;
-  orb.userData.baseY = y;
-  orb.userData.phase = Math.random() * Math.PI * 2;
-  orb.userData.active = true;
-  orb.visible = true;
-  if (orb.userData.innerRing) {
-    orb.userData.innerRing.rotation.set(Math.PI / 2, 0, 0);
-  }
-  if (orb.userData.outerRing) {
-    orb.userData.outerRing.rotation.set(0, Math.PI / 4, 0);
-  }
-  return orb;
+  if (orbPool.length === 0) initOrbPool(scene);
+  // 池满时复用最早的一颗（InstancedMesh 容量固定，不能像原实现那样无限新建）
+  const o = orbPool.find(item => !item.active) || orbPool[0];
+  o.x = x;
+  o.y = y;
+  o.z = z;
+  o.baseY = y;
+  o.phase = Math.random() * Math.PI * 2;
+  o.yaw = 0;
+  o.innerRx = Math.PI / 2;
+  o.innerRz = 0;
+  o.outerRy = Math.PI / 4;
+  o.outerRx = 0;
+  o.active = true;
+  return o;
 }
 
-export function releasePooledOrb(orb) {
-  orb.visible = false;
-  orb.userData.active = false;
-  orb.position.set(0, -999, 0);
+export function releasePooledOrb(o) {
+  o.active = false;
 }
 
 export function resetOrbPool() {
-  for (const orb of orbPool) {
-    orb.visible = false;
-    orb.userData.active = false;
-    orb.position.set(0, -999, 0);
+  for (const o of orbPool) o.active = false;
+  if (orbPool.length > 0) setOrbInstanceCount(0);
+}
+
+// 每帧由 pickups 调用：把活动记录紧凑打包进 0..n-1 实例槽位，
+// 并把 count / drawRange 收缩到实际数量，避免为 72 个空槽付顶点开销。
+export function syncOrbInstances() {
+  if (orbPool.length === 0) return;
+  let n = 0;
+  for (let i = 0; i < orbPool.length; i++) {
+    const o = orbPool[i];
+    if (!o.active) continue;
+
+    _orbDummy.position.set(o.x, o.y, o.z);
+    _orbDummy.rotation.set(0, o.yaw, 0);
+    _orbDummy.scale.set(1, 1, 1);
+    _orbDummy.updateMatrix();
+    orbCoreMesh.setMatrixAt(n, _orbDummy.matrix);
+
+    _orbDummy.rotation.set(o.innerRx, 0, o.innerRz);
+    _orbDummy.updateMatrix();
+    orbInnerMesh.setMatrixAt(n, _orbDummy.matrix);
+
+    _orbDummy.rotation.set(o.outerRx, o.outerRy, 0);
+    _orbDummy.updateMatrix();
+    orbOuterMesh.setMatrixAt(n, _orbDummy.matrix);
+
+    orbHaloPosArr[n * 3] = o.x;
+    orbHaloPosArr[n * 3 + 1] = o.y;
+    orbHaloPosArr[n * 3 + 2] = o.z;
+    n++;
   }
+  setOrbInstanceCount(n);
+  orbCoreMesh.instanceMatrix.needsUpdate = true;
+  orbInnerMesh.instanceMatrix.needsUpdate = true;
+  orbOuterMesh.instanceMatrix.needsUpdate = true;
+  orbHaloPosAttr.clearUpdateRanges();
+  orbHaloPosAttr.addUpdateRange(0, n * 3);
+  orbHaloPosAttr.needsUpdate = true;
 }
 
 // 护甲核心：高饱和绿色大晶体 + 绿色光晕 + 顶天立地光柱，远距离即可与能量球区分

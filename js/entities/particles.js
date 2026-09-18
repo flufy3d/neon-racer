@@ -264,41 +264,102 @@ export function updateShockwaves(pdt, move = 0) {
   }
 }
 
+// ── 通用 InstancedMesh 破片渲染器 ──
+// 原先每颗破片是独立 Mesh + 独立材质（每次爆发/撞击瞬间新增几十个 draw call），
+// 现改为每种几何一个 InstancedMesh。破片材质是加法混合，逐实例颜色乘以透明度
+// 与直接调 opacity 在数学上等价，因此淡出改用 instanceColor 实现。
+const _shardDummy = new THREE.Object3D();
+const _shardColor = new THREE.Color();
+const _shardWhite = new THREE.Color(1, 1, 1);
+
+function makeInstancedShardSet(geometries, perType) {
+  const types = [];
+  for (let t = 0; t < geometries.length; t++) {
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      fog: false
+    });
+    const mesh = new THREE.InstancedMesh(geometries[t], mat, perType);
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    mesh.frustumCulled = false;
+    mesh.visible = false;
+    const slots = [];
+    _shardDummy.position.set(0, -999, 0);
+    _shardDummy.rotation.set(0, 0, 0);
+    _shardDummy.scale.set(0, 0, 0);
+    _shardDummy.updateMatrix();
+    for (let i = 0; i < perType; i++) {
+      mesh.setMatrixAt(i, _shardDummy.matrix);
+      mesh.setColorAt(i, _shardWhite);
+      slots.push({
+        mesh, index: i,
+        active: false, hidden: true,
+        life: 0, maxLife: 1,
+        x: 0, y: -999, z: 0, rx: 0, ry: 0, rz: 0,
+        vx: 0, vy: 0, vz: 0, rvx: 0, rvy: 0, rvz: 0,
+        baseScale: 1, bounces: 0, color: 0xffffff, alpha: 1
+      });
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.instanceColor.needsUpdate = true;
+    view.scene.add(mesh);
+    types.push({ mesh, slots });
+  }
+  return types;
+}
+
+function hideShardSlot(s) {
+  if (s.hidden) return;
+  s.hidden = true;
+  _shardDummy.position.set(0, -999, 0);
+  _shardDummy.rotation.set(0, 0, 0);
+  _shardDummy.scale.set(0, 0, 0);
+  _shardDummy.updateMatrix();
+  s.mesh.setMatrixAt(s.index, _shardDummy.matrix);
+  s.mesh.instanceMatrix.needsUpdate = true;
+}
+
+function writeShardSlot(s, scale) {
+  _shardDummy.position.set(s.x, s.y, s.z);
+  _shardDummy.rotation.set(s.rx, s.ry, s.rz);
+  _shardDummy.scale.setScalar(scale);
+  _shardDummy.updateMatrix();
+  s.mesh.setMatrixAt(s.index, _shardDummy.matrix);
+  _shardColor.setHex(s.color).multiplyScalar(s.alpha);
+  s.mesh.setColorAt(s.index, _shardColor);
+  s.mesh.instanceMatrix.needsUpdate = true;
+  s.mesh.instanceColor.needsUpdate = true;
+  s.hidden = false;
+}
+
+function markShardTypesVisible(types) {
+  for (const type of types) {
+    let any = false;
+    for (const s of type.slots) {
+      if (s.active) { any = true; break; }
+    }
+    type.mesh.visible = any;
+  }
+}
+
 // ── 障碍物多边形爆裂破片池（Zero-GC，三维低面数网格，空中剧烈自旋与跑道后退） ──
 export const shardPool = [];
-const SHARD_POOL_SIZE = 28;
+const SHARD_PER_TYPE = 10;
 
 const shardGeoTetra = new THREE.TetrahedronGeometry(0.32);
 const shardGeoBox = new THREE.BoxGeometry(0.22, 0.42, 0.14);
 const shardGeoOcta = new THREE.OctahedronGeometry(0.26);
 
+let shardTypes = [];
+
 export function initShardPool() {
   if (shardPool.length > 0) return;
-  for (let i = 0; i < SHARD_POOL_SIZE; i++) {
-    const geo = i % 3 === 0 ? shardGeoTetra : (i % 3 === 1 ? shardGeoBox : shardGeoOcta);
-    const mat = new THREE.MeshBasicMaterial({
-      color: 0xff1155,
-      transparent: true,
-      opacity: 0,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      fog: false
-    });
-    const m = new THREE.Mesh(geo, mat);
-    m.visible = false;
-    view.scene.add(m);
-
-    shardPool.push({
-      mesh: m,
-      mat,
-      active: false,
-      life: 0,
-      maxLife: 1,
-      vel: new THREE.Vector3(),
-      rotVel: new THREE.Vector3(),
-      baseScale: 1,
-      bounces: 0
-    });
+  shardTypes = makeInstancedShardSet([shardGeoTetra, shardGeoBox, shardGeoOcta], SHARD_PER_TYPE);
+  for (const type of shardTypes) {
+    for (const s of type.slots) shardPool.push(s);
   }
 }
 
@@ -317,7 +378,7 @@ export function shatterObstacle(obstacle) {
   let allocated = 0;
 
   // 1. 激活三维几何立体破片
-  for (let i = 0; i < SHARD_POOL_SIZE && allocated < count; i++) {
+  for (let i = 0; i < shardPool.length && allocated < count; i++) {
     const s = shardPool[i];
     if (s.active) continue;
 
@@ -332,28 +393,25 @@ export function shatterObstacle(obstacle) {
     const px = pos.x + (Math.random() - 0.5) * 2.2;
     const py = Math.max(0.12, centerY + (Math.random() - 0.5) * spreadY);
     const pz = pos.z + (Math.random() - 0.5) * 0.4;
-    s.mesh.position.set(px, py, pz);
+    s.x = px; s.y = py; s.z = pz;
+    s.rx = 0; s.ry = 0; s.rz = 0;
 
     // 赋予强大的向外炸飞冲量（左右炸飞 + 被战机撞击向上抛甩 + 前后飞溅）
     const dx = px - (view.ship ? view.ship.position.x : 0);
-    s.vel.set(
-      dx * 4.8 + (Math.random() - 0.5) * 6.5,
-      (isWall ? 4.5 : 3.0) + Math.random() * 6.5,
-      (Math.random() - 0.5) * 7.0
-    );
+    s.vx = dx * 4.8 + (Math.random() - 0.5) * 6.5;
+    s.vy = (isWall ? 4.5 : 3.0) + Math.random() * 6.5;
+    s.vz = (Math.random() - 0.5) * 7.0;
 
     // 剧烈三维自旋翻滚
-    s.rotVel.set(
-      (Math.random() - 0.5) * 18,
-      (Math.random() - 0.5) * 18,
-      (Math.random() - 0.5) * 18
-    );
+    s.rvx = (Math.random() - 0.5) * 18;
+    s.rvy = (Math.random() - 0.5) * 18;
+    s.rvz = (Math.random() - 0.5) * 18;
 
     // 色彩交替：主色、辅色与部分高能白炽
     const randCol = Math.random();
-    s.mat.color.setHex(randCol < 0.55 ? themeHex : (randCol < 0.85 ? altHex : 0xffffff));
-    s.mat.opacity = 1.0;
-    s.mesh.scale.setScalar(s.baseScale);
+    s.color = randCol < 0.55 ? themeHex : (randCol < 0.85 ? altHex : 0xffffff);
+    s.alpha = 1.0;
+    writeShardSlot(s, s.baseScale);
     s.mesh.visible = true;
   }
 
@@ -368,90 +426,75 @@ export function shatterObstacle(obstacle) {
 export function updateShards(pdt, move = 0) {
   for (let i = 0; i < shardPool.length; i++) {
     const s = shardPool[i];
-    if (!s.active) continue;
+    if (!s.active) {
+      hideShardSlot(s);
+      continue;
+    }
     s.life -= pdt;
     if (s.life <= 0) {
       s.active = false;
-      s.mesh.visible = false;
+      hideShardSlot(s);
       continue;
     }
 
     // 物理：空气阻尼、重力、自旋
-    s.vel.x *= Math.exp(-1.6 * pdt);
-    s.vel.z *= Math.exp(-1.6 * pdt);
-    s.vel.y -= 13.5 * pdt;
+    s.vx *= Math.exp(-1.6 * pdt);
+    s.vz *= Math.exp(-1.6 * pdt);
+    s.vy -= 13.5 * pdt;
 
-    s.mesh.position.x += s.vel.x * pdt;
-    s.mesh.position.y += s.vel.y * pdt;
+    s.x += s.vx * pdt;
+    s.y += s.vy * pdt;
     // 关键：跑道相对物理位移，破片留在原地并随飞船呼啸向前而迅速向后流逝
-    s.mesh.position.z += (s.vel.z * pdt) + move;
+    s.z += (s.vz * pdt) + move;
 
-    s.mesh.rotation.x += s.rotVel.x * pdt;
-    s.mesh.rotation.y += s.rotVel.y * pdt;
-    s.mesh.rotation.z += s.rotVel.z * pdt;
+    s.rx += s.rvx * pdt;
+    s.ry += s.rvy * pdt;
+    s.rz += s.rvz * pdt;
 
     // 地面接触反弹
-    if (s.mesh.position.y <= 0.08) {
-      s.mesh.position.y = 0.08;
+    if (s.y <= 0.08) {
+      s.y = 0.08;
       if (s.bounces < 2) {
-        s.vel.y = -s.vel.y * 0.38;
-        s.vel.x *= 0.65;
-        s.vel.z *= 0.65;
+        s.vy = -s.vy * 0.38;
+        s.vx *= 0.65;
+        s.vz *= 0.65;
         s.bounces++;
       } else {
-        s.vel.y = 0;
-        s.vel.x *= 0.3;
-        s.vel.z *= 0.3;
+        s.vy = 0;
+        s.vx *= 0.3;
+        s.vz *= 0.3;
       }
     }
 
     // 远离视野后方回收
-    if (s.mesh.position.z > 24) {
+    if (s.z > 24) {
       s.active = false;
-      s.mesh.visible = false;
+      hideShardSlot(s);
       continue;
     }
 
     const progress = Math.max(0, s.life / s.maxLife);
-    s.mat.opacity = Math.pow(progress, 1.2);
-    s.mesh.scale.setScalar(s.baseScale * (0.25 + 0.75 * progress));
+    s.alpha = Math.pow(progress, 1.2);
+    writeShardSlot(s, s.baseScale * (0.25 + 0.75 * progress));
   }
+  markShardTypesVisible(shardTypes);
 }
 
 // ── 能量球晶体碎裂立体破片池（Zero-GC，能量球专属微型多边形水晶破片） ──
 export const orbShardPool = [];
-const ORB_SHARD_POOL_SIZE = 40;
+const ORB_SHARD_PER_TYPE = 14;
 
 const orbShardGeoTetra = new THREE.TetrahedronGeometry(0.14);
 const orbShardGeoOcta = new THREE.OctahedronGeometry(0.11);
 const orbShardGeoIcosa = new THREE.IcosahedronGeometry(0.10, 0);
 
+let orbShardTypes = [];
+
 export function initOrbShardPool() {
   if (orbShardPool.length > 0) return;
-  for (let i = 0; i < ORB_SHARD_POOL_SIZE; i++) {
-    const geo = i % 3 === 0 ? orbShardGeoTetra : (i % 3 === 1 ? orbShardGeoOcta : orbShardGeoIcosa);
-    const mat = new THREE.MeshBasicMaterial({
-      color: 0x00ffff,
-      transparent: true,
-      opacity: 0,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      fog: false
-    });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.visible = false;
-    view.scene.add(mesh);
-
-    orbShardPool.push({
-      mesh,
-      mat,
-      active: false,
-      life: 0,
-      maxLife: 1,
-      vel: new THREE.Vector3(),
-      rotVel: new THREE.Vector3(),
-      baseScale: 1
-    });
+  orbShardTypes = makeInstancedShardSet([orbShardGeoTetra, orbShardGeoOcta, orbShardGeoIcosa], ORB_SHARD_PER_TYPE);
+  for (const type of orbShardTypes) {
+    for (const s of type.slots) orbShardPool.push(s);
   }
 }
 
@@ -485,29 +528,26 @@ export function shatterOrb(pos) {
     const px = pos.x + (Math.random() - 0.5) * 0.20;
     const py = pos.y + (Math.random() - 0.5) * 0.35;
     const pz = pos.z + (Math.random() - 0.5) * 0.35;
-    s.mesh.position.set(px, py, pz);
+    s.x = px; s.y = py; s.z = pz;
+    s.rx = 0; s.ry = 0; s.rz = 0;
 
     // 强烈的向外爆裂放射速度（严格约束水平 X 轴分量乘 0.22，将爆发能量导向垂直 Y 轴与向后 Z 轴）
     const theta = Math.random() * Math.PI * 2;
     const phi = Math.acos((Math.random() * 2) - 1);
     const spd = 4.5 + Math.random() * 5.5;
 
-    s.vel.set(
-      Math.sin(phi) * Math.cos(theta) * spd * 0.22,
-      Math.abs(Math.sin(phi) * Math.sin(theta)) * spd * 0.85 + 2.2,
-      Math.cos(phi) * spd * 0.85
-    );
+    s.vx = Math.sin(phi) * Math.cos(theta) * spd * 0.22;
+    s.vy = Math.abs(Math.sin(phi) * Math.sin(theta)) * spd * 0.85 + 2.2;
+    s.vz = Math.cos(phi) * spd * 0.85;
 
     // 剧烈三维空间自旋翻滚
-    s.rotVel.set(
-      (Math.random() - 0.5) * 24,
-      (Math.random() - 0.5) * 24,
-      (Math.random() - 0.5) * 24
-    );
+    s.rvx = (Math.random() - 0.5) * 24;
+    s.rvy = (Math.random() - 0.5) * 24;
+    s.rvz = (Math.random() - 0.5) * 24;
 
-    s.mat.color.setHex(colors[i]);
-    s.mat.opacity = 1.0;
-    s.mesh.scale.setScalar(s.baseScale);
+    s.color = colors[i];
+    s.alpha = 1.0;
+    writeShardSlot(s, s.baseScale);
     s.mesh.visible = true;
   }
 }
@@ -515,44 +555,48 @@ export function shatterOrb(pos) {
 export function updateOrbShards(pdt, move = 0) {
   for (let i = 0; i < orbShardPool.length; i++) {
     const s = orbShardPool[i];
-    if (!s.active) continue;
+    if (!s.active) {
+      hideShardSlot(s);
+      continue;
+    }
     s.life -= pdt;
     if (s.life <= 0) {
       s.active = false;
-      s.mesh.visible = false;
+      hideShardSlot(s);
       continue;
     }
 
-    s.vel.x *= Math.exp(-3.8 * pdt);
-    s.vel.z *= Math.exp(-2.2 * pdt);
-    s.vel.y -= 11.0 * pdt;
+    s.vx *= Math.exp(-3.8 * pdt);
+    s.vz *= Math.exp(-2.2 * pdt);
+    s.vy -= 11.0 * pdt;
 
-    s.mesh.position.x += s.vel.x * pdt;
-    s.mesh.position.y += s.vel.y * pdt;
+    s.x += s.vx * pdt;
+    s.y += s.vy * pdt;
     // 跑道相对物理位移：随战机向前冲刺，碎裂晶片呼啸向后掠过视野！
-    s.mesh.position.z += (s.vel.z * pdt) + move;
+    s.z += (s.vz * pdt) + move;
 
-    s.mesh.rotation.x += s.rotVel.x * pdt;
-    s.mesh.rotation.y += s.rotVel.y * pdt;
-    s.mesh.rotation.z += s.rotVel.z * pdt;
+    s.rx += s.rvx * pdt;
+    s.ry += s.rvy * pdt;
+    s.rz += s.rvz * pdt;
 
-    if (s.mesh.position.y < 0.06) {
-      s.mesh.position.y = 0.06;
-      s.vel.y = Math.abs(s.vel.y) * 0.35;
-      s.vel.x *= 0.7;
-      s.vel.z *= 0.7;
+    if (s.y < 0.06) {
+      s.y = 0.06;
+      s.vy = Math.abs(s.vy) * 0.35;
+      s.vx *= 0.7;
+      s.vz *= 0.7;
     }
 
-    if (s.mesh.position.z > 20) {
+    if (s.z > 20) {
       s.active = false;
-      s.mesh.visible = false;
+      hideShardSlot(s);
       continue;
     }
 
     const progress = Math.max(0, s.life / s.maxLife);
-    s.mat.opacity = Math.pow(progress, 1.2);
-    s.mesh.scale.setScalar(s.baseScale * (0.2 + 0.8 * progress));
+    s.alpha = Math.pow(progress, 1.2);
+    writeShardSlot(s, s.baseScale * (0.2 + 0.8 * progress));
   }
+  markShardTypesVisible(orbShardTypes);
 }
 
 // ── 战斗机超音速马赫尾喷束（高密度连续向后排气流柱、高频推力光刃） ──
@@ -1095,14 +1139,16 @@ export function resetParticlePools() {
   for (let i = 0; i < shardPool.length; i++) {
     const s = shardPool[i];
     s.active = false;
-    s.mesh.visible = false;
+    hideShardSlot(s);
   }
+  markShardTypesVisible(shardTypes);
 
   for (let i = 0; i < orbShardPool.length; i++) {
     const s = orbShardPool[i];
     s.active = false;
-    s.mesh.visible = false;
+    hideShardSlot(s);
   }
+  markShardTypesVisible(orbShardTypes);
 
   resetShipWreckage();
 
