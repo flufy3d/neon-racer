@@ -29,19 +29,56 @@ export function multOf(c) { return Math.min(COMBO_COLORS.length, 1 + Math.floor(
 export function comboColor(mult) { return COMBO_COLORS[Math.min(COMBO_COLORS.length - 1, mult - 1)]; }
 
 const tmpV = new THREE.Vector3();
+
+// 浮动标签统一管理：限流（同屏上限）+ 合并（短窗口同文案叠加 ×N）+ 顶部 HUD 安全区避让
+const activeLabels = [];
+const LABEL_MAX = 5;
+const LABEL_MERGE_MS = 420;
+const LABEL_LIFE_MS = 750;
+
+function removeLabel(rec) {
+  clearTimeout(rec.timer);
+  rec.el.remove();
+  const i = activeLabels.indexOf(rec);
+  if (i >= 0) activeLabels.splice(i, 1);
+}
+
 export function floatLabel(text, worldPos, color = '#00ffff', size = 20) {
+  const now = performance.now();
+  const merged = activeLabels.find(l => l.text === text && now - l.bornAt < LABEL_MERGE_MS);
+  if (merged) {
+    merged.count++;
+    merged.el.textContent = text + ' ×' + merged.count;
+    merged.bornAt = now;
+    merged.el.style.animation = 'none';
+    void merged.el.offsetWidth;
+    merged.el.style.animation = '';
+    clearTimeout(merged.timer);
+    merged.timer = setTimeout(() => removeLabel(merged), LABEL_LIFE_MS);
+    return;
+  }
   tmpV.copy(worldPos).project(cameraRef);
   if (tmpV.z > 1) return;
+  while (activeLabels.length >= LABEL_MAX) removeLabel(activeLabels[0]);
   const el = document.createElement('div');
   el.className = 'float-label';
   el.textContent = text;
   el.style.left = ((tmpV.x * 0.5 + 0.5) * innerWidth) + 'px';
-  el.style.top = ((-tmpV.y * 0.5 + 0.5) * innerHeight) + 'px';
+  let top = (-tmpV.y * 0.5 + 0.5) * innerHeight;
+  // 避开顶部 HUD/横幅带（顶部 32%），并在同高度附近自动错位，防止多条标签压在一起
+  top = Math.max(top, innerHeight * 0.32);
+  top = Math.min(top, innerHeight * 0.88);
+  for (const l of activeLabels) {
+    if (Math.abs(l.top - top) < 24) top = l.top + 26;
+  }
+  el.style.top = top + 'px';
   el.style.color = color;
   el.style.textShadow = `0 0 10px ${color}`;
   el.style.fontSize = size + 'px';
   document.body.appendChild(el);
-  setTimeout(() => el.remove(), 750);
+  const rec = { el, text, bornAt: now, top, count: 1, timer: 0 };
+  rec.timer = setTimeout(() => removeLabel(rec), LABEL_LIFE_MS);
+  activeLabels.push(rec);
 }
 
 export function flash(color, strength, ms = 350) {
@@ -52,7 +89,14 @@ export function flash(color, strength, ms = 350) {
   setTimeout(() => { f.style.transition = `opacity ${ms}ms ease-out`; f.style.opacity = 0; }, 30);
 }
 
+let lastToastText = '';
+let lastToastAt = 0;
 export function toast(text, color = '#ffd700') {
+  const now = performance.now();
+  // 限流：短窗口内完全相同的文案不重播（速度提升/护盾充能等周期性提示防刷屏）
+  if (text === lastToastText && now - lastToastAt < 700) return;
+  lastToastText = text;
+  lastToastAt = now;
   els.toastEl.textContent = text;
   els.toastEl.style.color = color;
   els.toastEl.style.textShadow = `0 0 18px ${color}, 0 0 50px ${color}`;
@@ -289,76 +333,105 @@ export function playRunSummary(onStatStart) {
 
 export function resetRunSummary() {
   cancelResultAnimations();
+  clearBanners();
   pendingSummary = null;
   resultEls.screen.classList.remove('resultsActive');
   resultEls.panel.classList.remove('scoreLocked');
 }
 
-export function milestoneBanner(zoneName, distText, color = '#00ffff') {
-  document.querySelectorAll('.milestone-banner').forEach(e => e.remove());
+// ── 大横幅仲裁队列 ──
+// 升阶 / 里程碑 / Rush / 成就共用同一条横幅位，同一时刻只播放一条，其余排队：
+// 避免高强度时刻多条横幅叠罗汉，也避免连续成就解锁时后一条把前一条顶掉。
+const bannerQueue = [];
+const BANNER_QUEUE_CAP = 5;
+let bannerActive = false;
+let bannerEpoch = 0;
+
+function playBanner(spec) {
+  bannerActive = true;
+  const epoch = bannerEpoch;
   const el = document.createElement('div');
-  el.className = 'milestone-banner';
-  el.style.setProperty('--zone-col', color);
-  el.innerHTML = `<div class="milestone-dist">${distText}</div><div class="milestone-zone">${zoneName}</div>`;
+  el.className = spec.className;
+  el.style.setProperty(spec.colorVar, spec.color);
+  el.innerHTML = spec.html;
   document.body.appendChild(el);
+
+  if (spec.rise) {
+    requestAnimationFrame(() => {
+      if (epoch !== bannerEpoch) return;
+      el.style.opacity = '1';
+      el.style.transform = 'translate(-50%, -50%) scale(1.06)';
+      setTimeout(() => {
+        if (epoch === bannerEpoch && el.parentNode) el.style.transform = 'translate(-50%, -50%) scale(1.0)';
+      }, 180);
+    });
+  }
+
   setTimeout(() => {
+    if (epoch !== bannerEpoch) { el.remove(); return; }
     el.style.opacity = '0';
-    el.style.transform = 'translate(-50%, -70%)';
-    setTimeout(() => el.remove(), 600);
-  }, 1600);
+    el.style.transform = spec.rise ? 'translate(-50%, -85%) scale(0.95)' : 'translate(-50%, -70%)';
+    setTimeout(() => {
+      el.remove();
+      if (epoch === bannerEpoch) playNextBanner();
+    }, 520);
+  }, spec.duration);
+}
+
+function playNextBanner() {
+  const spec = bannerQueue.shift();
+  if (!spec) { bannerActive = false; return; }
+  playBanner(spec);
+}
+
+function enqueueBanner(spec) {
+  // 同类横幅去重：队列中尚未播放的同类型横幅被最新一条替换（成就按 id 区分，各自排队不丢失）
+  const dup = bannerQueue.findIndex(q => q.kind === spec.kind);
+  if (dup >= 0) bannerQueue.splice(dup, 1);
+  bannerQueue.push(spec);
+  while (bannerQueue.length > BANNER_QUEUE_CAP) bannerQueue.shift();
+  if (!bannerActive) playNextBanner();
+}
+
+export function clearBanners() {
+  bannerEpoch++;
+  bannerQueue.length = 0;
+  bannerActive = false;
+  document.querySelectorAll('.milestone-banner, .evolution-banner, .achieve-banner').forEach(e => e.remove());
+}
+
+export function milestoneBanner(zoneName, distText, color = '#00ffff') {
+  enqueueBanner({
+    kind: 'milestone', className: 'milestone-banner', colorVar: '--zone-col', color, duration: 1600,
+    html: `<div class="milestone-dist">${distText}</div><div class="milestone-zone">${zoneName}</div>`
+  });
 }
 
 export function rushBanner() {
-  document.querySelectorAll('.rush-banner').forEach(e => e.remove());
-  const el = document.createElement('div');
-  el.className = 'milestone-banner rush-banner';
-  el.style.setProperty('--zone-col', '#ff8822');
-  el.innerHTML = `<div class="milestone-dist">RUSH WAVE</div><div class="milestone-zone">冲刺浪潮 · 得分 ×2</div>`;
-  document.body.appendChild(el);
-  setTimeout(() => {
-    el.style.opacity = '0';
-    el.style.transform = 'translate(-50%, -70%)';
-    setTimeout(() => el.remove(), 600);
-  }, 1600);
+  enqueueBanner({
+    kind: 'rush', className: 'milestone-banner rush-banner', colorVar: '--zone-col', color: '#ff8822', duration: 1600,
+    html: `<div class="milestone-dist">RUSH WAVE</div><div class="milestone-zone">冲刺浪潮 · 得分 ×2</div>`
+  });
 }
 
 export function evolutionBanner(tier, title, color = '#00ffff') {
-  document.querySelectorAll('.evolution-banner').forEach(e => e.remove());
-  const el = document.createElement('div');
-  el.className = 'evolution-banner';
-  el.style.setProperty('--tier-col', color);
-  el.innerHTML = `
+  enqueueBanner({
+    kind: 'evolution', className: 'evolution-banner', colorVar: '--tier-col', color, rise: true, duration: 1600,
+    html: `
     <div class="evolution-tag">
       ◆ QUANTUM UPGRADE // 形态升阶 ◆
     </div>
     <div class="evolution-title">
       ${title}
     </div>
-  `;
-  document.body.appendChild(el);
-
-  requestAnimationFrame(() => {
-    el.style.opacity = '1';
-    el.style.transform = 'translate(-50%, -50%) scale(1.06)';
-    setTimeout(() => {
-      if (el.parentNode) el.style.transform = 'translate(-50%, -50%) scale(1.0)';
-    }, 180);
-  });
-
-  setTimeout(() => {
-    el.style.opacity = '0';
-    el.style.transform = 'translate(-50%, -85%) scale(0.95)';
-    setTimeout(() => el.remove(), 500);
-  }, 1600);
+  `});
 }
 
-// 成就解锁横幅：与 evolution/milestone 同范式的动态自毁横幅，def = { icon, name, desc }
+// 成就解锁横幅：与 evolution/milestone 共用队列，def = { id, icon, name, desc }
 export function achievementBanner(def, color = '#ffd700') {
-  document.querySelectorAll('.achieve-banner').forEach(e => e.remove());
-  const el = document.createElement('div');
-  el.className = 'achieve-banner';
-  el.style.setProperty('--ach-col', color);
-  el.innerHTML = `
+  enqueueBanner({
+    kind: 'ach:' + def.id, className: 'achieve-banner', colorVar: '--ach-col', color, rise: true, duration: 1800,
+    html: `
     <div class="achieve-tag">
       ◆ 成就解锁 // ACHIEVEMENT ◆
     </div>
@@ -366,21 +439,6 @@ export function achievementBanner(def, color = '#ffd700') {
       <span class="achieve-icon" aria-hidden="true">${def.icon}</span>${def.name}
     </div>
     <div class="achieve-desc">${def.desc}</div>
-  `;
-  document.body.appendChild(el);
-
-  requestAnimationFrame(() => {
-    el.style.opacity = '1';
-    el.style.transform = 'translate(-50%, -50%) scale(1.06)';
-    setTimeout(() => {
-      if (el.parentNode) el.style.transform = 'translate(-50%, -50%) scale(1.0)';
-    }, 180);
-  });
-
-  setTimeout(() => {
-    el.style.opacity = '0';
-    el.style.transform = 'translate(-50%, -85%) scale(0.95)';
-    setTimeout(() => el.remove(), 500);
-  }, 1800);
+  `});
 }
 
