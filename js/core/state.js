@@ -7,7 +7,7 @@
 // 用对象而不是模块顶层 let，是因为 ES module 的 import 绑定是只读的：
 // 想让多个模块写同一份状态，就必须让状态有一个显式的宿主。
 
-import { RUSH_FIRST_AT } from './constants.js';
+import { RUSH_FIRST_AT, SLIDE_ROLL_DUR } from './constants.js';
 
 export const view = {
   scene: undefined, camera: undefined, renderer: undefined, composer: undefined, clock: undefined,
@@ -30,7 +30,7 @@ export const run = {
   beatGlow: 0, beatCount: 0, timeScale: 1, slowMoTimer: 0, slowMoMaxDuration: 0,
   camSweepX: 0, camSweepY: 0, camSweepZ: 0, lastSpeedMark: 26, camRoll: 0, camY: 4.6,
   overTimerId: null, shieldReady: false, invuln: 0, orbCountAtShieldEvent: 0, tier: 0,
-  armorReady: false, lastArmorDist: -Infinity,
+  armorReady: false, lastArmorDist: -Infinity, armorIntroduced: false,
   shipMorph: 0, morphRoll: 0, shipBank: 0, airFlip: 0, airJumps: 0, lastJumpTime: 0, latVel: 0,
   stabilizerEngaged: false, dualHoldTime: 0, lastGuidedLane: null, lastGuidedDist: -Infinity,
   validPrevLanes: new Set([0, 1, 2]), lastPatternDist: -Infinity, showPending: false,
@@ -44,6 +44,8 @@ export const run = {
   lowLaneDist: [-Infinity, -Infinity, -Infinity], gateIntroduced: false,
   // 滑铲：slideTimer 剩余时长，slideK 姿态平滑系数（0~1）
   slideTimer: 0, slideK: 0,
+  // 滑铲刚性桶滚：slideRoll 当前滚转角，从 slideRollFrom 缓动到 slideRollTarget（2π 整数倍，收尾必回正）
+  slideRoll: 0, slideRollFrom: 0, slideRollTarget: 0, slideRollT: SLIDE_ROLL_DUR,
   // 成就系统单局计数器（achievements.js 的 resetRunCounters 填充）
   ach: null
 };

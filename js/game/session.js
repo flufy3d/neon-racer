@@ -1,5 +1,5 @@
 import { endAudioRun, playSound, startAudioRun } from '../audio.js';
-import { MILESTONE_ZONES, RUSH_FIRST_AT, TIER_COLORS } from '../core/constants.js';
+import { MILESTONE_ZONES, RUSH_FIRST_AT, SLIDE_ROLL_DUR, TIER_COLORS } from '../core/constants.js';
 import { $ } from '../core/dom.js';
 import { lists, run, view } from '../core/state.js';
 import { explode, resetParticlePools } from '../entities/particles.js';
@@ -51,8 +51,9 @@ function resetGame() {
   run.camSweepX = 0; run.camSweepY = 0; run.camSweepZ = 0;
   run.lastSpeedMark = 26; run.camRoll = 0; run.camY = 4.6;
   run.shieldReady = false; run.invuln = 0; run.orbCountAtShieldEvent = 0;
-  run.armorReady = false; run.lastArmorDist = -Infinity;
+  run.armorReady = false; run.lastArmorDist = -Infinity; run.armorIntroduced = false;
   run.slideTimer = 0; run.slideK = 0;
+  run.slideRoll = 0; run.slideRollFrom = 0; run.slideRollTarget = 0; run.slideRollT = SLIDE_ROLL_DUR;
   run.maxCombo = 0;
   run.latVel = 0; run.stabilizerEngaged = false; run.dualHoldTime = 0; activePointers.clear();
   run.lastGuidedLane = null; run.lastGuidedDist = -Infinity;

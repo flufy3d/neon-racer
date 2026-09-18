@@ -1,5 +1,5 @@
 import { playSound } from '../../audio.js';
-import { CENTER_X, DOUBLE_JUMP_TIER, GRAVITY, MAX_TIER, SLIDE_DROP_Y, SLIDE_SQUASH_Y, SLIDE_STRETCH_XZ, STABILIZER_ACCEL, STABILIZER_GAIN, TRACK_HALF } from '../../core/constants.js';
+import { CENTER_X, DOUBLE_JUMP_TIER, GRAVITY, MAX_TIER, SLIDE_DROP_Y, SLIDE_PITCH, SLIDE_ROLL_DUR, STABILIZER_ACCEL, STABILIZER_GAIN, TRACK_HALF } from '../../core/constants.js';
 import { run, view } from '../../core/state.js';
 import { burst, spawnShockwave } from '../../entities/particles.js';
 import { updateGroundGlow } from '../../scene/ground.js';
@@ -8,6 +8,7 @@ import { activePointers, keys } from '../input.js';
 import * as THREE from 'three';
 
 const landPos = new THREE.Vector3();
+const ONE = new THREE.Vector3(1, 1, 1);
 
 export function updateShipControl(dt, t, move) {
 let dir = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
@@ -64,10 +65,10 @@ if ((nx <= -TRACK_HALF && run.latVel < 0) || (nx >= TRACK_HALF && run.latVel > 0
 view.ship.position.x = Math.max(-TRACK_HALF, Math.min(TRACK_HALF, nx));
 const bankTarget = Math.max(-0.45, Math.min(0.45, -run.latVel * 0.02));
 run.shipBank += (bankTarget - run.shipBank) * Math.min(1, dt * 10);
-view.ship.rotation.z = run.shipBank + run.morphRoll;
-view.ship.rotation.x = -run.airFlip;
+view.ship.rotation.z = run.shipBank + run.morphRoll + run.slideRoll;
+view.ship.rotation.x = -run.airFlip - run.slideK * SLIDE_PITCH;
 
-// 滑铲姿态系数：目标 0/1 平滑过渡，驱动机体压扁拉伸与贴地高度
+// 滑铲姿态系数：目标 0/1 平滑过渡，驱动压低贴地与收翼滚转姿态
 run.slideK += ((run.slideTimer > 0 ? 1 : 0) - run.slideK) * Math.min(1, dt * 12);
 if (run.slideK < 0.004) run.slideK = 0;
 if (run.slideTimer > 0) {
@@ -76,6 +77,17 @@ if (run.slideTimer > 0) {
   // 滑铲拖尾火花
   if (Math.random() < dt * 46) {
     burst(view.ship.position, 0x66ffcc, 0.13, 0.3, 0.5, 5, 0.6);
+  }
+}
+
+// 刚性桶滚：smoothstep 缓动推到目标角，到位后精确归零回正（机体全程不形变）
+if (run.slideRollT < SLIDE_ROLL_DUR) {
+  run.slideRollT = Math.min(SLIDE_ROLL_DUR, run.slideRollT + dt);
+  const rp = run.slideRollT / SLIDE_ROLL_DUR;
+  const eased = rp * rp * (3 - 2 * rp);
+  run.slideRoll = run.slideRollFrom + (run.slideRollTarget - run.slideRollFrom) * eased;
+  if (run.slideRollT >= SLIDE_ROLL_DUR) {
+    run.slideRoll = 0; run.slideRollFrom = 0; run.slideRollTarget = 0;
   }
 }
 
@@ -96,11 +108,8 @@ if (!run.grounded) {
   view.ship.position.y = 0.95 - SLIDE_DROP_Y * run.slideK
     + Math.sin(t * (3.2 + run.slideK * 22)) * (0.07 - run.slideK * 0.045);
 }
-const slideStY = 1 - (1 - SLIDE_SQUASH_Y) * run.slideK;
-const slideStXZ = 1 + SLIDE_STRETCH_XZ * run.slideK;
-view.ship.scale.x += (slideStXZ - view.ship.scale.x) * Math.min(1, dt * 9);
-view.ship.scale.y += (slideStY - view.ship.scale.y) * Math.min(1, dt * 9);
-view.ship.scale.z += (slideStXZ - view.ship.scale.z) * Math.min(1, dt * 9);
+// 起跳瞬时拉伸自然回弹；滑铲只做刚性滚转，不再压扁/拉伸机体
+view.ship.scale.lerp(ONE, Math.min(1, dt * 9));
 
 if (run.invuln > 0) {
   run.invuln -= dt;

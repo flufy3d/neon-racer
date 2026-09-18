@@ -1,4 +1,4 @@
-import { MAX_TIER, TIER_COLORS } from '../core/constants.js';
+import { MAX_TIER, SLIDE_WING_FOLD, TIER_COLORS } from '../core/constants.js';
 import { run, view } from '../core/state.js';
 import { BG_BASE, WHITE, tmpColA, tmpColB } from '../scene/palette.js';
 
@@ -35,7 +35,9 @@ function tierColorAt(m, out) {
 export function poseShip(m, t) {
   const p = view.ship.userData;
   const col = tierColorAt(m, tmpColA);
-  view.shipGlowMat.color.copy(col);
+  // T4/T5 发光部件激增，辉光整体收束（最多 22%），避免泛光吞掉机体轮廓；其余配色仍用原色
+  const glowGain = 1 - Math.min(1, Math.max(0, m - 3) * 0.11);
+  view.shipGlowMat.color.copy(col).multiplyScalar(glowGain);
   p.bodyMat.emissive.copy(col).multiplyScalar(0.07);
   p.plateMat.emissive.copy(col).multiplyScalar(0.1);
   p.trimMat.color.copy(col).lerp(WHITE, 0.18);
@@ -57,10 +59,12 @@ export function poseShip(m, t) {
   const speedFlameK = 0.55 + spdRatio * 0.50;
   const flameLen = curve(MORPH.flameLen, m) * speedFlameK + Math.sin(t * 28) * (0.02 + spdRatio * 0.03);
   const podK = seg(m, 3), bladeK = seg(m, 4);
+  // 滑铲收翼：比压低更快（先锁翼再滚转），上折通过铰链旋转实现，机体不形变
+  const foldK = Math.min(1, run.slideK * 1.6);
 
   for (const w of p.wings) {
     w.g.rotation.y = -w.side * sweep;
-    w.g.rotation.z = w.side * rise;
+    w.g.rotation.z = w.side * (rise + foldK * SLIDE_WING_FOLD);
     w.g.scale.x = span;
     w.tip.scale.y = fin;
     w.tip.position.y = 0.02 + (fin - 1) * 0.055;
@@ -197,9 +201,12 @@ export function poseShip(m, t) {
     for (const r of p.rcs) {
       // 左侧 RCS (side = -1) 在向右变轨 (steer > 0) 时喷射；右侧 RCS (side = 1) 在向左变轨 (steer < 0) 时喷射
       const activeSteer = r.side < 0 ? Math.max(0, steer) : Math.max(0, -steer);
-      if (activeSteer > 0.06) {
+      // 滑铲桶滚：两侧 RCS 反向推力偶同时点火，提供滚转力矩
+      const rollFire = foldK > 0.05 ? foldK * (0.8 + Math.sin(t * 34 + r.side * 2.1) * 0.2) : 0;
+      const fireK = Math.max(activeSteer, rollFire);
+      if (fireK > 0.06) {
         const rcsFlicker = 0.85 + Math.sin(t * 45 + r.side) * 0.15;
-        const rcsScale = activeSteer * rcsFlicker;
+        const rcsScale = fireK * rcsFlicker;
         r.plume.scale.set(rcsScale * 1.1, rcsScale * 1.5, rcsScale * 1.1);
         r.plume.visible = true;
       } else {

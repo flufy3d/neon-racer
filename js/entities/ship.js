@@ -211,6 +211,22 @@ export function buildShip() {
   p.trimMat = trimMat;
 
   view.ship.userData = p;
+
+  // ── 轮廓补光（Rim Light）：机背冷光 + 机腹品红反光，T4/T5 部件辉光收束后保住机体剪影 ──
+  const rimTop = new THREE.DirectionalLight(0xbfeaff, 1.25);
+  rimTop.position.set(-0.6, 2.8, 2.2);
+  const rimTopTarget = new THREE.Object3D();
+  rimTopTarget.position.set(0, 0, -0.6);
+  rimTop.target = rimTopTarget;
+  view.ship.add(rimTop, rimTopTarget);
+
+  const rimBottom = new THREE.DirectionalLight(0xff3bd0, 0.7);
+  rimBottom.position.set(0.8, -2.0, -2.4);
+  const rimBottomTarget = new THREE.Object3D();
+  rimBottomTarget.position.set(0, 0, 0.8);
+  rimBottom.target = rimBottomTarget;
+  view.ship.add(rimBottom, rimBottomTarget);
+
   view.ship.position.set(0, 0.95, 0);
   view.scene.add(view.ship);
   poseShip(0, 0);
