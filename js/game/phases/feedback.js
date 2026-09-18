@@ -3,7 +3,7 @@ import { COMBO_WINDOW, MILESTONE_ZONES } from '../../core/constants.js';
 import { $ } from '../../core/dom.js';
 import { lists, run, view } from '../../core/state.js';
 import { updateBurstParticles, updateShipTrail, updateShockwaves, updateShards, updateOrbShards, updateShipWreckage } from '../../entities/particles.js';
-import { archNeonMat, gateCoreMat, gateEdgeMat, lowCoreMat, lowEdgeMat, towerCapMat, towerSpireMat, wallCoreMat, wallEdgeMat } from '../../scene/materials.js';
+import { archNeonMat, gateBodyMat, gateCoreMat, gateEdgeMat, lowBodyMat, lowCoreMat, lowEdgeMat, towerCapMat, towerSpireMat, wallBodyMat, wallCoreMat, wallEdgeMat } from '../../scene/materials.js';
 import { BG_BASE, WHITE, currentLowCoreCol, currentLowEdgeCol, currentWallCoreCol, currentWallEdgeCol, targetLowCoreCol, targetLowEdgeCol, targetWallCoreCol, targetWallEdgeCol, tmpColB } from '../../scene/palette.js';
 import * as ui from '../../ui.js';
 import { showPaused } from '../session.js';
@@ -116,20 +116,26 @@ if (run.state === 'playing' && !run.paused) {
   run.beatGlow = beat.glow;
   run.beatCount = beat.count;
 } else run.beatGlow *= Math.exp(-dt * 6);
+// Rush Wave 对比度补偿：浪潮期降低背景泛光、拉亮障碍描边并加厚暗体，
+// 抵消紫/品红强泛光下黑体+描边障碍"糊成一团"的问题。
+const rushK = Math.min(1, run.rushBoost / 13);
 view.grid.material.opacity = 0.72 + run.beatGlow * 0.28;
 wallCoreMat.opacity = 0.65 + run.beatGlow * 0.35;
 lowCoreMat.opacity = 0.65 + run.beatGlow * 0.35;
 wallCoreMat.color.copy(currentWallCoreCol);
 lowCoreMat.color.copy(currentLowCoreCol);
-wallEdgeMat.color.copy(currentWallEdgeCol).lerp(WHITE, run.beatGlow * 0.35);
-lowEdgeMat.color.copy(currentLowEdgeCol).lerp(WHITE, run.beatGlow * 0.35);
+wallEdgeMat.color.copy(currentWallEdgeCol).lerp(WHITE, Math.min(1, run.beatGlow * 0.35 + rushK * 0.45));
+lowEdgeMat.color.copy(currentLowEdgeCol).lerp(WHITE, Math.min(1, run.beatGlow * 0.35 + rushK * 0.45));
+wallBodyMat.opacity = 0.92 + rushK * 0.06;
+lowBodyMat.opacity = 0.92 + rushK * 0.06;
+gateBodyMat.opacity = 0.92 + rushK * 0.06;
 // 闸门保持固定紫色识别色，只随节拍增亮
 gateCoreMat.opacity = 0.65 + run.beatGlow * 0.35;
-gateEdgeMat.color.setHex(0xbb44ff).lerp(WHITE, run.beatGlow * 0.35);
+gateEdgeMat.color.setHex(0xbb44ff).lerp(WHITE, Math.min(1, run.beatGlow * 0.35 + rushK * 0.5));
 towerCapMat.color.setHex(0x00ffff).lerp(WHITE, run.beatGlow * 0.35);
 towerSpireMat.color.setHex(0xff0088).lerp(WHITE, run.beatGlow * 0.35);
 archNeonMat.color.setHex(0xff00aa).lerp(WHITE, run.beatGlow * 0.35);
-if (view.bloomPass) view.bloomPass.strength = 1.1 + run.beatGlow * 0.35 + Math.min(1, run.rushBoost / 13) * 0.3;
+if (view.bloomPass) view.bloomPass.strength = 1.1 + run.beatGlow * 0.28 - rushK * 0.15;
 if (run.state === 'over') run.timeScale += (1 - run.timeScale) * dt * 2;
 
 if (run.shakeTime > 0) {
