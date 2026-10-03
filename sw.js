@@ -1,4 +1,4 @@
-const CACHE = 'neon-racer-v43';
+const CACHE = 'neon-racer-v44';
 const ASSETS = [
   './',
   './index.html',
@@ -15,6 +15,7 @@ const ASSETS = [
   './js/core/dom.js',
   './js/core/quality.js',
   './js/core/state.js',
+  './js/debug/bench.js',
   './js/debug/inspect.js',
   './js/entities/obstacles.js',
   './js/entities/particles.js',
@@ -39,6 +40,8 @@ const ASSETS = [
   './js/scene/setup.js',
   './js/scene/sky.js',
   './js/scene/textures.js',
+  './js/scene/tv-post.js',
+  './js/scene/warmup.js',
   './js/ui.js',
   './vendor/three.module.js',
   './vendor/addons/postprocessing/EffectComposer.js',
@@ -87,23 +90,21 @@ self.addEventListener('fetch', e => {
 
   if (isFirstParty) {
     const netReq = isNavigate ? e.request : new Request(e.request.url, { cache: 'no-cache' });
+    // 导航请求可能带 ?tv=1、?bench=1 等查询参数：统一以 index.html 为键缓存、忽略查询参数读取，
+    // 断网时任何带参数的入口都能命中，也不会每种参数组合各存一份
+    const cacheKey = isNavigate ? './index.html' : e.request;
+    const fromCache = () => caches.match(cacheKey, { ignoreSearch: isNavigate });
     e.respondWith(
       fetch(netReq)
         .then(res => {
           if (res.ok) {
             const copy = res.clone();
-            caches.open(CACHE).then(c => c.put(e.request, copy));
+            caches.open(CACHE).then(c => c.put(cacheKey, copy));
             return res;
           }
-          return caches.match(e.request).then(cached => cached || res);
+          return fromCache().then(cached => cached || res);
         })
-        .catch(() =>
-          caches.match(e.request).then(cached => {
-            if (cached) return cached;
-            if (isNavigate) return caches.match('./index.html');
-            return undefined;
-          })
-        )
+        .catch(() => fromCache())
     );
   } else {
     e.respondWith(

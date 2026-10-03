@@ -1,6 +1,7 @@
 import { pauseAudioRun, playSound, resumeAudioRun } from '../audio.js';
 import { DOUBLE_JUMP_TIER, JUMP_V, MAX_TIER, SLIDE_DURATION, SLIDE_FASTFALL_V, SWIPE_AIRJUMP, SWIPE_JUMP, TIER_COLORS } from '../core/constants.js';
 import { $ } from '../core/dom.js';
+import { TV } from '../core/quality.js';
 import { run, view } from '../core/state.js';
 import { burst, spawnShockwave } from '../entities/particles.js';
 import * as ui from '../ui.js';
@@ -12,6 +13,15 @@ import * as THREE from 'three';
 export const activePointers = new Map();
 
 export const keys = { left: false, right: false };
+
+// 电视档位：遥控器方向键不适合"按住滑动 / 双键锁中线"，改为左中右三条车道离散切换。
+// 按一下换一条道，飞船自动滑到车道中心；长按时每到达一条车道中心就继续换下一条（见 control.js）。
+export const tvLane = { target: 1, hold: 0, lastStep: 0 };
+
+export function tvStepLane(dir) {
+  tvLane.target = Math.max(0, Math.min(2, tvLane.target + dir));
+  tvLane.lastStep = performance.now();
+}
 
 const airJumpPos = new THREE.Vector3();
 const slidePos = new THREE.Vector3();
@@ -61,6 +71,11 @@ function jump() {
 
 addEventListener('keydown', e => {
   if (e.repeat) return;
+  if (TV && (e.code === 'ArrowLeft' || e.code === 'KeyA' || e.code === 'ArrowRight' || e.code === 'KeyD')) {
+    tvLane.hold = (e.code === 'ArrowLeft' || e.code === 'KeyA') ? -1 : 1;
+    if (run.state === 'playing' && !run.paused) tvStepLane(tvLane.hold);
+    return;
+  }
   if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = true;
   else if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = true;
   else if (e.code === 'ArrowDown' || e.code === 'KeyS') {
@@ -74,6 +89,11 @@ addEventListener('keydown', e => {
 });
 
 addEventListener('keyup', e => {
+  if (TV) {
+    const dir = (e.code === 'ArrowLeft' || e.code === 'KeyA') ? -1 : (e.code === 'ArrowRight' || e.code === 'KeyD') ? 1 : 0;
+    if (dir && dir === tvLane.hold) tvLane.hold = 0;
+    return;
+  }
   if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
   else if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
 });
@@ -92,6 +112,7 @@ function clearInputState() {
   run.stabilizerEngaged = false;
   keys.left = false;
   keys.right = false;
+  tvLane.hold = 0;
 }
 
 addEventListener('pointerdown', e => {

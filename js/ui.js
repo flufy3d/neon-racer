@@ -23,6 +23,11 @@ export { els };
 let cameraRef = null;
 export function initUI(camera) {
   cameraRef = camera;
+  // 电视档位左右键是车道切换（见 input.js），开始页说明随之调整
+  if (document.documentElement.classList.contains('tv')) {
+    const hint = document.querySelector('.keyboardCard .controlRows small');
+    if (hint) hint.textContent = '按一下换一条道 · 长按连续换道';
+  }
 }
 
 export function multOf(c) { return Math.min(COMBO_COLORS.length, 1 + Math.floor(c / 4)); }

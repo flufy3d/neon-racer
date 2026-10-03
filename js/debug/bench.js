@@ -4,11 +4,11 @@
 // - 不写最高分和成就存档（见 session.js / achievements.js）
 // - 按状态（menu / playing / over）每 5 秒向 console 输出帧率，长帧单独输出，便于从 logcat 取数
 import { LANES } from '../core/constants.js';
+import { BENCH_RUN_SEC, TV } from '../core/quality.js';
 import { lists, run, view } from '../core/state.js';
-import { keys } from '../game/input.js';
+import { keys, tvLane } from '../game/input.js';
 import { gameOver } from '../game/session.js';
 
-const BENCH_RUN_SEC = 60;
 const WINDOW_MS = 5000;
 const LONG_FRAME_MS = 150;
 
@@ -55,14 +55,23 @@ function autopilot() {
   let best = cur;
   for (let i = 0; i < 3; i++) if (laneCost[i] < laneCost[best]) best = i;
 
-  // 提前松键，靠减速度（175 m/s²）停在车道中心附近
-  const dx = LANES[best] - ship.position.x;
-  const brake = run.latVel * run.latVel / 350 + 0.12;
-  keys.right = dx > brake;
-  keys.left = dx < -brake;
+  if (TV) {
+    // 电视档位走车道切换：与遥控器一样逐条派发 ←/→
+    if (best !== tvLane.target) press(best < tvLane.target ? 'ArrowLeft' : 'ArrowRight');
+  } else {
+    steerTo(best);
+  }
 
   if (jumpNeeded && run.grounded) press('ArrowUp');
   else if (slideNeeded && run.slideTimer <= 0) press('ArrowDown');
+}
+
+function steerTo(best) {
+  // 提前松键，靠减速度（175 m/s²）停在车道中心附近
+  const dx = LANES[best] - view.ship.position.x;
+  const brake = run.latVel * run.latVel / 350 + 0.12;
+  keys.right = dx > brake;
+  keys.left = dx < -brake;
 }
 
 // ── 帧率统计 ──

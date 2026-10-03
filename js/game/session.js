@@ -13,7 +13,7 @@ import { resetArmorPool, resetObstaclePool, resetOrbPool } from '../entities/obs
 import { resetPillars, resetStreaks } from './phases/world.js';
 import { resetFeedbackCache } from './phases/feedback.js';
 import { updateHUD } from './hud.js';
-import { activePointers, keys } from './input.js';
+import { activePointers, keys, tvLane } from './input.js';
 import { onGameEnd, resetRunCounters } from './achievements.js';
 
 function resetGame() {
@@ -46,6 +46,7 @@ function resetGame() {
   lowEdgeMat.color.setHex(MILESTONE_ZONES[0].lowEdgeHex);
   run.vy = 0; run.grounded = true;
   keys.left = keys.right = false;
+  tvLane.target = 1; tvLane.hold = 0;
   run.speed = 26; run.maxSpeed = 26; run.dist = 0; run.spawnDist = 0; run.orbCount = 0; run.elapsed = 0; run.shakeTime = 0;
   run.combo = 0; run.comboTimer = 0; run.score = 0; run.streakTimer = 0; run.fovKick = 0;
   run.beatGlow = 0; run.timeScale = 1; run.slowMoTimer = 0; run.slowMoMaxDuration = 0;
@@ -100,6 +101,7 @@ export function startGame() {
   run.beatCount = 0;
   startAudioRun();
   run.state = 'playing'; run.paused = false;
+  view.composer.overlay = false;
   run.showPending = false;
   updateFsBtn();
   $('startScreen').classList.add('hidden');
@@ -138,6 +140,7 @@ export function gameOver() {
   run.overTimerId = setTimeout(() => {
     if (run.state === 'over') {
       $('overScreen').classList.remove('hidden');
+      view.composer.overlay = true;
       ui.playRunSummary(index => playSound('summary', index));
     }
   }, 1350);

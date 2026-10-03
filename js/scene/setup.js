@@ -1,9 +1,11 @@
-import { applyQuality, bindQuality, quality } from '../core/quality.js';
+import { TV, TV_BLOOM, applyQuality, bindQuality, quality } from '../core/quality.js';
 import { lists, view } from '../core/state.js';
 import { initObstaclePool, initOrbPool } from '../entities/obstacles.js';
 import { buildShip } from '../entities/ship.js';
 import { initPillarInstancedMesh, initStreakInstancedMesh } from '../game/phases/world.js';
 import { initSky } from './sky.js';
+import { TvPipeline } from './tv-post.js';
+import { warmupScene } from './warmup.js';
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -28,13 +30,19 @@ export function initScene() {
   view.renderer.setPixelRatio(quality.pixelRatio);
   document.body.appendChild(view.renderer.domElement);
 
-  // 交给 EffectComposer 依据 renderer 的 pixelRatio 自行创建 HalfFloat 离屏
-  // RenderTarget，避免此处尺寸与 composer 内部 pixelRatio 约定不一致导致重复分配。
-  view.composer = new EffectComposer(view.renderer);
-  view.composer.setSize(innerWidth, innerHeight);
-  view.composer.addPass(new RenderPass(view.scene, view.camera));
-  view.bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 1.1, 0.6, 0.25);
-  view.composer.addPass(view.bloomPass);
+  if (TV && TV_BLOOM !== 'full') {
+    // 电视档位：便宜的辉光 / 无后期管线，同时充当 composer 与 bloomPass
+    view.composer = view.bloomPass = new TvPipeline(view.renderer, view.scene, view.camera, TV_BLOOM);
+    view.composer.setSize(innerWidth, innerHeight);
+  } else {
+    // 交给 EffectComposer 依据 renderer 的 pixelRatio 自行创建 HalfFloat 离屏
+    // RenderTarget，避免此处尺寸与 composer 内部 pixelRatio 约定不一致导致重复分配。
+    view.composer = new EffectComposer(view.renderer);
+    view.composer.setSize(innerWidth, innerHeight);
+    view.composer.addPass(new RenderPass(view.scene, view.camera));
+    view.bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 1.1, 0.6, 0.25);
+    view.composer.addPass(view.bloomPass);
+  }
   bindQuality(view.renderer, view.composer, view.bloomPass);
   window.composer = view.composer;
   window.bloomPass = view.bloomPass;
@@ -86,6 +94,7 @@ export function initScene() {
   initObstaclePool(view.scene);
   initStreakInstancedMesh(view.scene);
   initPillarInstancedMesh(view.scene);
+  if (TV) warmupScene();
 }
 
 function onResize() {

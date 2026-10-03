@@ -9,7 +9,7 @@ import * as THREE from 'three';
 // ── 爆发粒子池（Zero-GC，加法混合，跑道相对运动，内敛高级感） ──
 export const particlePool = [];
 
-function initParticlePool() {
+export function initParticlePool() {
   if (particlePool.length > 0) return;
   for (let i = 0; i < PARTICLE_POOL_SIZE; i++) {
     const geo = new THREE.BufferGeometry();

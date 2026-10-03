@@ -828,3 +828,72 @@ kbd.wideKey { min-width: 44px; font-size: 7px; }
 }
 
 
+/* ── 电视档位（html.tv，见 index.html 头部脚本）──
+   电视盒子 GPU 弱且合成输出固定 1080p，DOM 的每次重新栅格化都和 WebGL 抢同一个 GPU 线程。
+   1. 全屏 backdrop-filter 每帧都要重新模糊变化中的 WebGL 画面：去掉，改用更不透明的底色。
+   2. 无限循环的装饰动画（闪烁 / 旋转 / 脉冲 / 扫光）停在静止帧。
+   3. HUD 中会变化的元素各自独立合成图层，变化只重绘自身；去掉模糊阴影，降低每次重绘的代价。
+      原先吃球时的缩放动画会临时创建 / 销毁合成图层，牵连整屏根图层重新栅格化。 */
+html.tv .overlay { background: rgba(5, 5, 15, .88); backdrop-filter: none; -webkit-backdrop-filter: none; }
+html.tv #startScreen, html.tv #achieveScreen {
+  background:
+    radial-gradient(circle at 52% 37%, rgba(0, 229, 255, .12), transparent 34%),
+    radial-gradient(circle at 18% 78%, rgba(255, 34, 170, .07), transparent 28%),
+    linear-gradient(180deg, rgba(2, 5, 16, .86), rgba(2, 4, 14, .96)); }
+html.tv #overScreen {
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255, 24, 133, .12), transparent 36%),
+    linear-gradient(180deg, rgba(2, 4, 14, .86), rgba(2, 3, 12, .96)); }
+
+html.tv .startTopline i, html.tv .resultTopline i, html.tv .reactorGlyph::before, html.tv .reactorGlyph::after,
+html.tv .orbMark::before, html.tv .crashGlyph::before, html.tv #newRecord span, html.tv .ab.ready i,
+html.tv .update-text::before, html.tv #rushTag.on { animation: none; }
+html.tv #startBtn::before { display: none; }
+
+html.tv #topLeft, html.tv #score, html.tv .miniRow, html.tv #panel, html.tv #tierName, html.tv #tierBar,
+html.tv #speed, html.tv #maxCombo, html.tv #comboBox, html.tv #toast, html.tv #rushTag,
+html.tv .float-label, html.tv .evolution-banner, html.tv .milestone-banner, html.tv .achieve-banner { will-change: transform; }
+html.tv #speed { display: inline-block; }
+html.tv #score { text-shadow: 0 0 2px #0ff; }
+html.tv .miniRow, html.tv #tierName, html.tv #tierBar, html.tv #comboBar, html.tv .ab i { text-shadow: none; box-shadow: none; }
+html.tv #panel { box-shadow: none; }
+/* 暗角：140px 模糊的内阴影换成径向渐变，连击变色时的整屏重绘便宜得多 */
+html.tv #vig { box-shadow: none; background: radial-gradient(ellipse at center, transparent 50%, var(--vc, #00ffff) 135%); }
+/* 面板里随吃球变化的状态文字单独成层，不牵连整块面板重绘 */
+html.tv .ab b { will-change: transform; }
+/* 连击 / 提示文字收窄到内容宽度（原来是整屏宽的图层，每次变化重绘 1920 宽） */
+html.tv #comboBox, html.tv #toast { left: 0; right: 0; width: fit-content; margin-inline: auto; }
+/* 一次性横幅的大半径模糊阴影单次栅格化可达 50ms：收小半径，保留霓虹描边感 */
+html.tv #rushTag { text-shadow: 0 0 8px #ff8822; }
+html.tv .evolution-title { text-shadow: 0 0 8px var(--tier-col, #00ffff); }
+html.tv .achieve-title { text-shadow: 0 0 8px var(--ach-col, #ffd700); }
+html.tv .milestone-zone, html.tv .evolution-tag, html.tv .achieve-tag { text-shadow: 0 0 6px currentColor; }
+html.tv .float-label { text-shadow: 0 0 4px currentColor !important; }
+html.tv #toast { text-shadow: 0 0 8px currentColor !important; }
+/* 入场动画原本用 forwards 填充：播完后元素一直保持合成层，套在带 clip-path 的面板里，
+   合成器每帧都要为它们做 1080p 离屏渲染。电视档位改为"基础样式即终态 + backwards 填充"，
+   入场效果不变，播完即回到普通图层。 */
+html.tv .startPanel, html.tv .achievePanel, html.tv .startHero, html.tv .missionStrip, html.tv .controlGrid,
+html.tv .startTip, html.tv #startBtn, html.tv #achBtn, html.tv .achCard { opacity: 1; transform: none; animation-fill-mode: backwards; }
+html.tv .startPanel::before, html.tv .startPanel::after { animation-fill-mode: backwards; }
+html.tv .startPanel::before { left: 100%; }
+html.tv .startPanel::after { right: 100%; }
+html.tv .resultsActive .resultStat, html.tv .resultsActive .resultMeta { opacity: 1; transform: none; animation-fill-mode: backwards; }
+html.tv .resultsActive #restartBtn { opacity: 1; transform: none; pointer-events: auto; animation-fill-mode: backwards; }
+html.tv .resultsActive .achLink { opacity: 1; pointer-events: auto; animation-fill-mode: backwards; }
+html.tv #overScreen.resultsActive h2 { animation-fill-mode: backwards; }
+html.tv .resultsActive .resultPanel::before { left: 100%; animation-fill-mode: backwards; }
+html.tv .resultsActive .resultPanel::after { right: 100%; animation-fill-mode: backwards; }
+/* statReveal / rebootReveal / achLinkIn 只写了 to：基础样式改为终态后需要显式的起点 */
+@keyframes tvStatReveal { from { opacity: 0; transform: translateY(14px); } }
+@keyframes tvCardReveal { from { opacity: 0; transform: translateY(12px); } }
+@keyframes tvRebootReveal { from { opacity: 0; transform: translateY(10px); pointer-events: none; } }
+@keyframes tvFadeIn { from { opacity: 0; pointer-events: none; } }
+html.tv .resultsActive .resultStat { animation-name: tvStatReveal; }
+html.tv .achCard { animation-name: tvCardReveal; }
+html.tv .resultsActive #restartBtn { animation-name: tvRebootReveal; }
+html.tv .resultsActive .achLink { animation-name: tvFadeIn; }
+/* 开始页 / 结算页 / 成就页：CSS 透视网格（WebGL 场景里已有同样的地面网格）与扫描线各是一层全屏合成，
+   电视档位去掉；配合背后场景跳过辉光，开始页从 45 提到 60fps */
+html.tv #startScreen::before, html.tv #overScreen::before, html.tv #achieveScreen::before,
+html.tv .startScanlines, html.tv .resultScanlines { display: none; }

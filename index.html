@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>NEON RACER — 霓虹狂飙</title>
+<script>
+// 电视档位：安卓电视套壳（文档开始时注入 window.TVShell）或 ?tv=1；?tv=0 强制关闭。
+// 放在样式表之前同步执行，首帧就按 html.tv 的样式绘制；js/core/quality.js 以这个 class 为准。
+(function () {
+  var tv = new URLSearchParams(location.search).get('tv');
+  if (tv === '1' || (tv !== '0' && window.TVShell)) document.documentElement.classList.add('tv');
+})();
+</script>
 <link rel="stylesheet" href="style.css">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#05050f">
@@ -193,6 +201,7 @@
 <script>
 if ('serviceWorker' in navigator) {
   const hadController = !!navigator.serviceWorker.controller;
+  const isTV = document.documentElement.classList.contains('tv');
   let refreshing = false;
   let updatePending = false;
 
@@ -209,6 +218,12 @@ if ('serviceWorker' in navigator) {
       banner.classList.remove('hidden');
       const btn = document.getElementById('updateBtn');
       if (btn) btn.onclick = reloadPage;
+      if (isTV) {
+        // 遥控器点不到按钮：只提示，下一局开始前自动刷新（见下方 keydown）
+        if (btn) btn.hidden = true;
+        const text = banner.querySelector('.update-text');
+        if (text) text.textContent = '检测到新版本 · 下一局开始前自动更新';
+      }
     }
     const restartBtn = document.getElementById('restartBtn');
     if (restartBtn) {
@@ -216,6 +231,21 @@ if ('serviceWorker' in navigator) {
         if (updatePending) reloadPage();
       }, { once: true });
     }
+  }
+
+  // 电视档位：结算页上按确定 / 上键准备开下一局时，先刷新到新版本（捕获阶段拦截，不进入游戏输入）。
+  // 开始页检测到新版本时已直接刷新；游戏进行中不打断。
+  if (isTV) {
+    addEventListener('keydown', e => {
+      if (!updatePending) return;
+      if (e.code !== 'Enter' && e.code !== 'NumpadEnter' && e.code !== 'Space' && e.code !== 'ArrowUp' && e.code !== 'KeyW') return;
+      const over = document.getElementById('overScreen');
+      const archive = document.getElementById('achieveScreen');
+      if (!over || over.classList.contains('hidden') || (archive && !archive.classList.contains('hidden'))) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      reloadPage();
+    }, true);
   }
 
   navigator.serviceWorker.addEventListener('controllerchange', () => {

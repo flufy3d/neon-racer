@@ -1,6 +1,7 @@
 import { LANES } from '../core/constants.js';
 import { archBeamGeo, archFrameMat, archNeonGeo, archNeonMat, archPillarGeo, armorCoreGeo, armorCoreMat, armorPillarGeo, armorPillarMat, armorRingGeo, armorRingMat, beaconBaseGeo, beaconBeamMat, beaconCoreGeo, beaconPillarGeo, beaconRingMat, gateBodyMat, gateBottomGeo, gateBoxGeo, gateCableGeo, gateCableMat, gateCoreMat, gateEdgeMat, gateEdgesGeo, gateScanGeo, lowBodyMat, lowBoxGeo, lowCoreMat, lowEdgeMat, lowEdgesGeo, lowGuideGeo, lowScanGeo, orbCoreGeo, orbCoreMat, orbInnerRingGeo, orbOuterRingGeo, orbRingMat1, orbRingMat2, pillarGeo, pillarMat, relayBaseGeo, relayCoreGeo, relayPillarGeo, relayRingGeo, towerBeaconGeo, towerBodyMat, towerCapGeo, towerCapMat, towerGeo1, towerSpireMat, wallBodyMat, wallBoxGeo, wallCoreMat, wallEdgeMat, wallEdgesGeo, wallPylonGeo, wallScanGeo } from '../scene/materials.js';
 import { armorHaloMat, orbHaloMat } from '../scene/textures.js';
+import { TV } from '../core/quality.js';
 import * as THREE from 'three';
 
 export function makeWall(lane, z) {
@@ -256,12 +257,14 @@ export function spawnPooledArmor(scene, x, y, z) {
   o.userData.hintShown = false;
   o.userData.hintRinged = false;
   o.visible = true;
+  o.matrixWorldAutoUpdate = true;
   if (o.userData.ring) o.userData.ring.rotation.set(Math.PI / 2, 0, 0);
   return o;
 }
 
 export function releasePooledArmor(o) {
   o.visible = false;
+  if (TV) o.matrixWorldAutoUpdate = false;
   o.userData.active = false;
   o.position.set(0, -999, 0);
 }
@@ -269,6 +272,7 @@ export function releasePooledArmor(o) {
 export function resetArmorPool() {
   for (const o of armorPool) {
     o.visible = false;
+    if (TV) o.matrixWorldAutoUpdate = false;
     o.userData.active = false;
     o.position.set(0, -999, 0);
   }
@@ -347,11 +351,14 @@ export function spawnPooledObstacle(scene, type, lane, z) {
   }
 
   obj.visible = true;
+  obj.matrixWorldAutoUpdate = true;
   return obj;
 }
 
+// 电视档位：池里闲置的物体整棵子树跳过每帧矩阵更新（几个池共约 380 个物体，盒子 CPU 很弱）
 export function releasePooledObstacle(obj) {
   obj.visible = false;
+  if (TV) obj.matrixWorldAutoUpdate = false;
   obj.userData.active = false;
   obj.userData.passed = false;
   obj.position.set(0, -999, 0);

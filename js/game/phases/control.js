@@ -1,10 +1,11 @@
 import { playSound } from '../../audio.js';
-import { CENTER_X, DOUBLE_JUMP_TIER, GRAVITY, MAX_TIER, SLIDE_DROP_Y, SLIDE_PITCH, STABILIZER_ACCEL, STABILIZER_GAIN, TRACK_HALF } from '../../core/constants.js';
+import { CENTER_X, DOUBLE_JUMP_TIER, GRAVITY, LANES, MAX_TIER, SLIDE_DROP_Y, SLIDE_PITCH, STABILIZER_ACCEL, STABILIZER_GAIN, TRACK_HALF } from '../../core/constants.js';
 import { run, view } from '../../core/state.js';
 import { burst, spawnShockwave } from '../../entities/particles.js';
 import { updateGroundGlow } from '../../scene/ground.js';
 import * as ui from '../../ui.js';
-import { activePointers, keys } from '../input.js';
+import { TV } from '../../core/quality.js';
+import { activePointers, keys, tvLane, tvStepLane } from '../input.js';
 import * as THREE from 'three';
 
 const landPos = new THREE.Vector3();
@@ -45,13 +46,21 @@ if (activePointers.size) {
 }
 dir = Math.max(-1, Math.min(1, dir));
 const maxV = (5 + run.speed * 0.27) * (1 + run.tier * 0.08);
-if (stabilizing) {
-  const error = CENTER_X - view.ship.position.x;
+// 电视档位（无触摸时）：追踪目标车道中心，与双指锁中线共用同一个控制器
+const laneSteer = TV && !activePointers.size;
+if (laneSteer && tvLane.hold && performance.now() - tvLane.lastStep > 150
+  && Math.abs(LANES[tvLane.target] - view.ship.position.x) < 0.6) {
+  // 长按：接近当前目标车道中心时继续换下一条
+  tvStepLane(tvLane.hold);
+}
+if (stabilizing || laneSteer) {
+  const targetX = laneSteer ? LANES[tvLane.target] : CENTER_X;
+  const error = targetX - view.ship.position.x;
   const targetVel = Math.max(-maxV, Math.min(maxV, error * STABILIZER_GAIN));
   const step = STABILIZER_ACCEL * dt;
   run.latVel += Math.max(-step, Math.min(step, targetVel - run.latVel));
   if (Math.abs(error) < 0.012 && Math.abs(run.latVel) < 0.45) {
-    view.ship.position.x = CENTER_X;
+    view.ship.position.x = targetX;
     run.latVel = 0;
   }
 } else if (dir !== 0) {

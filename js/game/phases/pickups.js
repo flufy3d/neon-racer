@@ -7,11 +7,23 @@ import { applyShipTier } from '../../entities/ship.js';
 import * as ui from '../../ui.js';
 import { addScore, bumpScore, calcTier, updateHUD } from '../hud.js';
 import { achEvent } from '../achievements.js';
+import { TV } from '../../core/quality.js';
+
+let lastComboBarK = -1;
 
 export function updateComboAndOrbs(dt, t, move) {
 if (run.combo > 0) {
   run.comboTimer -= dt;
-  ui.els.comboBar.style.transform = 'scaleX(' + Math.max(0, run.comboTimer / COMBO_WINDOW) + ')';
+  const k = Math.max(0, run.comboTimer / COMBO_WINDOW);
+  if (!TV) ui.els.comboBar.style.transform = 'scaleX(' + k + ')';
+  else {
+    // 电视档位：连击条量化到 1/100，只在变化时写样式
+    const q = Math.round(k * 100) / 100;
+    if (q !== lastComboBarK) {
+      lastComboBarK = q;
+      ui.els.comboBar.style.transform = 'scaleX(' + q + ')';
+    }
+  }
   if (run.comboTimer <= 0) {
     run.combo = 0;
     ui.els.comboBox.style.opacity = 0;

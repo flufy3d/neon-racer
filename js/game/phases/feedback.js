@@ -1,6 +1,7 @@
 import { getAudioBeat, playSound, updateAudioState } from '../../audio.js';
 import { COMBO_WINDOW, MILESTONE_ZONES } from '../../core/constants.js';
 import { $ } from '../../core/dom.js';
+import { TV } from '../../core/quality.js';
 import { lists, run, view } from '../../core/state.js';
 import { updateBurstParticles, updateShipTrail, updateShockwaves, updateShards, updateOrbShards, updateShipWreckage } from '../../entities/particles.js';
 import { archNeonMat, gateCoreMat, gateEdgeMat, lowCoreMat, lowEdgeMat, towerCapMat, towerSpireMat, wallCoreMat, wallEdgeMat } from '../../scene/materials.js';
@@ -34,9 +35,13 @@ if (run.combo > 0) {
     _lastVigColor = vCol;
     ui.els.vig.style.setProperty('--vc', vCol);
   }
-  const op = Math.min(0.85, 0.18 + ui.multOf(run.combo) * 0.07) * Math.max(0, run.comboTimer / COMBO_WINDOW);
-  ui.els.vig.style.opacity = op;
-  _lastVigOpacity = op;
+  let op = Math.min(0.85, 0.18 + ui.multOf(run.combo) * 0.07) * Math.max(0, run.comboTimer / COMBO_WINDOW);
+  // 电视档位：透明度量化到 1/50，只在变化时写样式（原先每帧都触发样式重算）
+  if (TV) op = Math.round(op * 50) / 50;
+  if (!TV || op !== _lastVigOpacity) {
+    ui.els.vig.style.opacity = op;
+    _lastVigOpacity = op;
+  }
 } else {
   if (_lastVigOpacity !== 0) {
     _lastVigOpacity = 0;
