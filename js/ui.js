@@ -24,11 +24,11 @@ export { els };
 let cameraRef = null;
 export function initUI(camera) {
   cameraRef = camera;
+  // 结算页数字用 toLocaleString('zh-CN') 格式化，首次调用要初始化 ICU 区域数据（电视盒子上约 150ms），
+  // 提前在加载阶段调用一次，免得卡在坠毁后的结算动画第一帧
+  (0).toLocaleString('zh-CN');
   // 电视档位左右键是车道切换（见 input.js），开始页说明随之调整
   if (TV) {
-    // 结算页数字用 toLocaleString('zh-CN') 格式化，首次调用要初始化 ICU 区域数据（盒子上约 150ms），
-    // 提前在加载阶段调用一次，免得卡在坠毁后的结算动画第一帧
-    (0).toLocaleString('zh-CN');
     const hint = document.querySelector('.keyboardCard .controlRows small');
     if (hint) hint.textContent = '按一下换一条道 · 长按连续换道';
   }
@@ -93,25 +93,18 @@ export function floatLabel(text, worldPos, color = '#00ffff', size = 20) {
 let flashAnim = null;
 let flashColor = '';
 
+// 保持 30ms 后 ease-out 淡出：交给合成器（WAAPI），不再两次写样式 + setTimeout
 export function flash(color, strength, ms = 350) {
   const f = els.flashEl;
-  if (TV) {
-    // 电视档位：同样的"保持 30ms 后 ease-out 淡出"交给合成器，不再两次写样式 + setTimeout
-    if (color !== flashColor) { flashColor = color; f.style.background = color; }
-    if (flashAnim) flashAnim.cancel();
-    const hold = 30 / (ms + 30);
-    flashAnim = f.animate([
-      { opacity: strength, offset: 0 }, { opacity: strength, offset: hold, easing: 'ease-out' }, { opacity: 0, offset: 1 }
-    ], { duration: ms + 30 });
-    return;
-  }
-  f.style.background = color;
-  f.style.transition = 'none';
-  f.style.opacity = strength;
-  setTimeout(() => { f.style.transition = `opacity ${ms}ms ease-out`; f.style.opacity = 0; }, 30);
+  if (color !== flashColor) { flashColor = color; f.style.background = color; }
+  if (flashAnim) flashAnim.cancel();
+  const hold = 30 / (ms + 30);
+  flashAnim = f.animate([
+    { opacity: strength, offset: 0 }, { opacity: strength, offset: hold, easing: 'ease-out' }, { opacity: 0, offset: 1 }
+  ], { duration: ms + 30 });
 }
 
-// ── 电视档位：连击条与暗角的线性衰减交给合成器（WAAPI）──
+// ── 连击条与暗角的线性衰减交给合成器（WAAPI）──
 // 原实现每帧按 comboTimer 写 transform / opacity，于是几乎每帧都要跑一遍样式、分层、提交。
 // 吃球时启动一次线性动画，播放速率跟随子弹时间（暂停时为 0），每帧零 DOM 写入。
 let comboBarAnim = null;

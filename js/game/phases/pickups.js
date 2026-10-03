@@ -7,17 +7,15 @@ import { applyShipTier } from '../../entities/ship.js';
 import * as ui from '../../ui.js';
 import { addScore, bumpScore, calcTier, updateHUD } from '../hud.js';
 import { achEvent } from '../achievements.js';
-import { TV } from '../../core/quality.js';
 
 export function updateComboAndOrbs(dt, t, move) {
 if (run.combo > 0) {
   run.comboTimer -= dt;
-  // 电视档位由合成器动画衰减（ui.startComboDecay），这里不写样式
-  if (!TV) ui.els.comboBar.style.transform = 'scaleX(' + Math.max(0, run.comboTimer / COMBO_WINDOW) + ')';
+  // 连击条由合成器动画衰减（ui.startComboDecay），这里不写样式
   if (run.comboTimer <= 0) {
     run.combo = 0;
     ui.els.comboBox.style.opacity = 0;
-    if (TV) ui.stopComboDecay();
+    ui.stopComboDecay();
     playSound('comboBreak');
   }
 }
@@ -80,7 +78,7 @@ for (let i = lists.orbs.length - 1; i >= 0; i--) {
     ui.els.comboBox.style.color = ui.comboColor(mult);
     ui.els.comboBox.style.opacity = 1;
     ui.els.comboBar.style.transform = 'scaleX(1)';
-    if (TV) ui.startComboDecay(Math.min(0.85, 0.18 + mult * 0.07), COMBO_WINDOW * 1000);
+    ui.startComboDecay(Math.min(0.85, 0.18 + mult * 0.07), COMBO_WINDOW * 1000);
     // WAAPI 缩放替代 remove/offsetWidth/add：吃球高频，避免强制同步布局
     ui.els.comboBox.animate(
       [{ transform: 'scale(1.55)' }, { transform: 'scale(1)' }],

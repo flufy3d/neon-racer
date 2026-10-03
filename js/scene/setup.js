@@ -94,7 +94,7 @@ export function initScene() {
   initObstaclePool(view.scene);
   initStreakInstancedMesh(view.scene);
   initPillarInstancedMesh(view.scene);
-  if (TV) warmupScene();
+  warmupScene();
 }
 
 function onResize() {

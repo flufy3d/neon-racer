@@ -1,7 +1,6 @@
 import { getAudioBeat, playSound, updateAudioState } from '../../audio.js';
-import { COMBO_WINDOW, MILESTONE_ZONES } from '../../core/constants.js';
+import { MILESTONE_ZONES } from '../../core/constants.js';
 import { $ } from '../../core/dom.js';
-import { TV } from '../../core/quality.js';
 import { lists, run, view } from '../../core/state.js';
 import { updateBurstParticles, updateShipTrail, updateShockwaves, updateShards, updateOrbShards, updateShipWreckage } from '../../entities/particles.js';
 import { archNeonMat, gateCoreMat, gateEdgeMat, lowCoreMat, lowEdgeMat, towerCapMat, towerSpireMat, wallCoreMat, wallEdgeMat } from '../../scene/materials.js';
@@ -10,11 +9,9 @@ import * as ui from '../../ui.js';
 import { showPaused } from '../session.js';
 
 let _lastVigColor = '';
-let _lastVigOpacity = -1;
 
 export function resetFeedbackCache() {
   _lastVigColor = '';
-  _lastVigOpacity = -1;
 }
 
 export function updateRunFeedbackAndCamera(dt, t, move) {
@@ -29,22 +26,12 @@ if (run.speed - run.lastSpeedMark >= 10) {
   playSound('speed');
 }
 
+// 暗角透明度由合成器动画衰减（ui.startComboDecay），这里只管颜色
 if (run.combo > 0) {
   const vCol = ui.comboColor(ui.multOf(run.combo));
   if (vCol !== _lastVigColor) {
     _lastVigColor = vCol;
     ui.els.vig.style.setProperty('--vc', vCol);
-  }
-  // 电视档位的暗角透明度由合成器动画衰减（ui.startComboDecay），这里只管颜色
-  if (!TV) {
-    const op = Math.min(0.85, 0.18 + ui.multOf(run.combo) * 0.07) * Math.max(0, run.comboTimer / COMBO_WINDOW);
-    ui.els.vig.style.opacity = op;
-    _lastVigOpacity = op;
-  }
-} else {
-  if (_lastVigOpacity !== 0) {
-    _lastVigOpacity = 0;
-    ui.els.vig.style.opacity = 0;
   }
 }
 
@@ -108,7 +95,7 @@ currentLowCoreCol.lerp(targetLowCoreCol, dt * 2.0);
 
 export function updateTransientFx(dt, t) {
 const pdt = dt * run.timeScale;
-if (TV) ui.setComboDecayRate(run.state === 'playing' && !run.paused ? run.timeScale : 0);
+ui.setComboDecayRate(run.state === 'playing' && !run.paused ? run.timeScale : 0);
 const move = (run.state === 'playing' && !run.paused) ? (run.speed * pdt) : 0;
 updateBurstParticles(pdt, move);
 updateShockwaves(pdt, move);

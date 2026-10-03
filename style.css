@@ -98,11 +98,13 @@ button:hover { background: rgba(0,255,255,.13); box-shadow: 0 0 30px #0ff, inset
   border: 1px solid rgba(74, 230, 255, .42); border-radius: 3px;
   box-shadow: 0 0 0 1px rgba(255, 43, 145, .08), 0 0 52px rgba(0, 229, 255, .15), inset 0 0 54px rgba(0, 229, 255, .04);
   clip-path: polygon(0 13px, 13px 0, calc(100% - 78px) 0, calc(100% - 66px) 10px, 100% 10px, 100% calc(100% - 13px), calc(100% - 13px) 100%, 78px 100%, 66px calc(100% - 10px), 0 calc(100% - 10px));
-  animation: startPanelIn .55s cubic-bezier(.2,.8,.2,1) both; }
+  animation: startPanelIn .55s cubic-bezier(.2,.8,.2,1) backwards; }
+/* 入场动画一律"基础样式即终态 + backwards 填充"：效果与 forwards 相同，但播完后不再常驻合成层
+   （否则这些层套在带 clip-path 的面板里，合成器每帧都要为它们做离屏渲染） */
 .startPanel::before, .startPanel::after { content: ''; position: absolute; z-index: 4; height: 2px; width: 45%;
   background: linear-gradient(90deg, transparent, #00f2ff, #fff, #ff2b91, transparent); box-shadow: 0 0 12px #00e5ff; }
-.startPanel::before { top: 0; animation: bootSweep 1.2s .08s ease-out both; }
-.startPanel::after { right: -45%; bottom: 9px; animation: bootSweepBack 1.05s .16s ease-out both; }
+.startPanel::before { top: 0; left: 100%; animation: bootSweep 1.2s .08s ease-out backwards; }
+.startPanel::after { right: 100%; bottom: 9px; animation: bootSweepBack 1.05s .16s ease-out backwards; }
 @keyframes startPanelIn { from { opacity: 0; transform: translateY(12px) scale(.985); filter: brightness(1.7); } }
 @keyframes bootSweep { from { left: -45%; } to { left: 100%; } }
 @keyframes bootSweepBack { from { right: -45%; } to { right: 100%; } }
@@ -113,7 +115,7 @@ button:hover { background: rgba(0,255,255,.13); box-shadow: 0 0 30px #0ff, inset
   background: #61ffb1; box-shadow: 0 0 10px #24ffc5; animation: onlineBlink 1s steps(1) infinite; }
 @keyframes onlineBlink { 50% { opacity: .38; } }
 .startHero { display: grid; grid-template-columns: 72px 1fr 94px; align-items: center; min-height: 126px;
-  opacity: 0; animation: startReveal .44s .12s ease-out forwards; }
+  animation: startReveal .44s .12s ease-out backwards; }
 @keyframes startReveal { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 .startCode { align-self: stretch; display: grid; place-items: center; border-right: 1px solid rgba(0, 229, 255, .17);
   color: rgba(81, 225, 255, .46); font: 700 10px/1 Consolas, monospace; letter-spacing: 2px;
@@ -140,7 +142,7 @@ button:hover { background: rgba(0,255,255,.13); box-shadow: 0 0 30px #0ff, inset
 .missionStrip { display: grid; grid-template-columns: 42px 1fr auto; align-items: center; min-height: 52px; padding: 8px 12px;
   border: 1px solid rgba(0,229,255,.2); border-left: 3px solid #00eaff;
   background: linear-gradient(90deg, rgba(0,229,255,.09), rgba(255,43,145,.035), transparent);
-  opacity: 0; animation: startReveal .4s .2s ease-out forwards; }
+  animation: startReveal .4s .2s ease-out backwards; }
 .orbMark { position: relative; width: 25px; height: 25px; border: 1px solid #00efff; border-radius: 50%; box-shadow: 0 0 12px rgba(0,238,255,.55); }
 .orbMark::before { content: ''; position: absolute; inset: 5px; border: 1px dashed #00efff; border-radius: 50%; animation: reactorSpin 2s linear infinite; }
 .orbMark i { position: absolute; inset: 9px; border-radius: 50%; background: #caffff; box-shadow: 0 0 11px #00efff; }
@@ -148,8 +150,8 @@ button:hover { background: rgba(0,255,255,.13); box-shadow: 0 0 30px #0ff, inset
 .missionStrip small { display: block; margin-bottom: 4px; color: #5d8d99; font: 700 7px/1 Consolas, monospace; letter-spacing: 3px; }
 .missionStrip b { color: #d8faff; font-size: 12px; letter-spacing: 2px; font-weight: 650; }
 .missionTag { color: #59ffb4; font: 700 8px/1 Consolas, monospace; letter-spacing: 2px; white-space: nowrap; }
-.controlGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 9px; opacity: 0;
-  animation: startReveal .4s .28s ease-out forwards; }
+.controlGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 9px;
+  animation: startReveal .4s .28s ease-out backwards; }
 .controlCard { min-width: 0; padding: 11px 12px 10px; background: rgba(7,14,31,.82); border: 1px solid rgba(0,229,255,.2); }
 .touchCard { border-color: rgba(255,59,163,.24); background: linear-gradient(145deg, rgba(255,43,145,.065), rgba(7,14,31,.82)); }
 .controlHead { display: flex; align-items: center; gap: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(105,188,205,.13); }
@@ -171,7 +173,7 @@ kbd.wideKey { min-width: 44px; font-size: 7px; }
   border: 1px solid rgba(255,55,156,.3); background: rgba(255,43,145,.055); }
 .touchRows b { display: block; color: #c3eaf0; font-size: 9px; line-height: 1.35; font-weight: 600; text-align: center; }
 .startTip { display: flex; align-items: center; justify-content: center; min-height: 31px; margin-top: 7px; color: #597e88;
-  font: 600 9px/1.3 'Microsoft YaHei', sans-serif; letter-spacing: 1px; opacity: 0; animation: startReveal .4s .38s ease-out forwards; }
+  font: 600 9px/1.3 'Microsoft YaHei', sans-serif; letter-spacing: 1px; animation: startReveal .4s .38s ease-out backwards; }
 .startTip span { display: inline-grid; place-items: center; width: 16px; height: 16px; margin-right: 7px; color: #ffdd54;
   border: 1px solid rgba(255,221,84,.4); font: 800 9px/1 Consolas, monospace; }
 #startBtn { position: relative; display: flex; width: min(290px, 82%); height: 58px; margin: 10px auto 0; padding: 7px 46px;
@@ -179,7 +181,7 @@ kbd.wideKey { min-width: 44px; font-size: 7px; }
   background: linear-gradient(90deg, rgba(0,229,255,.13), rgba(255,43,145,.07)); border: 1px solid #00eaff; border-radius: 2px;
   box-shadow: 0 0 22px rgba(0,229,255,.23), inset 0 0 20px rgba(0,229,255,.07);
   clip-path: polygon(11px 0, 100% 0, 100% calc(100% - 11px), calc(100% - 11px) 100%, 0 100%, 0 11px);
-  opacity: 0; animation: startReveal .45s .48s ease-out forwards; }
+  animation: startReveal .45s .48s ease-out backwards; }
 #startBtn::before { content: ''; position: absolute; top: -50%; left: -42%; width: 32%; height: 200%; transform: skewX(-20deg);
   background: linear-gradient(90deg, transparent, rgba(255,255,255,.22), transparent); animation: startBtnSweep 2.6s 1.2s ease-in-out infinite; }
 #startBtn::after { content: ''; position: absolute; inset: 5px; border: 1px solid rgba(0,229,255,.12); pointer-events: none; }
@@ -215,8 +217,8 @@ kbd.wideKey { min-width: 44px; font-size: 7px; }
   box-shadow: 0 0 12px #00e5ff; }
 .resultPanel::before { left: -30%; top: 0; width: 45%; }
 .resultPanel::after { right: -35%; bottom: 9px; width: 54%; }
-.resultsActive .resultPanel::before { animation: resultSweep 1.1s .08s ease-out both; }
-.resultsActive .resultPanel::after { animation: resultSweepBack 1s .15s ease-out both; }
+.resultsActive .resultPanel::before { left: 100%; animation: resultSweep 1.1s .08s ease-out backwards; }
+.resultsActive .resultPanel::after { right: 100%; animation: resultSweepBack 1s .15s ease-out backwards; }
 @keyframes resultSweep { from { left: -45%; } to { left: 100%; } }
 @keyframes resultSweepBack { from { right: -54%; } to { right: 100%; } }
 .resultTopline { display: flex; justify-content: space-between; align-items: center; padding-bottom: 9px;
@@ -234,7 +236,7 @@ kbd.wideKey { min-width: 44px; font-size: 7px; }
 #overScreen h2 { position: relative; display: inline-block; margin: 0; color: #f8fbff;
   font: 900 clamp(34px, 6vw, 54px)/.92 'Segoe UI', 'Microsoft YaHei', sans-serif; letter-spacing: 14px;
   text-shadow: -3px 0 0 rgba(0, 238, 255, .68), 3px 0 0 rgba(255, 31, 126, .72), 0 0 20px rgba(255, 255, 255, .28); }
-#overScreen.resultsActive h2 { animation: crashGlitch .6s .08s steps(2, end) both; }
+#overScreen.resultsActive h2 { animation: crashGlitch .6s .08s steps(2, end) backwards; }
 @keyframes crashGlitch {
   0% { opacity: 0; transform: translateX(-18px) skewX(-9deg); clip-path: inset(0 0 72%); }
   35% { opacity: 1; transform: translateX(7px) skewX(5deg); clip-path: inset(33% 0 28%); }
@@ -276,12 +278,12 @@ kbd.wideKey { min-width: 44px; font-size: 7px; }
 .resultStat:nth-child(2) { --stat-color: #b2ff3c; }
 .resultStat:nth-child(3) { --stat-color: #ffdf32; }
 .resultStat:nth-child(4) { --stat-color: #ff4fa0; }
-.resultsActive .resultStat { animation: statReveal .34s cubic-bezier(.2,.9,.2,1) both; }
+.resultsActive .resultStat { opacity: 1; transform: none; animation: statReveal .34s cubic-bezier(.2,.9,.2,1) backwards; }
 .resultsActive .resultStat:nth-child(1) { animation-delay: .32s; }
 .resultsActive .resultStat:nth-child(2) { animation-delay: .43s; }
 .resultsActive .resultStat:nth-child(3) { animation-delay: .54s; }
 .resultsActive .resultStat:nth-child(4) { animation-delay: .65s; }
-@keyframes statReveal { to { opacity: 1; transform: none; } }
+@keyframes statReveal { from { opacity: 0; transform: translateY(14px); } }
 .statIndex { color: var(--stat-color); color: color-mix(in srgb, var(--stat-color) 56%, transparent); font: 700 9px/1 Consolas, monospace; }
 .resultStat > div { min-width: 0; }
 .statLabel { display: block; margin-bottom: 6px; color: #7fa7b1; font-size: 10px; letter-spacing: 2px; white-space: nowrap; }
@@ -291,7 +293,7 @@ kbd.wideKey { min-width: 44px; font-size: 7px; }
 .statPrefix { margin-right: 1px; color: var(--stat-color); font-size: .62em; }
 .resultMeta { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 37px; padding: 9px 11px 0;
   color: #587c89; font: 600 9px/1 Consolas, monospace; letter-spacing: 1px; opacity: 0; }
-.resultsActive .resultMeta { animation: metaReveal .35s .78s ease-out both; }
+.resultsActive .resultMeta { opacity: 1; animation: metaReveal .35s .78s ease-out backwards; }
 @keyframes metaReveal { from { opacity: 0; } to { opacity: 1; } }
 .resultMeta b { margin-left: 6px; color: #c7f8ff; font-weight: 700; }
 #restartBtn { position: relative; display: flex; width: min(270px, 80%); height: 54px; margin: 16px auto 0; padding: 7px 45px;
@@ -300,8 +302,8 @@ kbd.wideKey { min-width: 44px; font-size: 7px; }
   border: 1px solid #00eaff; border-radius: 2px; box-shadow: 0 0 18px rgba(0, 229, 255, .18), inset 0 0 18px rgba(0, 229, 255, .05);
   clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
   opacity: 0; transform: translateY(10px); pointer-events: none; }
-.resultsActive #restartBtn { animation: rebootReveal .4s .92s ease-out both; }
-@keyframes rebootReveal { to { opacity: 1; transform: none; pointer-events: auto; } }
+.resultsActive #restartBtn { opacity: 1; transform: none; pointer-events: auto; animation: rebootReveal .4s .92s ease-out backwards; }
+@keyframes rebootReveal { from { opacity: 0; transform: translateY(10px); pointer-events: none; } }
 #restartBtn::before, #restartBtn::after { content: ''; position: absolute; top: 50%; width: 25px; height: 1px; background: #00eaff; }
 #restartBtn::before { left: 15px; } #restartBtn::after { right: 15px; }
 #restartBtn span { font: 800 16px/1.1 'Segoe UI', 'Microsoft YaHei', sans-serif; letter-spacing: 6px; }
@@ -463,7 +465,7 @@ kbd.wideKey { min-width: 44px; font-size: 7px; }
   overscroll-behavior: contain;
   touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
-  animation: startPanelIn .55s cubic-bezier(.2,.8,.2,1) both; }
+  animation: startPanelIn .55s cubic-bezier(.2,.8,.2,1) backwards; }
 .achievePanel::-webkit-scrollbar { width: 6px; }
 .achievePanel::-webkit-scrollbar-thumb { background: rgba(0, 229, 255, .25); border-radius: 3px; }
 .achievePanel::-webkit-scrollbar-track { background: transparent; }
@@ -476,9 +478,10 @@ kbd.wideKey { min-width: 44px; font-size: 7px; }
 .achCard { --ach-col: #00edff; position: relative; display: flex; gap: 9px; min-width: 0; min-height: 86px; padding: 10px 9px 9px;
   background: linear-gradient(145deg, color-mix(in srgb, var(--ach-col) 10%, transparent), rgba(7, 11, 28, .74));
   border: 1px solid color-mix(in srgb, var(--ach-col) 30%, transparent);
-  overflow: hidden; opacity: 0; transform: translateY(12px);
-  animation: statReveal .3s cubic-bezier(.2,.9,.2,1) both;
+  overflow: hidden;
+  animation: cardReveal .3s cubic-bezier(.2,.9,.2,1) backwards;
   animation-delay: calc(.06s + var(--i, 0) * .018s); }
+@keyframes cardReveal { from { opacity: 0; transform: translateY(12px); } }
 .achCard::after { content: ''; position: absolute; right: -14px; bottom: -22px; width: 46px; height: 46px;
   border: 1px solid color-mix(in srgb, var(--ach-col) 28%, transparent); transform: rotate(45deg); }
 .achCard.off { filter: grayscale(.8) brightness(.62); }
@@ -512,7 +515,7 @@ kbd.wideKey { min-width: 44px; font-size: 7px; }
 #achBtn:hover, #achClose:hover { color: #fff; background: rgba(0, 229, 255, .14); border-color: #7fe9ff;
   box-shadow: 0 0 22px rgba(0, 229, 255, .3), inset 0 0 16px rgba(0, 229, 255, .1); transform: scale(1.02); }
 #achBtn { width: min(290px, 82%); height: 44px; margin: 8px auto 0;
-  opacity: 0; animation: startReveal .45s .58s ease-out forwards; }
+  animation: startReveal .45s .58s ease-out backwards; }
 #achClose { width: min(240px, 70%); height: 42px; margin: 13px auto 0; }
 .achLink { display: flex; align-items: center; justify-content: center; gap: 7px; width: min(240px, 64%); height: 34px;
   margin: 9px auto 0; padding: 0 20px; color: #6fb9c9; background: transparent; box-shadow: none;
@@ -521,8 +524,8 @@ kbd.wideKey { min-width: 44px; font-size: 7px; }
   opacity: 0; pointer-events: none; }
 .achLink span { width: 14px; height: 1px; background: rgba(0, 229, 255, .5); }
 .achLink:hover { color: #fff; border-color: #7fe9ff; background: rgba(0, 229, 255, .12); box-shadow: 0 0 12px rgba(0, 229, 255, .3); transform: none; }
-.resultsActive .achLink { animation: achLinkIn .35s 1s ease-out both; }
-@keyframes achLinkIn { to { opacity: 1; pointer-events: auto; } }
+.resultsActive .achLink { opacity: 1; pointer-events: auto; animation: achLinkIn .35s 1s ease-out backwards; }
+@keyframes achLinkIn { from { opacity: 0; pointer-events: none; } }
 
 @media (max-width: 640px) {
   #topLeft { top: 10px; left: 12px; }
@@ -828,12 +831,19 @@ kbd.wideKey { min-width: 44px; font-size: 7px; }
 }
 
 
+/* ── HUD 合成图层（所有平台）──
+   只给会变化的容器分层：变化只重绘自身，不牵连整屏根图层（原先吃球时的缩放动画会临时创建 / 销毁
+   合成层，带动整屏根图层重新栅格化）。也不宜过碎：画布每帧都在变，每帧都有一次提交，
+   提交成本随图层数增长。连击 / 提示文字收窄到内容宽度，变化时不必重绘整屏宽的一条。 */
+#topLeft, #panel, #comboBox, #toast, #rushTag,
+.float-label, .evolution-banner, .milestone-banner, .achieve-banner { will-change: transform; }
+#comboBox, #toast { left: 0; right: 0; width: fit-content; margin-inline: auto; }
+
 /* ── 电视档位（html.tv，见 index.html 头部脚本）──
    电视盒子 GPU 弱且合成输出固定 1080p，DOM 的每次重新栅格化都和 WebGL 抢同一个 GPU 线程。
    1. 全屏 backdrop-filter 每帧都要重新模糊变化中的 WebGL 画面：去掉，改用更不透明的底色。
    2. 无限循环的装饰动画（闪烁 / 旋转 / 脉冲 / 扫光）停在静止帧。
-   3. HUD 中会变化的元素各自独立合成图层，变化只重绘自身；去掉模糊阴影，降低每次重绘的代价。
-      原先吃球时的缩放动画会临时创建 / 销毁合成图层，牵连整屏根图层重新栅格化。 */
+   3. HUD 去掉 / 收小模糊阴影，降低每次重绘的代价。 */
 html.tv .overlay { background: rgba(5, 5, 15, .88); backdrop-filter: none; -webkit-backdrop-filter: none; }
 html.tv #startScreen, html.tv #achieveScreen {
   background:
@@ -850,16 +860,11 @@ html.tv .orbMark::before, html.tv .crashGlyph::before, html.tv #newRecord span, 
 html.tv .update-text::before, html.tv #rushTag.on { animation: none; }
 html.tv #startBtn::before { display: none; }
 
-/* 只给容器分层：画布每帧都在变，每帧都有一次提交，提交成本随图层数增长，图层不宜过碎 */
-html.tv #topLeft, html.tv #panel, html.tv #comboBox, html.tv #toast, html.tv #rushTag,
-html.tv .float-label, html.tv .evolution-banner, html.tv .milestone-banner, html.tv .achieve-banner { will-change: transform; }
 html.tv #score { text-shadow: 0 0 2px #0ff; }
 html.tv .miniRow, html.tv #tierName, html.tv #tierBar, html.tv #comboBar, html.tv .ab i { text-shadow: none; box-shadow: none; }
 html.tv #panel { box-shadow: none; }
 /* 暗角：140px 模糊的内阴影换成径向渐变，连击变色时的整屏重绘便宜得多 */
 html.tv #vig { box-shadow: none; background: radial-gradient(ellipse at center, transparent 50%, var(--vc, #00ffff) 135%); }
-/* 连击 / 提示文字收窄到内容宽度（原来是整屏宽的图层，每次变化重绘 1920 宽） */
-html.tv #comboBox, html.tv #toast { left: 0; right: 0; width: fit-content; margin-inline: auto; }
 /* 一次性横幅的大半径模糊阴影单次栅格化可达 50ms：收小半径，保留霓虹描边感 */
 html.tv #rushTag { text-shadow: 0 0 8px #ff8822; }
 html.tv .evolution-title { text-shadow: 0 0 8px var(--tier-col, #00ffff); }
@@ -867,29 +872,6 @@ html.tv .achieve-title { text-shadow: 0 0 8px var(--ach-col, #ffd700); }
 html.tv .milestone-zone, html.tv .evolution-tag, html.tv .achieve-tag { text-shadow: 0 0 6px currentColor; }
 html.tv .float-label { text-shadow: 0 0 4px currentColor !important; }
 html.tv #toast { text-shadow: 0 0 8px currentColor !important; }
-/* 入场动画原本用 forwards 填充：播完后元素一直保持合成层，套在带 clip-path 的面板里，
-   合成器每帧都要为它们做 1080p 离屏渲染。电视档位改为"基础样式即终态 + backwards 填充"，
-   入场效果不变，播完即回到普通图层。 */
-html.tv .startPanel, html.tv .achievePanel, html.tv .startHero, html.tv .missionStrip, html.tv .controlGrid,
-html.tv .startTip, html.tv #startBtn, html.tv #achBtn, html.tv .achCard { opacity: 1; transform: none; animation-fill-mode: backwards; }
-html.tv .startPanel::before, html.tv .startPanel::after { animation-fill-mode: backwards; }
-html.tv .startPanel::before { left: 100%; }
-html.tv .startPanel::after { right: 100%; }
-html.tv .resultsActive .resultStat, html.tv .resultsActive .resultMeta { opacity: 1; transform: none; animation-fill-mode: backwards; }
-html.tv .resultsActive #restartBtn { opacity: 1; transform: none; pointer-events: auto; animation-fill-mode: backwards; }
-html.tv .resultsActive .achLink { opacity: 1; pointer-events: auto; animation-fill-mode: backwards; }
-html.tv #overScreen.resultsActive h2 { animation-fill-mode: backwards; }
-html.tv .resultsActive .resultPanel::before { left: 100%; animation-fill-mode: backwards; }
-html.tv .resultsActive .resultPanel::after { right: 100%; animation-fill-mode: backwards; }
-/* statReveal / rebootReveal / achLinkIn 只写了 to：基础样式改为终态后需要显式的起点 */
-@keyframes tvStatReveal { from { opacity: 0; transform: translateY(14px); } }
-@keyframes tvCardReveal { from { opacity: 0; transform: translateY(12px); } }
-@keyframes tvRebootReveal { from { opacity: 0; transform: translateY(10px); pointer-events: none; } }
-@keyframes tvFadeIn { from { opacity: 0; pointer-events: none; } }
-html.tv .resultsActive .resultStat { animation-name: tvStatReveal; }
-html.tv .achCard { animation-name: tvCardReveal; }
-html.tv .resultsActive #restartBtn { animation-name: tvRebootReveal; }
-html.tv .resultsActive .achLink { animation-name: tvFadeIn; }
 /* 开始页 / 结算页 / 成就页：CSS 透视网格（WebGL 场景里已有同样的地面网格）与扫描线各是一层全屏合成，
    电视档位去掉；配合背后场景跳过辉光，开始页从 45 提到 60fps */
 html.tv #startScreen::before, html.tv #overScreen::before, html.tv #achieveScreen::before,

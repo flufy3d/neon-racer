@@ -1,4 +1,4 @@
-// 电视档位开局前预热：消除游戏中途第一次出现某种物体时的着色器编译 / 缓冲上传卡顿。
+// 开局前预热：消除游戏中途第一次出现某种物体时的着色器编译 / 缓冲上传卡顿。
 //
 // 1. 提前创建所有懒加载的对象池（粒子、冲击波、破片、尾焰、残骸、护甲核心），
 //    原本它们在第一次爆发 / 撞击 / 坠毁时才创建，正好卡在游戏进行中。
@@ -57,7 +57,7 @@ export function warmupScene() {
   view.ship.visible = true;
   renderer.setRenderTarget(null);
   rt.dispose();
-  // 开始页跳过辉光：辉光管线自己的着色器也在这里编译，免得卡在开局第一帧
+  // 电视档位开始页跳过辉光：辉光管线自己的着色器也在这里编译，免得卡在开局第一帧
   if (view.composer.warm) view.composer.warm();
 
   for (const o of hidden) o.visible = false;
