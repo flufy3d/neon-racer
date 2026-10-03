@@ -1,4 +1,5 @@
-import { sampleQuality } from '../core/quality.js';
+import { BENCH, sampleQuality } from '../core/quality.js';
+import { benchTick } from '../debug/bench.js';
 import { run, view } from '../core/state.js';
 import { achTick } from './achievements.js';
 import { updateAmbient, updateMenu } from './phases/ambient.js';
@@ -69,6 +70,7 @@ export function animate() {
   requestAnimationFrame(animate);
   const raw = view.clock.getDelta();
   sampleQuality(raw);
+  if (BENCH) benchTick(Math.min(raw, 0.05));
   advanceFrame(Math.min(raw, 0.05), view.clock.elapsedTime);
 }
 

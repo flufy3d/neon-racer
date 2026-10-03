@@ -5,6 +5,7 @@
 // 解锁走 1.4s 间隔的播报队列（横幅 + 闪屏 + 专属音效），持久化在 localStorage。
 
 import { $ } from '../core/dom.js';
+import { BENCH } from '../core/quality.js';
 import { run } from '../core/state.js';
 import { playSound } from '../audio.js';
 import * as ui from '../ui.js';
@@ -58,6 +59,7 @@ try {
 } catch {}
 
 function save() {
+  if (BENCH) return;
   try { localStorage.setItem(STORE_KEY, JSON.stringify({ u: unlocked, s: totals })); } catch {}
 }
 

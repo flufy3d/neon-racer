@@ -5,6 +5,11 @@
 // EffectComposer 的离屏 RenderTarget（含 UnrealBloom 的整条 mip 链），因此它
 // 是移动端性价比最高的一根性能杠杆。
 
+const params = new URLSearchParams(typeof location !== 'undefined' ? location.search : '');
+
+// ?bench=1：测帧率用的自动驾驶模式（见 debug/bench.js）
+export const BENCH = params.get('bench') === '1';
+
 function detectMobile() {
   if (typeof navigator === 'undefined') return false;
   const uaData = navigator.userAgentData;

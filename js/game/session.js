@@ -1,6 +1,6 @@
 import { endAudioRun, playSound, startAudioRun } from '../audio.js';
 import { MILESTONE_ZONES, RUSH_FIRST_AT, TIER_COLORS } from '../core/constants.js';
-import { resetQualityAdaptive } from '../core/quality.js';
+import { BENCH, resetQualityAdaptive } from '../core/quality.js';
 import { $ } from '../core/dom.js';
 import { lists, run, view } from '../core/state.js';
 import { explode, resetParticlePools } from '../entities/particles.js';
@@ -122,7 +122,8 @@ export function gameOver() {
   ui.els.vig.style.opacity = 0;
   run.timeScale = 0.22;
   const sc = Math.floor(run.dist) + run.score;
-  const isRecord = sc > run.best;
+  // 测帧率模式是自动驾驶，不计入最高分和成就存档
+  const isRecord = !BENCH && sc > run.best;
   if (isRecord) {
     run.best = sc;
     localStorage.setItem('neonRacerBest', run.best);

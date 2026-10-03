@@ -10,6 +10,8 @@ import { addScore, bumpScore } from '../hud.js';
 import { achEvent } from '../achievements.js';
 import { triggerSlowMo } from '../loop.js';
 import { gameOver } from '../session.js';
+import { BENCH } from '../../core/quality.js';
+import { benchSaveCrash } from '../../debug/bench.js';
 import * as THREE from 'three';
 
 const STREAK_MAX = 40;
@@ -250,6 +252,11 @@ for (let i = lists.obstacles.length - 1; i >= 0; i--) {
       const hitTop = o.userData.type === 'wall' ? 3.2 : 0.76;
       const bottom = view.ship.position.y - 0.35;
       crashing = dx < 1.85 && bottom < hitTop;
+    }
+    if (crashing && BENCH) {
+      // 测帧率模式：自动驾驶漏判的碰撞直接忽略，保证每局跑满固定时长
+      crashing = false;
+      benchSaveCrash();
     }
     if (crashing) {
       if (run.invuln <= 0) {
