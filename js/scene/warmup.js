@@ -5,6 +5,7 @@
 // 2. 每种按需新建的场景物体（墙、低障、闸门、拱门、路边塔、中继站、信标）各临时放一个进场景，
 //    把场景里所有物体（含隐藏的机体形态部件、对象池）临时设为可见，往一个 1x1 离屏缓冲渲染一帧：
 //    这一帧会编译所有着色器程序并上传全部几何体与贴图。之后恢复可见性、移除临时物体。
+// 3. 再隐藏飞船渲染一次：编译"飞船补光不在场"的程序变体（坠毁后 / 无敌闪烁时用到）。
 // 离屏渲染不碰画布，开始页上看不到任何痕迹。
 import { lists, view } from '../core/state.js';
 import {
@@ -48,8 +49,16 @@ export function warmupScene() {
   renderer.compile(scene, camera);
   renderer.setRenderTarget(rt);
   renderer.render(scene, camera);
+  // 飞船上挂着两盏补光：飞船可见时场景有 3 盏方向光，坠毁隐藏 / 无敌闪烁时只剩 1 盏。
+  // three.js 的程序按光源数量区分（MeshBasicMaterial 也一样），不预热这一套，
+  // 坠毁那一帧画面上所有材质都要重新编译（实测约 100ms）。
+  view.ship.visible = false;
+  renderer.render(scene, camera);
+  view.ship.visible = true;
   renderer.setRenderTarget(null);
   rt.dispose();
+  // 开始页跳过辉光：辉光管线自己的着色器也在这里编译，免得卡在开局第一帧
+  if (view.composer.warm) view.composer.warm();
 
   for (const o of hidden) o.visible = false;
   for (const o of temp) scene.remove(o);

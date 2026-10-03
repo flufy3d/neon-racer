@@ -25,7 +25,10 @@ let cameraRef = null;
 export function initUI(camera) {
   cameraRef = camera;
   // 电视档位左右键是车道切换（见 input.js），开始页说明随之调整
-  if (document.documentElement.classList.contains('tv')) {
+  if (TV) {
+    // 结算页数字用 toLocaleString('zh-CN') 格式化，首次调用要初始化 ICU 区域数据（盒子上约 150ms），
+    // 提前在加载阶段调用一次，免得卡在坠毁后的结算动画第一帧
+    (0).toLocaleString('zh-CN');
     const hint = document.querySelector('.keyboardCard .controlRows small');
     if (hint) hint.textContent = '按一下换一条道 · 长按连续换道';
   }

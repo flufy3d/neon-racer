@@ -850,17 +850,14 @@ html.tv .orbMark::before, html.tv .crashGlyph::before, html.tv #newRecord span, 
 html.tv .update-text::before, html.tv #rushTag.on { animation: none; }
 html.tv #startBtn::before { display: none; }
 
-html.tv #topLeft, html.tv #score, html.tv .miniRow, html.tv #panel, html.tv #tierName, html.tv #tierBar,
-html.tv #speed, html.tv #maxCombo, html.tv #comboBox, html.tv #toast, html.tv #rushTag,
+/* 只给容器分层：画布每帧都在变，每帧都有一次提交，提交成本随图层数增长，图层不宜过碎 */
+html.tv #topLeft, html.tv #panel, html.tv #comboBox, html.tv #toast, html.tv #rushTag,
 html.tv .float-label, html.tv .evolution-banner, html.tv .milestone-banner, html.tv .achieve-banner { will-change: transform; }
-html.tv #speed { display: inline-block; }
 html.tv #score { text-shadow: 0 0 2px #0ff; }
 html.tv .miniRow, html.tv #tierName, html.tv #tierBar, html.tv #comboBar, html.tv .ab i { text-shadow: none; box-shadow: none; }
 html.tv #panel { box-shadow: none; }
 /* 暗角：140px 模糊的内阴影换成径向渐变，连击变色时的整屏重绘便宜得多 */
 html.tv #vig { box-shadow: none; background: radial-gradient(ellipse at center, transparent 50%, var(--vc, #00ffff) 135%); }
-/* 面板里随吃球变化的状态文字单独成层，不牵连整块面板重绘 */
-html.tv .ab b { will-change: transform; }
 /* 连击 / 提示文字收窄到内容宽度（原来是整屏宽的图层，每次变化重绘 1920 宽） */
 html.tv #comboBox, html.tv #toast { left: 0; right: 0; width: fit-content; margin-inline: auto; }
 /* 一次性横幅的大半径模糊阴影单次栅格化可达 50ms：收小半径，保留霓虹描边感 */
@@ -897,3 +894,7 @@ html.tv .resultsActive .achLink { animation-name: tvFadeIn; }
    电视档位去掉；配合背后场景跳过辉光，开始页从 45 提到 60fps */
 html.tv #startScreen::before, html.tv #overScreen::before, html.tv #achieveScreen::before,
 html.tv .startScanlines, html.tv .resultScanlines { display: none; }
+/* 结算页：滚动中的数字每帧重绘，模糊阴影收小半径；面板 50px 内阴影在出现瞬间栅格化代价大，去掉 */
+html.tv .resultPanel { box-shadow: 0 0 0 1px rgba(255, 43, 145, .1); }
+html.tv #finalScore { text-shadow: 0 0 6px rgba(0, 238, 255, .5); }
+html.tv .resultStat strong { text-shadow: 0 0 4px var(--stat-color); }

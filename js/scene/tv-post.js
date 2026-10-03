@@ -163,7 +163,16 @@ export class TvPipeline {
     this._pass(this.blurMat, src);
   }
 
-  render() {
+  // 预热：把辉光各 pass 跑一遍（合成结果写进离屏缓冲而不是画布），编译全部着色器
+  warm() {
+    if (this.mode === 'off') return;
+    const overlay = this.overlay;
+    this.overlay = false;
+    this.render(this.rtFar2);
+    this.overlay = overlay;
+  }
+
+  render(target = null) {
     const r = this.renderer;
     if (this.mode === 'off' || !this.enabled || this.overlay) {
       r.setRenderTarget(null);
@@ -188,6 +197,6 @@ export class TvPipeline {
     const c = this.compositeMat.uniforms;
     c.nearK.value = this.strength * NEAR_WEIGHT;
     c.farK.value = this.strength * FAR_WEIGHT;
-    this._pass(this.compositeMat, null);
+    this._pass(this.compositeMat, target);
   }
 }
