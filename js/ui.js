@@ -1,3 +1,4 @@
+import { TV } from './core/quality.js';
 import * as THREE from 'three';
 
 export const COMBO_COLORS = ['#00ffff', '#38ffff', '#70ffff', '#ffd700', '#ffea38', '#fff6aa'];
@@ -86,12 +87,54 @@ export function floatLabel(text, worldPos, color = '#00ffff', size = 20) {
   activeLabels.push(rec);
 }
 
+let flashAnim = null;
+let flashColor = '';
+
 export function flash(color, strength, ms = 350) {
   const f = els.flashEl;
+  if (TV) {
+    // 电视档位：同样的"保持 30ms 后 ease-out 淡出"交给合成器，不再两次写样式 + setTimeout
+    if (color !== flashColor) { flashColor = color; f.style.background = color; }
+    if (flashAnim) flashAnim.cancel();
+    const hold = 30 / (ms + 30);
+    flashAnim = f.animate([
+      { opacity: strength, offset: 0 }, { opacity: strength, offset: hold, easing: 'ease-out' }, { opacity: 0, offset: 1 }
+    ], { duration: ms + 30 });
+    return;
+  }
   f.style.background = color;
   f.style.transition = 'none';
   f.style.opacity = strength;
   setTimeout(() => { f.style.transition = `opacity ${ms}ms ease-out`; f.style.opacity = 0; }, 30);
+}
+
+// ── 电视档位：连击条与暗角的线性衰减交给合成器（WAAPI）──
+// 原实现每帧按 comboTimer 写 transform / opacity，于是几乎每帧都要跑一遍样式、分层、提交。
+// 吃球时启动一次线性动画，播放速率跟随子弹时间（暂停时为 0），每帧零 DOM 写入。
+let comboBarAnim = null;
+let vigAnim = null;
+let comboDecayRate = 1;
+
+export function startComboDecay(peakVig, durationMs) {
+  stopComboDecay();
+  const opts = { duration: durationMs, easing: 'linear', fill: 'forwards' };
+  comboBarAnim = els.comboBar.animate([{ transform: 'scaleX(1)' }, { transform: 'scaleX(0)' }], opts);
+  vigAnim = els.vig.animate([{ opacity: peakVig }, { opacity: 0 }], opts);
+  comboBarAnim.playbackRate = vigAnim.playbackRate = comboDecayRate;
+}
+
+export function stopComboDecay() {
+  if (comboBarAnim) comboBarAnim.cancel();
+  if (vigAnim) vigAnim.cancel();
+  comboBarAnim = vigAnim = null;
+}
+
+export function setComboDecayRate(rate) {
+  rate = Math.round(rate * 20) / 20;
+  if (rate === comboDecayRate) return;
+  comboDecayRate = rate;
+  if (comboBarAnim) comboBarAnim.playbackRate = rate;
+  if (vigAnim) vigAnim.playbackRate = rate;
 }
 
 let lastToastText = '';

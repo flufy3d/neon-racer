@@ -11,6 +11,17 @@ const params = new URLSearchParams(typeof location !== 'undefined' ? location.se
 export const BENCH = params.get('bench') === '1';
 // 每局时长（秒），默认 60；排查性能时可加长，如 ?bench=1&benchsec=600
 export const BENCH_RUN_SEC = +params.get('benchsec') || 60;
+if (BENCH) {
+  // 固定随机种子（?seed= 可换），让每次测量的障碍 / 能量球序列基本一致，前后对比不被随机负载淹没
+  let seed = (+params.get('seed') || 1) >>> 0;
+  Math.random = () => {
+    seed = (seed + 0x6D2B79F5) >>> 0;
+    let t = seed;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
 
 function detectMobile() {
   if (typeof navigator === 'undefined') return false;

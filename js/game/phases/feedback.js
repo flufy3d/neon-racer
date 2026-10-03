@@ -35,10 +35,9 @@ if (run.combo > 0) {
     _lastVigColor = vCol;
     ui.els.vig.style.setProperty('--vc', vCol);
   }
-  let op = Math.min(0.85, 0.18 + ui.multOf(run.combo) * 0.07) * Math.max(0, run.comboTimer / COMBO_WINDOW);
-  // 电视档位：透明度量化到 1/50，只在变化时写样式（原先每帧都触发样式重算）
-  if (TV) op = Math.round(op * 50) / 50;
-  if (!TV || op !== _lastVigOpacity) {
+  // 电视档位的暗角透明度由合成器动画衰减（ui.startComboDecay），这里只管颜色
+  if (!TV) {
+    const op = Math.min(0.85, 0.18 + ui.multOf(run.combo) * 0.07) * Math.max(0, run.comboTimer / COMBO_WINDOW);
     ui.els.vig.style.opacity = op;
     _lastVigOpacity = op;
   }
@@ -109,6 +108,7 @@ currentLowCoreCol.lerp(targetLowCoreCol, dt * 2.0);
 
 export function updateTransientFx(dt, t) {
 const pdt = dt * run.timeScale;
+if (TV) ui.setComboDecayRate(run.state === 'playing' && !run.paused ? run.timeScale : 0);
 const move = (run.state === 'playing' && !run.paused) ? (run.speed * pdt) : 0;
 updateBurstParticles(pdt, move);
 updateShockwaves(pdt, move);

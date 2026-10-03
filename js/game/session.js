@@ -69,6 +69,7 @@ function resetGame() {
   ui.els.vig.style.opacity = 0;
   ui.els.comboBox.style.opacity = 0;
   ui.els.comboBar.style.transform = 'scaleX(1)';
+  ui.stopComboDecay();
   run.tier = 0;
   run.airJumps = 0; run.lastJumpTime = 0; run.airFlip = 0; run.morphRoll = 0; run.shipBank = 0; run.shipMorph = 0;
   applyShipTier();
@@ -122,6 +123,7 @@ export function gameOver() {
   ui.flash('#ffffff', 0.6, 450);
   ui.els.comboBox.style.opacity = 0;
   ui.els.vig.style.opacity = 0;
+  ui.stopComboDecay();
   run.timeScale = 0.22;
   const sc = Math.floor(run.dist) + run.score;
   // 测帧率模式是自动驾驶，不计入最高分和成就存档
