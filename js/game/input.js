@@ -19,7 +19,7 @@ export const keys = { left: false, right: false };
 // 之后每到达一条车道中心就继续换下一条（见 control.js）。
 // 遥控器一次普通短按本身就可能持续 150~200ms，而高速时飞船 0.1s 就能滑到相邻车道，
 // 所以长按判定必须看按住时长，不能只看"已到达车道"。
-export const TV_HOLD_DELAY = 350;
+export const TV_HOLD_DELAY = 250;
 export const tvLane = { target: 1, hold: 0, holdSince: 0, lastStep: 0 };
 
 export function tvStepLane(dir) {

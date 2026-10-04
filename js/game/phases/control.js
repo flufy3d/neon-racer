@@ -11,6 +11,7 @@ import * as THREE from 'three';
 const landPos = new THREE.Vector3();
 const belly = new THREE.Vector3();
 const ONE = new THREE.Vector3(1, 1, 1);
+const LANE_EASE = 0.6;
 
 export function updateShipControl(dt, t, move) {
 let dir = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
@@ -57,7 +58,15 @@ if (laneSteer && tvLane.hold && nowMs - tvLane.holdSince > TV_HOLD_DELAY && nowM
 if (stabilizing || laneSteer) {
   const targetX = laneSteer ? LANES[tvLane.target] : CENTER_X;
   const error = targetX - view.ship.position.x;
-  const targetVel = Math.max(-maxV, Math.min(maxV, error * STABILIZER_GAIN));
+  let vCap = maxV;
+  // 长按判定期内（按住未满 TV_HOLD_DELAY）：最后 LANE_EASE 米匀速滑入，恰好在判定时刻到达车道中心。
+  // 确认长按时飞船带着速度直接滑向下一道，不会先停住再起步；短按松手后立即恢复全速补完。
+  // 只放慢最后 0.6m：离开原车道 1.9m 时已脱离障碍判定（横向 < 1.85m 才算撞），不影响躲避。
+  if (laneSteer && tvLane.hold && Math.abs(error) < LANE_EASE) {
+    const remain = (TV_HOLD_DELAY - (nowMs - tvLane.holdSince)) / 1000;
+    if (remain > 0) vCap = Math.min(maxV, Math.abs(error) / Math.max(remain, 0.03));
+  }
+  const targetVel = Math.max(-vCap, Math.min(vCap, error * STABILIZER_GAIN));
   const step = STABILIZER_ACCEL * dt;
   run.latVel += Math.max(-step, Math.min(step, targetVel - run.latVel));
   if (Math.abs(error) < 0.012 && Math.abs(run.latVel) < 0.45) {
