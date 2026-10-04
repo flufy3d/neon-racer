@@ -5,7 +5,7 @@ import { burst, spawnShockwave } from '../../entities/particles.js';
 import { updateGroundGlow } from '../../scene/ground.js';
 import * as ui from '../../ui.js';
 import { TV } from '../../core/quality.js';
-import { activePointers, keys, tvLane, tvStepLane } from '../input.js';
+import { TV_HOLD_DELAY, activePointers, keys, tvLane, tvStepLane } from '../input.js';
 import * as THREE from 'three';
 
 const landPos = new THREE.Vector3();
@@ -48,9 +48,10 @@ dir = Math.max(-1, Math.min(1, dir));
 const maxV = (5 + run.speed * 0.27) * (1 + run.tier * 0.08);
 // 电视档位（无触摸时）：追踪目标车道中心，与双指锁中线共用同一个控制器
 const laneSteer = TV && !activePointers.size;
-if (laneSteer && tvLane.hold && performance.now() - tvLane.lastStep > 150
+const nowMs = performance.now();
+if (laneSteer && tvLane.hold && nowMs - tvLane.holdSince > TV_HOLD_DELAY && nowMs - tvLane.lastStep > 150
   && Math.abs(LANES[tvLane.target] - view.ship.position.x) < 0.6) {
-  // 长按：接近当前目标车道中心时继续换下一条
+  // 长按：按住超过 TV_HOLD_DELAY 后，接近当前目标车道中心时继续换下一条
   tvStepLane(tvLane.hold);
 }
 if (stabilizing || laneSteer) {

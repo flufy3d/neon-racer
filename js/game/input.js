@@ -15,8 +15,12 @@ export const activePointers = new Map();
 export const keys = { left: false, right: false };
 
 // 电视档位：遥控器方向键不适合"按住滑动 / 双键锁中线"，改为左中右三条车道离散切换。
-// 按一下换一条道，飞船自动滑到车道中心；长按时每到达一条车道中心就继续换下一条（见 control.js）。
-export const tvLane = { target: 1, hold: 0, lastStep: 0 };
+// 按一下换一条道，飞船自动滑到车道中心；按住超过 TV_HOLD_DELAY 才算长按，
+// 之后每到达一条车道中心就继续换下一条（见 control.js）。
+// 遥控器一次普通短按本身就可能持续 150~200ms，而高速时飞船 0.1s 就能滑到相邻车道，
+// 所以长按判定必须看按住时长，不能只看"已到达车道"。
+export const TV_HOLD_DELAY = 350;
+export const tvLane = { target: 1, hold: 0, holdSince: 0, lastStep: 0 };
 
 export function tvStepLane(dir) {
   tvLane.target = Math.max(0, Math.min(2, tvLane.target + dir));
@@ -73,6 +77,7 @@ addEventListener('keydown', e => {
   if (e.repeat) return;
   if (TV && (e.code === 'ArrowLeft' || e.code === 'KeyA' || e.code === 'ArrowRight' || e.code === 'KeyD')) {
     tvLane.hold = (e.code === 'ArrowLeft' || e.code === 'KeyA') ? -1 : 1;
+    tvLane.holdSince = performance.now();
     if (run.state === 'playing' && !run.paused) tvStepLane(tvLane.hold);
     return;
   }
